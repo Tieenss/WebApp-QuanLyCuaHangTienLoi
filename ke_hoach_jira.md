@@ -3,7 +3,7 @@
 > **Project Key:** `ERP`  
 > **Tổng thời gian:** 3 Sprint × 7 ngày = 21 ngày (24/08 – 13/09/2026)  
 > **Team:** 1 BA · 1 Dev · 1 Tester  
-> **Nguồn chính thức:** [`database_schema.md`](file:///d:/Documents/ERPCuaHangTienLoi/database_schema.md) · [`role_workflows.md`](file:///d:/Documents/ERPCuaHangTienLoi/role_workflows.md) · [`functional_specification v1.0.md`](file:///d:/Documents/ERPCuaHangTienLoi/functional_specification%20v1.0.md)
+> **Nguồn chính thức:** [`co_so_du_lieu.md`](file:///d:/Documents/Nam4/WebApp-QuanLyCuaHangTienLoi/co_so_du_lieu.md) · [`luong_nghiep_vu.md`](file:///d:/Documents/Nam4/WebApp-QuanLyCuaHangTienLoi/luong_nghiep_vu.md) · [`dac_ta_chuc_nang_v1_0.md`](file:///d:/Documents/Nam4/WebApp-QuanLyCuaHangTienLoi/dac_ta_chuc_nang_v1_0.md)
 
 ---
 
@@ -35,9 +35,9 @@
 
 | # | Công việc | Kết quả bàn giao |
 |:--|:---|:---|
-| 1 | Rà soát danh sách 13 module MVP, chốt P0/P1 | Scope document không thay đổi sau 25/08 |
+| 1 | Rà soát danh sách 14 module MVP, chốt P0/P1 | Scope document không thay đổi sau 25/08 |
 | 2 | Xác nhận "Hủy hóa đơn = Không hỗ trợ trong MVP" | Ghi rõ trong BR-08 |
-| 3 | Chốt môi trường: Local dev (npm run dev + PostgreSQL) | Ghi rõ trong README |
+| 3 | Chốt môi trường: React Vite + Spring Boot + Neon PostgreSQL | Ghi rõ trong README |
 
 ---
 
@@ -47,10 +47,10 @@
 
 | # | Công việc | Kết quả bàn giao |
 |:--|:---|:---|
-| 1 | Init React/Vite + TypeScript + React Router + Zustand | FE chạy được `npm run dev` |
-| 2 | Init Node.js/Express + TypeScript + Prisma | BE chạy được `npm run dev` |
-| 3 | Tạo Prisma schema cho 18 bảng theo [`database_schema.md`](file:///d:/Documents/ERPCuaHangTienLoi/database_schema.md) | `npx prisma migrate dev` thành công |
-| 4 | Viết seed data: 1 Kho Tổng + 2 Chi nhánh bán lẻ + tài khoản 5 role + 3 danh mục + 10 sản phẩm + 2 NCC | `npx prisma db seed` chạy xong, có dữ liệu |
+| 1 | Init React/Vite + TypeScript + React Router + Redux Toolkit + Ant Design | FE chạy được `npm run dev` |
+| 2 | Init Spring Boot 3 + Java 21 + Spring Data JPA | BE chạy được ứng dụng Spring Boot |
+| 3 | Tạo JPA Entity cho 18 bảng theo [`co_so_du_lieu.md`](file:///d:/Documents/Nam4/WebApp-QuanLyCuaHangTienLoi/co_so_du_lieu.md) | Database tạo bảng thành công |
+| 4 | Viết DataSeeder (Spring): 1 Kho Tổng + 2 Chi nhánh bán lẻ + tài khoản 5 role + 3 danh mục + 10 sản phẩm + 2 NCC | Khởi chạy app có dữ liệu tự động |
 | 5 | Viết README hướng dẫn cài đặt & chạy | Thành viên mới clone về chạy được trong 5 phút |
 
 ---

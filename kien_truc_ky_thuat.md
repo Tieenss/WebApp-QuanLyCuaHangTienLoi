@@ -12,23 +12,25 @@
 *   **Frontend (Ứng dụng Web):**
     *   **Core:** React.js (khởi tạo qua Vite).
     *   **Ngôn ngữ:** TypeScript.
-    *   **Styling:** Vanilla CSS (Module/Variables) — không dùng TailwindCSS.
-    *   **State Management:** Zustand (Giỏ hàng POS, Phiên đăng nhập, Chi nhánh hiện tại).
+    *   **UI/Styling:** **Ant Design (antd)** kết hợp với CSS/SCSS.
+    *   **State Management:** Redux Toolkit (Chuẩn mực doanh nghiệp).
     *   **Routing:** React Router v6.
 *   **Backend (API Server):**
-    *   **Framework:** Node.js với Express.js.
-    *   **Ngôn ngữ:** TypeScript.
-    *   **ORM:** Prisma (Giao tiếp với Database, migration, seed data).
+    *   **Framework:** Spring Boot 3.3.1 (Java 21).
+    *   **ORM:** Spring Data JPA / Hibernate.
 *   **Database:**
-    *   **Cơ sở dữ liệu:** PostgreSQL — đảm bảo ACID cho giao dịch tài chính và kho hàng.
+    *   **Cơ sở dữ liệu:** Neon PostgreSQL (Serverless Postgres, khả năng tự động scale và quản lý kết nối hiệu quả, đảm bảo ACID).
+*   **IDE & Quản lý Mã Nguồn:**
+    *   **Môi trường (IDE):** IntelliJ IDEA (Backend), WebStorm hoặc VS Code (Frontend).
+    *   **Cấu trúc Repo:** Monorepo (1 thư mục gốc chung chứa 2 thư mục con `frontend` và `backend` để dễ quản lý và push code).
 *   **Authentication:**
-    *   JWT (Access Token + Refresh Token).
-    *   Mật khẩu hash bằng bcrypt.
+    *   Spring Security + JWT (Access Token + Refresh Token).
+    *   Mật khẩu hash bằng BCrypt (Spring Security).
     *   Middleware RBAC kiểm tra `vai_tro` trên mỗi request.
 *   **Deployment (Dự kiến):**
     *   Frontend: Vercel / Netlify.
-    *   Backend + Database: Render / Railway.
-    *   Môi trường phát triển: Local (`npm run dev` + PostgreSQL local).
+    *   Backend: Railway / Render (hỗ trợ Java Spring Boot).
+    *   Database: Neon (Cloud).
 
 ---
 
