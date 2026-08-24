@@ -42,7 +42,7 @@
 ---
 
 ### ERP-S1-02: Khởi tạo source code, database & dữ liệu mẫu
-**Type:** Task | **Assignee:** Dev | **Priority:** 🔴 Highest  
+**Type:** Task | **Assignee:** Trần Văn Tiến (Tech Lead) | **Priority:** 🔴 Highest  
 **Deadline:** 25/08 | **Status:** 📋
 
 | # | Công việc | Kết quả bàn giao |
@@ -69,7 +69,7 @@
 ---
 
 ### ERP-S1-04: Đăng nhập, phân quyền 5 role & giới hạn dữ liệu theo chi nhánh
-**Type:** Story | **Assignee:** Dev | **Priority:** 🔴 Highest  
+**Type:** Story | **Assignee:** Tô Minh Đức (BE), Lê Thu Trang (FE) | **Priority:** 🔴 Highest  
 **Deadline:** 27/08 | **Status:** 📋  
 **⚡ Phụ thuộc:** ERP-S1-02
 
@@ -90,7 +90,7 @@
 ---
 
 ### ERP-S1-05: CRUD chi nhánh, nhân viên, danh mục, sản phẩm, nhà cung cấp
-**Type:** Story | **Assignee:** Dev | **Priority:** High  
+**Type:** Story | **Assignee:** Quang Anh, Trường (BE) & Nội, Đại (FE) | **Priority:** High  
 **Deadline:** 29/08 | **Status:** 📋  
 **⚡ Phụ thuộc:** ERP-S1-04
 
@@ -110,7 +110,7 @@
 ---
 
 ### ERP-S1-06: Nhập kho từ NCC (Phiếu nhập → Tồn kho → Thẻ kho → Sổ quỹ)
-**Type:** Story | **Assignee:** Dev | **Priority:** 🔴 Critical Path  
+**Type:** Story | **Assignee:** Đặng Xuân Tuấn (BE), Trịnh Tuấn Đạt (FE) | **Priority:** 🔴 Critical Path  
 **Deadline:** 29/08 | **Status:** 📋  
 **⚡ Phụ thuộc:** ERP-S1-05 (cần có sản phẩm + NCC)
 
@@ -130,7 +130,7 @@
 ---
 
 ### ERP-S1-07: Xuất kho nội bộ (Kho Tổng → Chi nhánh)
-**Type:** Story | **Assignee:** Dev | **Priority:** 🔴 Critical Path  
+**Type:** Story | **Assignee:** Đặng Xuân Tuấn (BE), Trịnh Tuấn Đạt (FE) | **Priority:** 🔴 Critical Path  
 **Deadline:** 30/08 | **Status:** 📋  
 **⚡ Phụ thuộc:** ERP-S1-06 (cần có tồn kho tại Kho Tổng)
 
@@ -216,7 +216,7 @@
 ---
 
 ### ERP-S2-02: POS — Tìm/quét mã, giỏ hàng, thanh toán, in hóa đơn
-**Type:** Story | **Assignee:** Dev | **Priority:** 🔴 Critical Path  
+**Type:** Story | **Assignee:** Trang, Nội, Đại (FE) | **Priority:** 🔴 Critical Path  
 **Deadline:** 03/09 | **Status:** 📋  
 **⚡ Phụ thuộc:** ERP-S1-07 (cần có tồn kho tại chi nhánh)
 
@@ -231,7 +231,7 @@
 ---
 
 ### ERP-S2-03: Khi bán — Trừ tồn, ghi thẻ kho, tạo sổ quỹ (Transaction)
-**Type:** Story | **Assignee:** Dev | **Priority:** 🔴 Critical Path  
+**Type:** Story | **Assignee:** Đức, Quang Anh (BE), Tiến (Lead hỗ trợ) | **Priority:** 🔴 Critical Path  
 **Deadline:** 04/09 | **Status:** 📋  
 **⚡ Phụ thuộc:** ERP-S2-02
 
@@ -253,7 +253,7 @@
 ---
 
 ### ERP-S2-04: Kiểm kê và cân bằng kho
-**Type:** Story | **Assignee:** Dev | **Priority:** High  
+**Type:** Story | **Assignee:** Trường, Tuấn (BE) & Đạt (FE) | **Priority:** High  
 **Deadline:** 06/09 | **Status:** 📋  
 **⚡ Phụ thuộc:** ERP-S2-03
 
@@ -274,7 +274,7 @@
 ---
 
 ### ERP-S2-05: Ghi rõ "Hủy hóa đơn không hỗ trợ trong MVP"
-**Type:** Task | **Assignee:** Dev + BA | **Priority:** Medium  
+**Type:** Task | **Assignee:** Trường (BA), Đại (FE) | **Priority:** Medium  
 **Deadline:** 06/09 | **Status:** 📋
 
 | # | Công việc | Kết quả bàn giao |
@@ -349,7 +349,7 @@
 ---
 
 ### ERP-S3-02: Check-in/out, tổng hợp giờ, bảng lương, điều chỉnh
-**Type:** Story | **Assignee:** Dev | **Priority:** 🔴 Critical Path  
+**Type:** Story | **Assignee:** Tô Minh Đức (BE), Lê Thu Trang (FE) | **Priority:** 🔴 Critical Path  
 **Deadline:** 09/09 | **Status:** 📋
 
 | # | Công việc | Chi tiết |
@@ -369,7 +369,7 @@
 ---
 
 ### ERP-S3-03: Duyệt lương 2 tầng + Sổ quỹ chi lương
-**Type:** Story | **Assignee:** Dev | **Priority:** 🔴 Critical Path  
+**Type:** Story | **Assignee:** Nguyễn Hà Quang Anh (BE), La Xuân Nội (FE) | **Priority:** 🔴 Critical Path  
 **Deadline:** 10/09 | **Status:** 📋  
 **⚡ Phụ thuộc:** ERP-S3-02
 
@@ -391,7 +391,7 @@
 ---
 
 ### ERP-S3-04: Dashboard tối thiểu
-**Type:** Story | **Assignee:** Dev | **Priority:** High  
+**Type:** Story | **Assignee:** Trường, Tuấn (BE) & Đại, Đạt (FE) | **Priority:** High  
 **Deadline:** 10/09 | **Status:** 📋
 
 | # | Công việc | Chi tiết |
@@ -426,7 +426,7 @@
 ---
 
 ### ERP-S3-06: Sửa bug P0/P1, seed dữ liệu demo, đóng gói
-**Type:** Task | **Assignee:** Dev | **Priority:** 🔴 Highest  
+**Type:** Task | **Assignee:** Tiến (Lead) & Toàn bộ Dev | **Priority:** 🔴 Highest  
 **Deadline:** 12/09 | **Status:** 📋
 
 | # | Công việc | Kết quả bàn giao |
@@ -508,22 +508,23 @@
 | 3 | ERP-S3-09: Kịch bản demo + slide | 12/09 |
 | 3 | ERP-S3-10: Rehearsal (cả team) | 13/09 |
 
-### Dev (11 task)
+### Đội Dev (9 thành viên: 1 Lead, 4 BE, 4 FE)
 
-| Sprint | Task | Deadline |
-|:---:|:---|:---:|
-| 1 | ERP-S1-02: Init project + DB + seed | 25/08 |
-| 1 | ERP-S1-04: Auth + RBAC + chi nhánh | 27/08 |
-| 1 | ERP-S1-05: CRUD 5 entity master data | 29/08 |
-| 1 | ERP-S1-06: Nhập kho NCC (transaction) | 29/08 |
-| 1 | ERP-S1-07: Xuất kho nội bộ (transaction) | 30/08 |
-| 2 | ERP-S2-02: POS UI | 03/09 |
-| 2 | ERP-S2-03: POS transaction (bán → trừ tồn → sổ quỹ) | 04/09 |
-| 2 | ERP-S2-04: Kiểm kê + cân bằng kho | 06/09 |
-| 3 | ERP-S3-02: Chấm công + bảng lương | 09/09 |
-| 3 | ERP-S3-03: Duyệt lương 2 tầng | 10/09 |
-| 3 | ERP-S3-04: Dashboard | 10/09 |
-| 3 | ERP-S3-06: Fix bug + seed demo + đóng gói | 12/09 |
+| Sprint | Task | Assignee (BE / FE) | Deadline |
+|:---:|:---|:---|:---:|
+| 1 | ERP-S1-02: Init project + DB + seed | **Tiến** (Tech Lead) | 25/08 |
+| 1 | ERP-S1-04: Auth + RBAC + chi nhánh | **Đức** (BE) / **Trang** (FE) | 27/08 |
+| 1 | ERP-S1-05: CRUD 5 entity master data | **QA, Trường** (BE) / **Nội, Đại** (FE) | 29/08 |
+| 1 | ERP-S1-06: Nhập kho NCC (transaction) | **Tuấn** (BE) / **Đạt** (FE) | 29/08 |
+| 1 | ERP-S1-07: Xuất kho nội bộ (transaction) | **Tuấn** (BE) / **Đạt** (FE) | 30/08 |
+| 2 | ERP-S2-02: POS UI | **Trang, Nội, Đại** (FE) | 03/09 |
+| 2 | ERP-S2-03: POS transaction (trừ tồn, sổ quỹ) | **Đức, QA** (BE) & **Tiến** (Lead) | 04/09 |
+| 2 | ERP-S2-04: Kiểm kê + cân bằng kho | **Trường, Tuấn** (BE) / **Đạt** (FE) | 06/09 |
+| 2 | ERP-S2-05: Ẩn nút hủy hóa đơn | **Đại** (FE) / *Trường (BA)* | 06/09 |
+| 3 | ERP-S3-02: Chấm công + bảng lương | **Đức** (BE) / **Trang** (FE) | 09/09 |
+| 3 | ERP-S3-03: Duyệt lương 2 tầng | **QA** (BE) / **Nội** (FE) | 10/09 |
+| 3 | ERP-S3-04: Dashboard | **Trường, Tuấn** (BE) / **Đại, Đạt** (FE)| 10/09 |
+| 3 | ERP-S3-06: Fix bug + seed demo + đóng gói| **Tiến** (Lead) & Toàn bộ Dev | 12/09 |
 
 ### Tester (6 task)
 
