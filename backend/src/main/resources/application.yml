@@ -5,9 +5,7 @@ spring:
   application:
     name: cuahangtienloi
   security:
-    user:
-      name: admin
-      password: admin
+    # Disable default security user, custom UserDetailsService is registered
   config:
     import: optional:file:.env[.properties], optional:file:backend/.env[.properties]
   datasource:
@@ -23,6 +21,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+jwt:
+  secret: ${JWT_SECRET:dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLWp3dC10b2tlbi1nZW5lcmF0aW9uLXBsZWFzZS1jaGFuZ2UtaXQtaW4tcHJvZHVjdGlvbg==}
+  expiration: ${JWT_EXPIRATION:86400000} # 24h (milliseconds)
 
 logging:
   level:
