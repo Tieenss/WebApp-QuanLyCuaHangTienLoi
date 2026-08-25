@@ -1,0 +1,158 @@
+/* Circle K Dashboard Custom Styling */
+
+.brand-logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: #0B0C0E;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.brand-logo-badge {
+    background: #E31837;
+    color: #FFFFFF;
+    font-weight: 900;
+    font-size: 20px;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(227, 24, 55, 0.4);
+    letter-spacing: -1px;
+}
+
+.brand-title {
+    color: #FFFFFF;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.brand-subtitle {
+    color: #FFC72C;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Stat Cards */
+.stat-card {
+    transition: all 0.25s ease-in-out;
+    border: 1px solid #E5E7EB;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(227, 24, 55, 0.08);
+    border-color: rgba(227, 24, 55, 0.3);
+}
+
+.stat-card-accent-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #E31837 0%, #FFC72C 100%);
+}
+
+.stat-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+}
+
+.stat-icon-revenue {
+    background-color: #FFF0F2;
+    color: #E31837;
+}
+
+.stat-icon-orders {
+    background-color: #FEF3C7;
+    color: #D97706;
+}
+
+.stat-icon-avgOrder {
+    background-color: #ECFDF5;
+    color: #059669;
+}
+
+.stat-icon-lowStock {
+    background-color: #FEF2F2;
+    color: #DC2626;
+}
+
+/* Custom Table Row Highlight */
+.top-product-row {
+    cursor: pointer;
+}
+
+.top-product-row:hover {
+    background-color: #FFF0F2 !important;
+}
+
+/* Circle K Banner Card */
+.circlek-promo-card {
+    background: linear-gradient(135deg, #1A1D20 0%, #2A080C 50%, #E31837 100%);
+    color: #FFFFFF;
+    border-radius: 12px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(227, 24, 55, 0.25);
+}
+
+.circlek-promo-badge {
+    background: #FFC72C;
+    color: #111827;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    display: inline-block;
+    margin-bottom: 12px;
+}
+
+/* Category Progress Bars */
+.category-progress-item {
+    margin-bottom: 16px;
+}
+
+.category-progress-item:last-child {
+    margin-bottom: 0;
+}
+
+.category-label-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+/* Quick Action Buttons */
+.quick-action-btn {
+    height: 48px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+    transform: scale(1.02);
+}

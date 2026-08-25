@@ -1,0 +1,121 @@
+/* ============================================
+   AdminLayout Styles
+   ============================================ */
+
+.admin-layout {
+  min-height: 100vh;
+  width: 100vw;
+}
+
+/* ---------- Sidebar ---------- */
+.admin-sider {
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.sider-menu {
+  padding: 12px 0;
+  border-right: 0;
+}
+
+.menu-item-icon {
+  font-size: 18px;
+}
+
+/* ---------- Main area ---------- */
+.main-area {
+  background: #f5f7fa;
+}
+
+/* ---------- Header ---------- */
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.collapse-btn {
+  font-size: 18px;
+  width: 40px;
+  height: 40px;
+}
+
+.branch-select {
+  width: 280px;
+}
+
+.branch-icon {
+  color: #e31837;
+}
+
+.header-search {
+  width: 260px;
+  border-radius: 20px;
+}
+
+.search-icon {
+  color: #9ca3af;
+}
+
+.pos-btn {
+  background-color: #e31837;
+  border-color: #e31837;
+  font-weight: 600;
+}
+
+.bell-icon {
+  font-size: 20px;
+}
+
+/* ---------- User profile ---------- */
+.user-profile {
+  cursor: pointer;
+}
+
+.user-avatar {
+  background-color: #e31837;
+  vertical-align: middle;
+}
+
+.user-info {
+  line-height: 1.2;
+  text-align: left;
+}
+
+.user-name {
+  font-weight: 600;
+  display: block;
+  font-size: 13px;
+}
+
+.user-role {
+  font-size: 11px;
+}
+
+/* ---------- Content & Footer ---------- */
+.admin-content {
+  padding: 24px;
+  min-height: calc(100vh - 120px);
+}
+
+.admin-footer {
+  text-align: center;
+  background: transparent;
+  padding: 16px 24px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+/* ---------- Logout menu ---------- */
+.logout-icon {
+  color: #e31837;
+}
+
+.logout-label {
+  color: #e31837;
+}
