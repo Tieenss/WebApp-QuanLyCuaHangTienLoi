@@ -22,6 +22,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { toggleSidebar, setSelectedBranch, clearNotifications } from '../store/slices/dashboardSlice';
 import './AdminLayout.css';
+import logo from '../assets/logo.png';
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Text } = Typography;
@@ -111,7 +112,7 @@ export const AdminLayout: React.FC = () => {
                 className="admin-sider"
             >
                 <div className="brand-logo-container">
-                    <div className="brand-logo-badge">K</div>
+                    <img src={logo} alt="Circle K" className="brand-logo-img" />
                     {!isSidebarCollapsed && (
                         <div>
                             <h1 className="brand-title">CIRCLE K</h1>

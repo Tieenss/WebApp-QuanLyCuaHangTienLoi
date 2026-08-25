@@ -22,12 +22,17 @@
   font-size: 18px;
 }
 
-/* ---------- Main area ---------- */
+.brand-logo-img {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
 .main-area {
   background: #f5f7fa;
 }
 
-/* ---------- Header ---------- */
 .admin-header {
   display: flex;
   align-items: center;
@@ -72,7 +77,6 @@
   font-size: 20px;
 }
 
-/* ---------- User profile ---------- */
 .user-profile {
   cursor: pointer;
 }
