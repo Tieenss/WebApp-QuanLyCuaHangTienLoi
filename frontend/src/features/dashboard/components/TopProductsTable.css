@@ -1,0 +1,47 @@
+/* TopProductsTable */
+
+.top-products-icon {
+  color: #ffc72c;
+  font-size: 20px;
+}
+
+.product-avatar {
+  border-radius: 6px;
+}
+
+.product-name {
+  font-weight: 600;
+  display: block;
+  color: #111827;
+}
+
+.product-sku {
+  font-size: 11px;
+}
+
+.product-price {
+  font-weight: 500;
+}
+
+.qty-tag {
+  font-weight: 700;
+  padding: 2px 10px;
+}
+
+.revenue-cell {
+  font-weight: 700;
+  color: #e31837;
+}
+
+.status-tag {
+  font-weight: 600;
+}
+
+/* Table Row Highlight */
+.top-product-row {
+  cursor: pointer;
+}
+
+.top-product-row:hover {
+  background-color: #fff0f2 !important;
+}

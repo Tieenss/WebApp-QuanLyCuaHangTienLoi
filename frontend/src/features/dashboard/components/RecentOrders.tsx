@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { RecentOrder } from '../../../types/dashboardTypes';
 import { mockRecentOrders } from '../mockData';
 import { formatVND } from '../../../utils/formatters';
+import './RecentOrders.css';
 
 const { Text } = Typography;
 
@@ -14,7 +15,7 @@ export const RecentOrders: React.FC = () => {
             title: 'Mã Đơn Hàng',
             dataIndex: 'orderId',
             key: 'orderId',
-            render: (id) => <Text style={{ fontWeight: 600, color: '#E31837' }}>{id}</Text>,
+            render: (id) => <Text className="order-id">{id}</Text>,
         },
         {
             title: 'Thời Gian',
@@ -26,7 +27,7 @@ export const RecentOrders: React.FC = () => {
             title: 'Thu Ngân',
             dataIndex: 'cashier',
             key: 'cashier',
-            render: (cashier) => <Text style={{ fontSize: 13 }}>{cashier}</Text>,
+            render: (cashier) => <Text className="cashier-name">{cashier}</Text>,
         },
         {
             title: 'Số Lượng',
@@ -46,7 +47,7 @@ export const RecentOrders: React.FC = () => {
                 if (method === 'ZaloPay') color = 'cyan';
                 if (method === 'Cash') color = 'green';
                 if (method === 'Card') color = 'purple';
-                return <Tag color={color} style={{ fontWeight: 600 }}>{method}</Tag>;
+                return <Tag color={color} className="payment-tag">{method}</Tag>;
             },
         },
         {
@@ -54,7 +55,7 @@ export const RecentOrders: React.FC = () => {
             dataIndex: 'totalAmount',
             key: 'totalAmount',
             align: 'right',
-            render: (amount) => <Text style={{ fontWeight: 700 }}>{formatVND(amount)}</Text>,
+            render: (amount) => <Text className="order-total">{formatVND(amount)}</Text>,
         },
         {
             title: 'Trạng Thái',
@@ -76,14 +77,14 @@ export const RecentOrders: React.FC = () => {
     return (
         <Card
             title={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <HistoryOutlined style={{ color: '#E31837', fontSize: 18 }} />
+                <div className="card-title-row">
+                    <HistoryOutlined className="recent-orders-icon" />
                     <span>Giao Dịch POS Gần Đây (Recent Transactions)</span>
                 </div>
             }
             extra={
-                <Button type="link" style={{ color: '#E31837', padding: 0 }}>
-                    Xem tất cả <RightOutlined style={{ fontSize: 11 }} />
+                <Button type="link" className="view-all-btn">
+                    Xem tất cả <RightOutlined className="view-all-arrow" />
                 </Button>
             }
             bodyStyle={{ padding: 0 }}

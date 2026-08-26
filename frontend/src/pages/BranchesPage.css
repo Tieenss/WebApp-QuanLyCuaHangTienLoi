@@ -1,0 +1,16 @@
+/* BranchesPage */
+
+.add-branch-btn {
+  background-color: #e31837;
+  border-color: #e31837;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.branches-search-row {
+  margin-bottom: 20px;
+}
+
+.branch-search-icon {
+  color: #9ca3af;
+}

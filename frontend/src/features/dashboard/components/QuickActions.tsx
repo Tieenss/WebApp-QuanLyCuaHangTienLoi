@@ -7,6 +7,7 @@ import {
     ExportOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import './QuickActions.css';
 
 export const QuickActions: React.FC = () => {
     const navigate = useNavigate();
@@ -19,16 +20,15 @@ export const QuickActions: React.FC = () => {
     };
 
     return (
-        <Card title="Thao Tác Nhanh Quản Trị" style={{ height: '100%' }}>
+        <Card title="Thao Tác Nhanh Quản Trị" className="full-height-card">
             <Row gutter={[12, 12]}>
                 <Col span={12}>
                     <Button
                         type="primary"
                         block
-                        className="quick-action-btn"
-                        icon={<ShoppingCartOutlined style={{ fontSize: 18 }} />}
+                        className="quick-action-btn qa-btn-primary"
+                        icon={<ShoppingCartOutlined className="qa-icon" />}
                         onClick={() => navigate('/pos')}
-                        style={{ backgroundColor: '#E31837', borderColor: '#E31837' }}
                     >
                         Mở Bán Hàng POS
                     </Button>
@@ -38,7 +38,7 @@ export const QuickActions: React.FC = () => {
                         type="default"
                         block
                         className="quick-action-btn"
-                        icon={<InboxOutlined style={{ fontSize: 18, color: '#111827' }} />}
+                        icon={<InboxOutlined className="qa-icon-dark" />}
                         onClick={() => navigate('/inventory')}
                     >
                         Nhập Kho Cấp Tốc
@@ -49,7 +49,7 @@ export const QuickActions: React.FC = () => {
                         type="default"
                         block
                         className="quick-action-btn"
-                        icon={<PlusOutlined style={{ fontSize: 18, color: '#111827' }} />}
+                        icon={<PlusOutlined className="qa-icon-dark" />}
                         onClick={() => navigate('/products')}
                     >
                         Thêm Sản Phẩm Mới
@@ -60,7 +60,7 @@ export const QuickActions: React.FC = () => {
                         type="dashed"
                         block
                         className="quick-action-btn"
-                        icon={<ExportOutlined style={{ fontSize: 18, color: '#E31837' }} />}
+                        icon={<ExportOutlined className="qa-icon-red" />}
                         onClick={handleExport}
                     >
                         Xuất Báo Cáo CSV

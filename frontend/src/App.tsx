@@ -4,7 +4,7 @@ import { store } from './store';
 import { circleKTheme } from './config/themeConfig';
 import { AppRouter } from './router';
 import './index.css';
-import './styles/dashboard.css';
+import './styles/shared.css';
 
 function App() {
   return (

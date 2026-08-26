@@ -2,6 +2,48 @@
    AdminLayout Styles
    ============================================ */
 
+/* ---------- Sidebar Brand Logo ---------- */
+.brand-logo-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #0b0c0e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.brand-logo-badge {
+  background: #e31837;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 20px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(227, 24, 55, 0.4);
+  letter-spacing: -1px;
+}
+
+.brand-title {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.brand-subtitle {
+  color: #ffc72c;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
 .admin-layout {
   min-height: 100vh;
   width: 100vw;
@@ -115,7 +157,7 @@
   font-size: 12px;
 }
 
-/* ---------- Logout menu ---------- */
+
 .logout-icon {
   color: #e31837;
 }

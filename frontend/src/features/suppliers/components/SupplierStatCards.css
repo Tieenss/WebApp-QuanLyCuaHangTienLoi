@@ -1,0 +1,32 @@
+/* SupplierStatCards */
+
+.supplier-stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.supplier-stat-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.supplier-stat-value {
+  margin: 6px 0 2px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.supplier-stat-subtitle {
+  font-size: 12px;
+}
+
+.supplier-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}

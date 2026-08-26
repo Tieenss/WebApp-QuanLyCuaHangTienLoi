@@ -16,11 +16,15 @@ import {
     ShopOutlined,
     SettingOutlined,
     UserOutlined,
+    ExportOutlined,
+    EnvironmentOutlined,
 } from '@ant-design/icons';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { toggleSidebar, setSelectedBranch, clearNotifications } from '../store/slices/dashboardSlice';
+import { toggleSidebar, setSelectedBranch as setSelectedBranchGlobal, clearNotifications } from '../store/slices/dashboardSlice';
+import { logout } from '../store/slices/authSlice';
+import { hasPermission, ROLE_LABEL, ROUTE_PERMISSIONS, PERMISSIONS } from '../config/rbacConfig';
 import './AdminLayout.css';
 import logo from '../assets/logo.png';
 
@@ -35,8 +39,10 @@ export const AdminLayout: React.FC = () => {
     const { isSidebarCollapsed, selectedBranchId, notificationCount } = useSelector(
         (state: RootState) => state.dashboard
     );
+    const user = useSelector((state: RootState) => state.auth.user);
+    const branches = useSelector((state: RootState) => state.branch.branches);
 
-    const menuItems = [
+    const allMenuItems = [
         {
             key: '/',
             icon: <DashboardOutlined className="menu-item-icon" />,
@@ -58,9 +64,19 @@ export const AdminLayout: React.FC = () => {
             label: 'Quản Lý Tồn Kho',
         },
         {
+            key: '/internal-export',
+            icon: <ExportOutlined className="menu-item-icon" />,
+            label: 'Xuất Kho Nội Bộ',
+        },
+        {
             key: '/suppliers',
             icon: <ShopOutlined className="menu-item-icon" />,
             label: 'Quản Lý Nhà Cung Cấp',
+        },
+        {
+            key: '/branches',
+            icon: <EnvironmentOutlined className="menu-item-icon" />,
+            label: 'Chi Nhánh',
         },
         {
             key: '/orders',
@@ -78,6 +94,20 @@ export const AdminLayout: React.FC = () => {
             label: 'Báo Cáo & Thống Kê',
         },
     ];
+
+    // RBAC: chỉ hiển thị menu item mà vai trò được phép truy cập
+    const menuItems = allMenuItems.filter(
+        (item) => hasPermission(user, ROUTE_PERMISSIONS[item.key])
+    );
+
+    const handleUserMenuClick = ({ key }: { key: string }) => {
+        if (key === 'logout') {
+            dispatch(logout());
+            navigate('/login');
+        }
+    };
+
+    const branchOptions = branches.map((b) => ({ value: b.id, label: b.name }));
 
     const userMenuItems = [
         {
@@ -144,18 +174,13 @@ export const AdminLayout: React.FC = () => {
                         />
 
                         <Select
-                            defaultValue={selectedBranchId}
+                            value={selectedBranchId}
                             className="branch-select"
                             prefix={<ShopOutlined className="branch-icon" />}
                             onChange={(value, option: any) =>
-                                dispatch(setSelectedBranch({ id: value, name: option.label }))
+                                dispatch(setSelectedBranchGlobal({ id: value, name: option.label }))
                             }
-                            options={[
-                                { value: 'CK-0101', label: 'Circle K - Quận 1 (Bùi Viện)' },
-                                { value: 'CK-0102', label: 'Circle K - Quận 3 (Trần Quốc Thảo)' },
-                                { value: 'CK-0103', label: 'Circle K - TP.Thủ Đức (Thảo Điền)' },
-                                { value: 'CK-0201', label: 'Circle K - Hà Nội (Hoàn Kiếm)' },
-                            ]}
+                            options={branchOptions}
                         />
                     </Space>
 
@@ -167,14 +192,16 @@ export const AdminLayout: React.FC = () => {
                             className="header-search"
                         />
 
-                        <Button
-                            type="primary"
-                            icon={<ShoppingCartOutlined />}
-                            onClick={() => navigate('/pos')}
-                            className="pos-btn"
-                        >
-                            Màn Hình POS
-                        </Button>
+                        {hasPermission(user, PERMISSIONS.POS_VIEW) && (
+                            <Button
+                                type="primary"
+                                icon={<ShoppingCartOutlined />}
+                                onClick={() => navigate('/pos')}
+                                className="pos-btn"
+                            >
+                                Màn Hình POS
+                            </Button>
+                        )}
 
                         <Badge count={notificationCount} overflowCount={99}>
                             <Button
@@ -185,20 +212,21 @@ export const AdminLayout: React.FC = () => {
                             />
                         </Badge>
 
-                        <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow>
+                        <Dropdown
+                            menu={{ items: userMenuItems, onClick: handleUserMenuClick }}
+                            placement="bottomRight"
+                            arrow
+                        >
                             <Space className="user-profile">
-                                <Avatar
-                                    className="user-avatar"
-                                    size="medium"
-                                >
-                                    AK
+                                <Avatar className="user-avatar" size="medium">
+                                    {user?.fullName?.charAt(0).toUpperCase() || 'U'}
                                 </Avatar>
                                 <div className="user-info">
                                     <Text className="user-name">
-                                        Trần Văn Anh
+                                        {user?.fullName || 'Khách'}
                                     </Text>
                                     <Text type="secondary" className="user-role">
-                                        Store Manager
+                                        {user ? ROLE_LABEL[user.role] : ''}
                                     </Text>
                                 </div>
                             </Space>

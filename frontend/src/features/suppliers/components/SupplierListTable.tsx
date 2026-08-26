@@ -11,6 +11,7 @@ import {
     deleteSupplier,
 } from '../../../store/slices/supplierSlice';
 import { formatVND } from '../../../utils/formatters';
+import './SupplierListTable.css';
 
 const { Text } = Typography;
 
@@ -47,7 +48,7 @@ export const SupplierListTable: React.FC = () => {
             dataIndex: 'code',
             key: 'code',
             width: 100,
-            render: (code) => <Text style={{ fontWeight: 700, color: '#E31837' }}>{code}</Text>,
+            render: (code) => <Text className="supplier-code">{code}</Text>,
         },
         {
             title: 'Tên Nhà Cung Cấp',
@@ -55,8 +56,8 @@ export const SupplierListTable: React.FC = () => {
             key: 'name',
             render: (name, record) => (
                 <div>
-                    <Text style={{ fontWeight: 600, color: '#111827', display: 'block' }}>{name}</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>MST: {record.taxCode}</Text>
+                    <Text className="supplier-name">{name}</Text>
+                    <Text type="secondary" className="supplier-taxcode">MST: {record.taxCode}</Text>
                 </div>
             ),
         },
@@ -67,7 +68,7 @@ export const SupplierListTable: React.FC = () => {
             render: (cats: string[]) => (
                 <Space size={[0, 4]} wrap>
                     {cats.map((c) => (
-                        <Tag key={c} color="volcano" style={{ fontSize: 11 }}>
+                        <Tag key={c} color="volcano" className="category-tag">
                             {c}
                         </Tag>
                     ))}
@@ -79,12 +80,12 @@ export const SupplierListTable: React.FC = () => {
             key: 'contact',
             render: (_, record) => (
                 <div>
-                    <div style={{ fontSize: 12 }}>
-                        <PhoneOutlined style={{ color: '#E31837', marginRight: 6 }} />
+                    <div className="contact-line">
+                        <PhoneOutlined className="contact-phone-icon" />
                         {record.phone}
                     </div>
-                    <div style={{ fontSize: 12, color: '#6B7280' }}>
-                        <MailOutlined style={{ marginRight: 6 }} />
+                    <div className="contact-email">
+                        <MailOutlined className="contact-mail-icon" />
                         {record.email}
                     </div>
                 </div>
@@ -102,7 +103,7 @@ export const SupplierListTable: React.FC = () => {
             key: 'totalDebt',
             align: 'right',
             render: (debt) => (
-                <Text style={{ fontWeight: 700, color: debt > 0 ? '#E31837' : '#10B981' }}>
+                <Text className={debt > 0 ? 'debt-positive' : 'debt-zero'}>
                     {formatVND(debt)}
                 </Text>
             ),
@@ -127,7 +128,7 @@ export const SupplierListTable: React.FC = () => {
                 <Space size={4}>
                     <Button
                         type="text"
-                        icon={<EditOutlined style={{ color: '#1890ff' }} />}
+                        icon={<EditOutlined className="edit-action-icon" />}
                         onClick={() => handleEdit(record)}
                     />
                     <Popconfirm
@@ -138,7 +139,7 @@ export const SupplierListTable: React.FC = () => {
                         cancelText="Hủy"
                         okButtonProps={{ danger: true }}
                     >
-                        <Button type="text" icon={<DeleteOutlined style={{ color: '#FF4D4F' }} />} />
+                        <Button type="text" icon={<DeleteOutlined className="delete-action-icon" />} />
                     </Popconfirm>
                 </Space>
             ),

@@ -5,13 +5,13 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { setTimeRange } from '../store/slices/dashboardSlice';
 import type { TimeRange } from '../types/dashboardTypes';
-import { mockStatCards } from '../features/dashboard/mockData';
-import { StatCard } from '../features/dashboard/companents/StatCard';
-import { RevenueOverview } from '../features/dashboard/companents/RevenueOverview';
-import { TopProductsTable } from '../features/dashboard/companents/TopProductsTable';
-import { RecentOrders } from '../features/dashboard/companents/RecentOrders';
-import { InventoryAlerts } from '../features/dashboard/companents/InventoryAlerts';
-import { QuickActions } from '../features/dashboard/companents/QuickActions';
+import { mockStatCards } from '../features/dashboard/mockData';import { StatCard } from '../features/dashboard/components/StatCard';
+import { RevenueOverview } from '../features/dashboard/components/RevenueOverview';
+import { TopProductsTable } from '../features/dashboard/components/TopProductsTable';
+import { RecentOrders } from '../features/dashboard/components/RecentOrders';
+import { InventoryAlerts } from '../features/dashboard/components/InventoryAlerts';
+import { QuickActions } from '../features/dashboard/components/QuickActions';
+import './DashboardPage.css';
 
 const { Title, Text } = Typography;
 
@@ -22,26 +22,26 @@ export const DashboardPage: React.FC = () => {
     );
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div className="page-stack">
             {/* Top Banner Header */}
-            <Card bodyStyle={{ padding: '20px 24px' }} style={{ borderLeft: '5px solid #E31837' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+            <Card bodyStyle={{ padding: '20px 24px' }} className="page-banner-card">
+                <div className="page-banner-inner">
                     <div>
                         <Space size={8}>
-                            <Tag color="error" style={{ fontWeight: 700, backgroundColor: '#E31837', color: '#FFF' }}>
+                            <Tag color="error" className="live-tag">
                                 LIVE ERP
                             </Tag>
-                            <Text type="secondary" style={{ fontSize: 13 }}>
+                            <Text type="secondary" className="branch-label">
                                 <ShopOutlined /> {selectedBranchName}
                             </Text>
                         </Space>
-                        <Title level={2} style={{ margin: '4px 0 0 0', fontWeight: 800, color: '#111827' }}>
+                        <Title level={2} className="page-title">
                             Bảng Quản Trị ERP Cửa Hàng Tiện Lợi
                         </Title>
                     </div>
 
                     <Space size={12}>
-                        <ClockCircleOutlined style={{ color: '#6B7280' }} />
+                        <ClockCircleOutlined className="clock-icon" />
                         <Segmented
                             options={[
                                 { label: 'Hôm Nay', value: 'today' },

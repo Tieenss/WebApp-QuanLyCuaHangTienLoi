@@ -6,24 +6,29 @@ import type { RootState } from '../store';
 import {
     setModalOpen,
     setSearchQuery,
-    setCategoryFilter,
-    setSelectedSupplier,
-} from '../store/slices/supplierSlice';
-import { SupplierStatCards } from '../features/suppliers/components/SupplierStatCards';
-import { SupplierListTable } from '../features/suppliers/components/SupplierListTable';
-import { SupplierFormModal } from '../features/suppliers/components/SupplierFormModal';
-import './SuppliersPage.css';
+    setStatusFilter,
+} from '../store/slices/internalExportSlice';
+import { InternalExportStatCards } from '../features/inventory/components/InternalExportStatCards';
+import { InternalExportListTable } from '../features/inventory/components/InternalExportListTable';
+import { InternalExportFormModal } from '../features/inventory/components/InternalExportFormModal';
+import './InternalExportPage.css';
 
 const { Title, Text } = Typography;
 
-export const SuppliersPage: React.FC = () => {
+const STATUS_FILTER_OPTIONS = [
+    { value: 'Nháp', label: 'Nháp' },
+    { value: 'Chờ duyệt', label: 'Chờ duyệt' },
+    { value: 'Đã duyệt', label: 'Đã duyệt' },
+    { value: 'Hoàn tất', label: 'Hoàn tất' },
+];
+
+export const InternalExportPage: React.FC = () => {
     const dispatch = useDispatch();
-    const { searchQuery, categoryFilter } = useSelector(
-        (state: RootState) => state.supplier
+    const { searchQuery, statusFilter } = useSelector(
+        (state: RootState) => state.internalExport
     );
 
-    const handleOpenAddModal = () => {
-        dispatch(setSelectedSupplier(null));
+    const handleOpenCreateModal = () => {
         dispatch(setModalOpen(true));
     };
 
@@ -34,10 +39,10 @@ export const SuppliersPage: React.FC = () => {
                 <div className="page-banner-inner">
                     <div>
                         <Text type="secondary" className="breadcrumb-label">
-                            ERP Cửa Hàng Tiện Lợi / Danh Mục Hệ Thống
+                            ERP Cửa Hàng Tiện Lợi / Kho Vận
                         </Text>
                         <Title level={2} className="page-title">
-                            Quản Lý Nhà Cung Cấp & Công Nợ
+                            Xuất Kho Nội Bộ
                         </Title>
                     </div>
 
@@ -45,16 +50,16 @@ export const SuppliersPage: React.FC = () => {
                         type="primary"
                         size="large"
                         icon={<PlusOutlined />}
-                        onClick={handleOpenAddModal}
-                        className="add-supplier-btn"
+                        onClick={handleOpenCreateModal}
+                        className="add-export-btn"
                     >
-                        Thêm Nhà Cung Cấp Mới
+                        Tạo Phiếu Xuất Mới
                     </Button>
                 </div>
             </Card>
 
             {/* KPI Overview Cards */}
-            <SupplierStatCards />
+            <InternalExportStatCards />
 
             {/* Table Container Card */}
             <Card bodyStyle={{ padding: 24 }}>
@@ -62,7 +67,7 @@ export const SuppliersPage: React.FC = () => {
                 <Row gutter={[16, 16]} className="filters-row">
                     <Col xs={24} sm={12} md={8}>
                         <Input
-                            placeholder="Tìm theo tên nhà cung cấp, mã NCC, MST..."
+                            placeholder="Tìm theo mã phiếu, nơi nhận, người tạo..."
                             prefix={<SearchOutlined className="search-prefix-icon" />}
                             value={searchQuery}
                             onChange={(e) => dispatch(setSearchQuery(e.target.value))}
@@ -71,31 +76,23 @@ export const SuppliersPage: React.FC = () => {
                     </Col>
                     <Col xs={24} sm={12} md={6}>
                         <Select
-                            placeholder="Lọc theo danh mục hàng"
+                            placeholder="Lọc theo trạng thái"
                             className="category-filter-select"
                             allowClear
-                            value={categoryFilter}
-                            onChange={(val) => dispatch(setCategoryFilter(val || null))}
+                            value={statusFilter}
+                            onChange={(val) => dispatch(setStatusFilter(val || null))}
                             prefix={<FilterOutlined className="filter-prefix-icon" />}
-                            options={[
-                                { value: 'Nước giải khát', label: 'Nước giải khát' },
-                                { value: 'Snack & Bánh kẹo', label: 'Snack & Bánh kẹo' },
-                                { value: 'Sữa & Chế phẩm', label: 'Sữa & Chế phẩm' },
-                                { value: 'Đồ ăn nhanh', label: 'Đồ ăn nhanh' },
-                                { value: 'Mì ăn liền', label: 'Mì ăn liền' },
-                                { value: 'Thực phẩm tươi sống', label: 'Thực phẩm tươi sống' },
-                                { value: 'Mỹ phẩm & Tiện ích', label: 'Mỹ phẩm & Tiện ích' },
-                            ]}
+                            options={STATUS_FILTER_OPTIONS}
                         />
                     </Col>
                 </Row>
 
-                {/* Supplier Table */}
-                <SupplierListTable />
+                {/* Export Table */}
+                <InternalExportListTable />
             </Card>
 
-            {/* Form Modal */}
-            <SupplierFormModal />
+            {/* Create / Edit Modal */}
+            <InternalExportFormModal />
         </div>
     );
 };

@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { TopProduct } from '../../../types/dashboardTypes';
 import { mockTopProducts } from '../mockData';
 import { formatVND } from '../../../utils/formatters';
+import './TopProductsTable.css';
 
 const { Text } = Typography;
 
@@ -16,10 +17,10 @@ export const TopProductsTable: React.FC = () => {
             key: 'name',
             render: (text, record) => (
                 <Space size={12}>
-                    <Avatar src={record.image} shape="square" size={40} style={{ borderRadius: 6 }} />
+                    <Avatar src={record.image} shape="square" size={40} className="product-avatar" />
                     <div>
-                        <Text style={{ fontWeight: 600, display: 'block', color: '#111827' }}>{text}</Text>
-                        <Text type="secondary" style={{ fontSize: 11 }}>SKU: {record.sku}</Text>
+                        <Text className="product-name">{text}</Text>
+                        <Text type="secondary" className="product-sku">SKU: {record.sku}</Text>
                     </div>
                 </Space>
             ),
@@ -35,7 +36,7 @@ export const TopProductsTable: React.FC = () => {
             dataIndex: 'price',
             key: 'price',
             align: 'right',
-            render: (price) => <Text style={{ fontWeight: 500 }}>{formatVND(price)}</Text>,
+            render: (price) => <Text className="product-price">{formatVND(price)}</Text>,
         },
         {
             title: 'Đã Bán',
@@ -43,7 +44,7 @@ export const TopProductsTable: React.FC = () => {
             key: 'quantitySold',
             align: 'center',
             render: (qty) => (
-                <Tag color="volcano" style={{ fontWeight: 700, padding: '2px 10px' }}>
+                <Tag color="volcano" className="qty-tag">
                     {qty} ly/món
                 </Tag>
             ),
@@ -53,7 +54,7 @@ export const TopProductsTable: React.FC = () => {
             dataIndex: 'totalRevenue',
             key: 'totalRevenue',
             align: 'right',
-            render: (rev) => <Text style={{ fontWeight: 700, color: '#E31837' }}>{formatVND(rev)}</Text>,
+            render: (rev) => <Text className="revenue-cell">{formatVND(rev)}</Text>,
         },
         {
             title: 'Trạng Thái',
@@ -62,12 +63,12 @@ export const TopProductsTable: React.FC = () => {
             align: 'center',
             render: (status) => {
                 if (status === 'Best Seller') {
-                    return <Tag color="gold" style={{ fontWeight: 600 }}>🔥 Best Seller</Tag>;
+                    return <Tag color="gold" className="status-tag">🔥 Best Seller</Tag>;
                 }
                 if (status === 'Low Stock') {
-                    return <Tag color="error" style={{ fontWeight: 600 }}>⚠️ Sắp hết</Tag>;
+                    return <Tag color="error" className="status-tag">⚠️ Sắp hết</Tag>;
                 }
-                return <Tag color="success" style={{ fontWeight: 600 }}>Sẵn hàng</Tag>;
+                return <Tag color="success" className="status-tag">Sẵn hàng</Tag>;
             },
         },
     ];
@@ -75,8 +76,8 @@ export const TopProductsTable: React.FC = () => {
     return (
         <Card
             title={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <CrownOutlined style={{ color: '#FFC72C', fontSize: 20 }} />
+                <div className="card-title-row">
+                    <CrownOutlined className="top-products-icon" />
                     <span>Sản Phẩm Bán Chạy Nhất (Top Products)</span>
                 </div>
             }

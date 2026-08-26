@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, List, Tag, Typography, Button, Space, Progress, message } from 'antd';
 import { WarningOutlined, PlusCircleOutlined } from '@ant-design/icons';
 import { mockInventoryAlerts } from '../mockData';
+import './InventoryAlerts.css';
 
 const { Text } = Typography;
 
@@ -13,13 +14,13 @@ export const InventoryAlerts: React.FC = () => {
     return (
         <Card
             title={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <WarningOutlined style={{ color: '#DC2626', fontSize: 18 }} />
+                <div className="card-title-row">
+                    <WarningOutlined className="inventory-alerts-icon" />
                     <span>Cảnh Báo Tồn Kho Thấp</span>
                 </div>
             }
-            extra={<Tag color="error" style={{ fontWeight: 700 }}>{mockInventoryAlerts.length} món cần nhập</Tag>}
-            style={{ height: '100%' }}
+            extra={<Tag color="error" className="alert-count-tag">{mockInventoryAlerts.length} món cần nhập</Tag>}
+            className="full-height-card"
         >
             <List
                 itemLayout="vertical"
@@ -29,30 +30,31 @@ export const InventoryAlerts: React.FC = () => {
                     return (
                         <List.Item
                             key={item.id}
-                            style={{ padding: '12px 0', borderBottom: '1px dashed #F3F4F6' }}
+                            className="alert-item"
                             actions={[
                                 <Button
+                                    key="reorder"
                                     type="primary"
                                     size="small"
                                     icon={<PlusCircleOutlined />}
                                     onClick={() => handleReorder(item.productName, item.suggestedReorder)}
-                                    style={{ fontSize: 12 }}
+                                    className="reorder-btn"
                                 >
                                     Nhập +{item.suggestedReorder}
                                 </Button>,
                             ]}
                         >
-                            <div style={{ marginBottom: 6 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                    <Text style={{ fontWeight: 600, color: '#111827' }}>{item.productName}</Text>
-                                    <Tag color={item.urgency === 'high' ? 'error' : 'warning'} style={{ margin: 0, fontSize: 11 }}>
+                            <div className="alert-content">
+                                <div className="alert-header">
+                                    <Text className="alert-product-name">{item.productName}</Text>
+                                    <Tag color={item.urgency === 'high' ? 'error' : 'warning'} className="alert-urgency-tag">
                                         {item.urgency === 'high' ? 'Gấp' : 'Chú ý'}
                                     </Tag>
                                 </div>
-                                <Space size={8} style={{ marginTop: 2 }}>
-                                    <Text type="secondary" style={{ fontSize: 12 }}>SKU: {item.sku}</Text>
-                                    <Text type="secondary" style={{ fontSize: 12 }}>|</Text>
-                                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: 600 }}>
+                                <Space size={8} className="alert-meta">
+                                    <Text type="secondary" className="alert-meta-text">SKU: {item.sku}</Text>
+                                    <Text type="secondary" className="alert-meta-text">|</Text>
+                                    <Text className="alert-stock">
                                         Còn: {item.currentStock} (Tối thiểu: {item.minStock})
                                     </Text>
                                 </Space>

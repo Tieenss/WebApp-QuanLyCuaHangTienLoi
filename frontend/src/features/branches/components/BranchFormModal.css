@@ -1,0 +1,41 @@
+/* BranchFormModal */
+
+.branch-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.branch-modal-hint {
+  display: block;
+  margin-top: -4px;
+}
+
+.branch-form {
+  margin-top: 16px;
+}
+
+.branch-form-bottom-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.branch-staff-item {
+  flex: 0 0 160px;
+  margin-bottom: 0;
+}
+
+.branch-status-item {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.branch-ok-btn {
+  background-color: #e31837;
+  border-color: #e31837;
+}
+
+.branch-number-input {
+  width: 100%;
+}

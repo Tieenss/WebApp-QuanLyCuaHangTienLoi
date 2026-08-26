@@ -8,6 +8,7 @@ import {
     updateSupplier,
     setModalOpen,
 } from '../../../store/slices/supplierSlice';
+import './SupplierFormModal.css';
 
 export const SupplierFormModal: React.FC = () => {
     const [form] = Form.useForm();
@@ -44,7 +45,7 @@ export const SupplierFormModal: React.FC = () => {
                 message.success('Thêm mới nhà cung cấp thành công!');
             }
             dispatch(setModalOpen(false));
-        } catch (err) {
+        } catch {
             // Validation error handled by Form
         }
     };
@@ -52,7 +53,7 @@ export const SupplierFormModal: React.FC = () => {
     return (
         <Modal
             title={
-                <span style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>
+                <span className="supplier-modal-title">
           {isEditing ? `Chỉnh Sửa Nhà Cung Cấp (${selectedSupplier?.code})` : 'Thêm Nhà Cung Cấp Mới'}
         </span>
             }
@@ -61,11 +62,11 @@ export const SupplierFormModal: React.FC = () => {
             onCancel={() => dispatch(setModalOpen(false))}
             okText={isEditing ? 'Lưu Thay Đổi' : 'Thêm Nhà Cung Cấp'}
             cancelText="Hủy Bỏ"
-            okButtonProps={{ style: { backgroundColor: '#E31837', borderColor: '#E31837' } }}
+            okButtonProps={{ className: 'supplier-modal-ok-btn' }}
             width={700}
             destroyOnClose
         >
-            <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+            <Form form={form} layout="vertical" className="supplier-form">
                 <Row gutter={16}>
                     <Col span={14}>
                         <Form.Item

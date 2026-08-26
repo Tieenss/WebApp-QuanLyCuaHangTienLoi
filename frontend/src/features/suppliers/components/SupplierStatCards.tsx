@@ -9,6 +9,7 @@ import {
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
 import { formatVND } from '../../../utils/formatters';
+import './SupplierStatCards.css';
 
 const { Text, Title } = Typography;
 
@@ -61,30 +62,21 @@ export const SupplierStatCards: React.FC = () => {
                 <Col xs={24} sm={12} xl={6} key={idx}>
                     <Card bodyStyle={{ padding: '18px 20px' }} className="stat-card">
                         <div className="stat-card-accent-line" />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div className="supplier-stat-header">
                             <div>
-                                <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>
+                                <Text type="secondary" className="supplier-stat-label">
                                     {stat.title}
                                 </Text>
-                                <Title level={4} style={{ margin: '6px 0 2px 0', fontWeight: 700, color: '#111827' }}>
+                                <Title level={4} className="supplier-stat-value">
                                     {stat.value}
                                 </Title>
-                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                <Text type="secondary" className="supplier-stat-subtitle">
                                     {stat.subtitle}
                                 </Text>
                             </div>
                             <div
-                                style={{
-                                    width: 44,
-                                    height: 44,
-                                    borderRadius: 10,
-                                    backgroundColor: stat.bgColor,
-                                    color: stat.iconColor,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: 20,
-                                }}
+                                className="supplier-stat-icon"
+                                style={{ backgroundColor: stat.bgColor, color: stat.iconColor }}
                             >
                                 {stat.icon}
                             </div>

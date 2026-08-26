@@ -9,6 +9,7 @@ import {
     FallOutlined,
 } from '@ant-design/icons';
 import type { StatCardData } from '../../../types/dashboardTypes';
+import './StatCard.css';
 
 const { Text, Title } = Typography;
 
@@ -35,12 +36,12 @@ export const StatCard: React.FC<StatCardProps> = ({ data }) => {
     return (
         <Card className="stat-card" bodyStyle={{ padding: '20px' }}>
             <div className="stat-card-accent-line" />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="stat-card-header">
                 <div>
-                    <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>
+                    <Text type="secondary" className="stat-card-label">
                         {data.title}
                     </Text>
-                    <Title level={3} style={{ margin: '8px 0 4px 0', fontWeight: 700, color: '#111827' }}>
+                    <Title level={3} className="stat-card-value">
                         {data.formattedValue}
                     </Title>
                 </div>
@@ -49,15 +50,15 @@ export const StatCard: React.FC<StatCardProps> = ({ data }) => {
                 </div>
             </div>
 
-            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="stat-card-footer">
                 <Space size={4}>
                     <Tag
                         color={data.isPositive ? 'success' : 'error'}
-                        style={{ fontWeight: 600, border: 'none', padding: '2px 8px' }}
+                        className="stat-change-tag"
                     >
                         {data.isPositive ? <RiseOutlined /> : <FallOutlined />} {Math.abs(data.change)}%
                     </Tag>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text type="secondary" className="stat-timeframe">
                         {data.timeframe}
                     </Text>
                 </Space>

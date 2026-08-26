@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, Result, Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import './PlaceholderPage.css';
 
 interface PlaceholderPageProps {
     title: string;
@@ -11,7 +12,7 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({ title, subTitl
     const navigate = useNavigate();
 
     return (
-        <Card style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Card className="placeholder-card">
             <Result
                 status="info"
                 title={title}
@@ -20,7 +21,7 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({ title, subTitl
                     <Button
                         type="primary"
                         onClick={() => navigate('/')}
-                        style={{ backgroundColor: '#E31837', borderColor: '#E31837' }}
+                        className="placeholder-back-btn"
                     >
                         Quay Về Trang Dashboard
                     </Button>

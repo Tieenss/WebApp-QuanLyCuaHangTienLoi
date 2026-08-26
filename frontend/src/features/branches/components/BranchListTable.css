@@ -1,0 +1,33 @@
+/* BranchListTable */
+
+.branch-code {
+  font-weight: 700;
+  color: #e31837;
+}
+
+.branch-name {
+  font-weight: 600;
+  color: #111827;
+  display: block;
+}
+
+.branch-address {
+  font-size: 12px;
+}
+
+.branch-phone {
+  font-size: 12px;
+}
+
+.branch-phone-icon {
+  color: #e31837;
+  margin-right: 6px;
+}
+
+.branch-edit-icon {
+  color: #1890ff;
+}
+
+.branch-delete-icon {
+  color: #ff4d4f;
+}
