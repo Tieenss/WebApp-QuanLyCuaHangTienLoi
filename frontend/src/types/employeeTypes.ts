@@ -1,5 +1,5 @@
 import type { ID, RecordStatus, VND } from './commonTypes';
-import type { UserRole } from './authTypes';
+import { USER_ROLE, type UserRole } from './authTypes';
 
 /**
  * Module 4 — Quản lý Nhân viên & Module 11 — Chấm công / Bảng lương.
@@ -117,19 +117,88 @@ export interface AttendanceRecord {
   note: string;
 }
 
+/**
+ * Trạng thái bảng lương (`bang_luong.trang_thai`) — luồng duyệt 2 tầng.
+ *
+ * CHO_XAC_NHAN → DA_XAC_NHAN → DA_THANH_TOAN
+ *
+ * Không có trạng thái từ chối/huỷ: quản lý sai giờ thì sửa `adjustedHours` kèm
+ * lý do rồi xác nhận, chứ không trả ngược bảng lương.
+ */
+export const PAYROLL_STATUS = {
+  PendingConfirm: 'CHO_XAC_NHAN',
+  Confirmed: 'DA_XAC_NHAN',
+  Paid: 'DA_THANH_TOAN',
+} as const;
+
+export type PayrollStatus = (typeof PAYROLL_STATUS)[keyof typeof PAYROLL_STATUS];
+
+export const PAYROLL_STATUS_LABEL: Record<PayrollStatus, string> = {
+  CHO_XAC_NHAN: 'Chờ xác nhận',
+  DA_XAC_NHAN: 'Đã xác nhận giờ',
+  DA_THANH_TOAN: 'Đã thanh toán',
+};
+
+export const PAYROLL_STATUS_COLOR: Record<PayrollStatus, string> = {
+  CHO_XAC_NHAN: 'gold',
+  DA_XAC_NHAN: 'blue',
+  DA_THANH_TOAN: 'green',
+};
+
+/**
+ * Quy tắc "ai duyệt cho ai" (`luong_nghiep_vu.md` mục 4.2).
+ *
+ * | Nhân viên | Tầng 1 (xác nhận giờ) | Tầng 2 (duyệt chi) |
+ * |-----------|----------------------|--------------------|
+ * | THU_NGAN  | QUAN_LY chi nhánh    | KE_TOAN            |
+ * | QUAN_LY   | (bỏ qua)             | KE_TOAN            |
+ * | THU_KHO   | (bỏ qua)             | KE_TOAN            |
+ * | KE_TOAN   | (bỏ qua)             | ADMIN              |
+ *
+ * Chỉ THU_NGAN đi qua tầng 1 — các vai trò còn lại tự quản giờ làm của mình
+ * nên bảng lương của họ vào thẳng trạng thái chờ duyệt chi.
+ */
+
+/** Vai trò phải qua bước xác nhận giờ của Quản lý chi nhánh. */
+export const requiresHourConfirmation = (role: UserRole): boolean =>
+  role === USER_ROLE.Cashier;
+
+/**
+ * Vai trò có quyền duyệt chi lương cho một nhân viên.
+ *
+ * Lương Kế toán do Admin duyệt — đây là ngoại lệ duy nhất được đặc tả, nhằm
+ * tránh việc Kế toán tự phê duyệt tiền của chính mình.
+ *
+ * Lương của ADMIN không được đặc tả nêu. Ở đây gán cho KE_TOAN để bảng lương
+ * không bị kẹt vĩnh viễn ở trạng thái chờ, đồng thời vẫn giữ nguyên tắc không
+ * ai tự duyệt cho mình.
+ */
+export const paymentApproverRole = (role: UserRole): UserRole =>
+  role === USER_ROLE.Accountant ? USER_ROLE.Admin : USER_ROLE.Accountant;
+
 /** Dòng bảng lương tổng hợp theo kỳ (tháng) của 1 nhân viên. */
 export interface PayrollRow {
   id: ID;
   employeeId: ID;
   employeeCode: string;
   employeeName: string;
+  /** Vai trò nhân viên — quyết định luồng duyệt áp dụng cho dòng này. */
+  role: UserRole;
   branchId: ID;
   branchName: string;
-  /** Kỳ lương dạng YYYY-MM. */
+  /** Kỳ lương dạng MM-YYYY theo `bang_luong.thang_nam`. */
   period: string;
   employmentType: EmploymentType;
   totalShifts: number;
+  /** Giờ hệ thống tự tổng hợp từ chấm công. */
   totalHours: number;
+  /**
+   * Giờ sau khi Quản lý điều chỉnh; `null` nghĩa là không sửa.
+   * Khi có giá trị, tiền lương tính theo số này thay cho `totalHours`.
+   */
+  adjustedHours: number | null;
+  /** Lý do điều chỉnh — bắt buộc ghi nếu `adjustedHours` khác `null`. */
+  adjustReason: string;
   overtimeHours: number;
   baseSalary: VND;
   /** Tiền lương theo giờ đã nhân hệ số ca. */
@@ -141,4 +210,12 @@ export interface PayrollRow {
   deduction: VND;
   /** Tổng thực nhận = baseSalary + shiftPay + overtimePay + bonus - deduction. */
   netPay: VND;
+
+  status: PayrollStatus;
+  /** Người xác nhận giờ (Tầng 1); `null` nếu chưa xác nhận hoặc được bỏ qua. */
+  confirmedBy: string | null;
+  confirmedAt: string | null;
+  /** Người duyệt chi (Tầng 2); `null` nếu chưa duyệt. */
+  paidBy: string | null;
+  paidAt: string | null;
 }

@@ -1,20 +1,25 @@
 import {
   ATTENDANCE_STATUS,
   EMPLOYMENT_TYPE,
+  PAYROLL_STATUS,
   RECORD_STATUS,
   SHIFT_CODE,
   SHIFT_RATE_MULTIPLIER,
   USER_ROLE,
+  paymentApproverRole,
+  requiresHourConfirmation,
   type AttendanceRecord,
   type AttendanceStatus,
   type Employee,
   type EmploymentType,
   type PayrollRow,
+  type PayrollStatus,
   type ShiftCode,
   type UserRole,
 } from '@/types';
 import { dayjs } from '@/utils/dateUtils';
 import { initialsOf } from '@/utils/formatters';
+import { accountByRole } from './accounts';
 import { activeStores, branchById, DISTRIBUTION_CENTER_ID } from './branches';
 import { createRandom, randomInt, randomPick, roundTo } from './seed';
 
@@ -401,19 +406,54 @@ const buildAttendance = (): AttendanceRecord[] => {
 /** Bản ghi chấm công 30 ngày gần nhất. */
 export const mockAttendance: AttendanceRecord[] = buildAttendance();
 
-/** Kỳ lương hiện tại dạng YYYY-MM. */
-export const CURRENT_PAYROLL_PERIOD = dayjs().format('YYYY-MM');
+/** Kỳ lương hiện tại dạng MM-YYYY theo `bang_luong.thang_nam`. */
+export const CURRENT_PAYROLL_PERIOD = dayjs().format('MM-YYYY');
+
+/** Tiền tố lọc bản ghi chấm công theo kỳ (chấm công dùng ISO YYYY-MM-DD). */
+const CURRENT_PERIOD_ISO_PREFIX = dayjs().format('YYYY-MM');
+
+/**
+ * Người xác nhận giờ (Tầng 1) của một thu ngân: Quản lý cùng chi nhánh.
+ * Trả về `null` nếu chi nhánh chưa có quản lý đang hoạt động.
+ */
+const branchManagerNameOf = (branchId: string): string | null => {
+  const manager = activeEmployees.find(
+    (employee) =>
+      employee.branchId === branchId && employee.role === USER_ROLE.StoreManager,
+  );
+  return manager ? `${manager.fullName} (${manager.code})` : null;
+};
+
+/**
+ * Phân bổ trạng thái duyệt để trang bảng lương có đủ dữ liệu cả 3 cột việc:
+ * chờ Quản lý xác nhận, chờ Kế toán duyệt chi, và đã thanh toán.
+ *
+ * Thu ngân trải đều 3 trạng thái; các vai trò khác bỏ qua Tầng 1 nên chỉ nằm ở
+ * `DA_XAC_NHAN` hoặc `DA_THANH_TOAN`.
+ */
+const seedPayrollStatus = (role: UserRole, index: number): PayrollStatus => {
+  if (requiresHourConfirmation(role)) {
+    const roll = index % 3;
+    if (roll === 0) return PAYROLL_STATUS.PendingConfirm;
+    if (roll === 1) return PAYROLL_STATUS.Confirmed;
+    return PAYROLL_STATUS.Paid;
+  }
+  return index % 2 === 0 ? PAYROLL_STATUS.Confirmed : PAYROLL_STATUS.Paid;
+};
 
 /**
  * Tính bảng lương của kỳ hiện tại từ dữ liệu chấm công.
+ *
  * Công thức: netPay = baseSalary + shiftPay + overtimePay + bonus - deduction.
+ * Giờ dùng để tính tiền là `adjustedHours ?? totalHours` — khi Quản lý sửa giờ
+ * thì toàn bộ con số phía sau được tính lại (xem `payrollSlice`).
  */
 const buildPayroll = (): PayrollRow[] =>
   activeEmployees.map((employee, index) => {
     const records = mockAttendance.filter(
       (record) =>
         record.employeeId === employee.id &&
-        record.workDate.startsWith(CURRENT_PAYROLL_PERIOD),
+        record.workDate.startsWith(CURRENT_PERIOD_ISO_PREFIX),
     );
 
     const workedRecords = records.filter(
@@ -463,17 +503,35 @@ const buildPayroll = (): PayrollRow[] =>
       (employee.baseSalary * workedRecords.length) / expectedShifts,
     );
 
+    const status = seedPayrollStatus(employee.role, index);
+    const isConfirmed = status !== PAYROLL_STATUS.PendingConfirm;
+    const isPaid = status === PAYROLL_STATUS.Paid;
+
+    /**
+     * Người xác nhận Tầng 1. Vai trò bỏ qua tầng này giữ `null` — đúng đặc tả
+     * "Bỏ qua Tầng 1", chứ không gán người xác nhận giả.
+     */
+    const confirmedBy =
+      isConfirmed && requiresHourConfirmation(employee.role)
+        ? branchManagerNameOf(employee.branchId)
+        : null;
+
+    const approver = accountByRole(paymentApproverRole(employee.role));
+
     return {
       id: `pay-${employee.id}`,
       employeeId: employee.id,
       employeeCode: employee.code,
       employeeName: employee.fullName,
+      role: employee.role,
       branchId: employee.branchId,
       branchName: employee.branchName,
       period: CURRENT_PAYROLL_PERIOD,
       employmentType: employee.employmentType,
       totalShifts: workedRecords.length,
       totalHours: Number(totalHours.toFixed(1)),
+      adjustedHours: null,
+      adjustReason: '',
       overtimeHours,
       baseSalary: proratedBase,
       shiftPay: Math.round(employee.baseSalary > 0 ? 0 : shiftPay),
@@ -487,6 +545,13 @@ const buildPayroll = (): PayrollRow[] =>
           bonus -
           deduction,
       ),
+      status,
+      confirmedBy,
+      confirmedAt: isConfirmed
+        ? dayjs().startOf('month').add(2, 'day').toISOString()
+        : null,
+      paidBy: isPaid ? `${approver.fullName} (${approver.employeeCode})` : null,
+      paidAt: isPaid ? dayjs().startOf('month').add(4, 'day').toISOString() : null,
     };
   });
 
