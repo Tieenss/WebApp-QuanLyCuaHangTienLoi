@@ -1,0 +1,24 @@
+/*
+ * TableToolbar.css — style cho thanh công cụ bảng dùng chung
+ * (components/TableToolbar). Tách từ inline style trong TSX.
+ */
+
+/* Thanh công cụ cách khối nội dung phía dưới 16px. */
+.table-toolbar {
+  margin-bottom: 16px;
+}
+
+/* Icon kính lúp trong ô tìm kiếm. */
+.table-toolbar .toolbar-search-icon {
+  color: #9ca3af;
+}
+
+/* Select lọc luôn chiếm hết chiều rộng cột chứa nó. */
+.table-toolbar .toolbar-filter {
+  width: 100%;
+}
+
+/* Cột chứa nút hành động đẩy sang phải. */
+.table-toolbar-actions-col {
+  text-align: right;
+}

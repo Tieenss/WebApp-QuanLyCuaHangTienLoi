@@ -1,73 +1,78 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AdminLayout } from '../layouts/AdminLayout';
-import { DashboardPage } from '../pages/DashboardPage';
-import { SuppliersPage } from '../pages/SuppliersPage';
-import { PlaceholderPage } from '../pages/PlaceholderPage';
+import type { FC } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthLayout } from '@/layouts/AuthLayout';
+import { AdminLayout } from '@/layouts/AdminLayout';
+import { PosLayout } from '@/layouts/PosLayout';
+import { ProtectedRoute } from './ProtectedRoute';
+import { LoginPage } from '@/features/auth/LoginPage';
+import { DashboardPage } from '@/features/dashboard/DashboardPage';
+import { PosPage } from '@/features/pos/PosPage';
+import { BranchesPage } from '@/features/branches/BranchesPage';
+import { EmployeesPage } from '@/features/employees/EmployeesPage';
+import { ProductsPage } from '@/features/products/ProductsPage';
+import { SuppliersPage } from '@/features/suppliers/SuppliersPage';
+import { InventoryPage } from '@/features/inventory/InventoryPage';
+import { PurchaseOrdersPage } from '@/features/purchaseOrders/PurchaseOrdersPage';
+import { TransfersPage } from '@/features/transfers/TransfersPage';
+import { StocktakesPage } from '@/features/stocktakes/StocktakesPage';
+import { AttendancePage } from '@/features/attendance/AttendancePage';
+import { CashbookPage } from '@/features/cashbook/CashbookPage';
+import { ReportsPage } from '@/features/reports/ReportsPage';
+import { AccountPage } from '@/features/account/AccountPage';
+import { NotFoundPage } from '@/features/shared/NotFoundPage';
 
-export const AppRouter: React.FC = () => {
-    return (
-        <BrowserRouter>
-            <Routes>
-                <Route path="/" element={<AdminLayout />}>
-                    <Route index element={<DashboardPage />} />
-                    <Route path="suppliers" element={<SuppliersPage />} />
-                    <Route
-                        path="pos"
-                        element={
-                            <PlaceholderPage
-                                title="Màn Hình Bán Hàng POS Cửa Hàng Tiện Lợi"
-                                subTitle="Tính năng quét mã vạch và thanh toán nhanh POS đang phát triển (Module POS)."
-                            />
-                        }
-                    />
-                    <Route
-                        path="products"
-                        element={
-                            <PlaceholderPage
-                                title="Quản Lý Danh Mục & Sản Phẩm"
-                                subTitle="Quản lý SKU, giá bán, danh mục hàng hóa Circle K."
-                            />
-                        }
-                    />
-                    <Route
-                        path="inventory"
-                        element={
-                            <PlaceholderPage
-                                title="Quản Lý & Kiểm Kê Tồn Kho"
-                                subTitle="Quản lý nhập xuất kho, cảnh báo hết hàng, kiểm kê chi nhánh."
-                            />
-                        }
-                    />
-                    <Route
-                        path="orders"
-                        element={
-                            <PlaceholderPage
-                                title="Quản Lý Đơn Hàng & Doanh Thu"
-                                subTitle="Lịch sử hóa đơn, đối soát ca bán hàng và phương thức thanh toán."
-                            />
-                        }
-                    />
-                    <Route
-                        path="customers"
-                        element={
-                            <PlaceholderPage
-                                title="Quản Lý Khách Hàng Thân Thiết"
-                                subTitle="Chương trình tích điểm thẻ thành viên Circle K Club."
-                            />
-                        }
-                    />
-                    <Route
-                        path="reports"
-                        element={
-                            <PlaceholderPage
-                                title="Báo Cáo & Thống Kê Chi Tiết"
-                                subTitle="Báo cáo doanh thu theo ngày/tuần/tháng, thống kê hàng tồn và lợi nhuận."
-                            />
-                        }
-                    />
-                </Route>
-            </Routes>
-        </BrowserRouter>
-    );
-};
+
+export const AppRouter: FC = () => (
+  <BrowserRouter>
+    <Routes>
+      {/* Module 0 – Khu vực xác thực, nằm ngoài layout quản trị.
+          AuthLayout dựng khung 2 cột và đẩy người đã đăng nhập về trang chính. */}
+      <Route element={<AuthLayout />}>
+        <Route path="/login" element={<LoginPage />} />
+      </Route>
+
+      {/* Module 2 – Quầy bán hàng, dùng layout riêng không có sidebar quản trị.
+          Đặt trước nhóm route của AdminLayout để `/pos` khớp ở đây. */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <PosLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/pos" element={<PosPage />} />
+      </Route>
+
+      <Route
+        element={
+          <ProtectedRoute>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        {/* Điều hướng gốc về Dashboard; thu ngân sẽ bị ProtectedRoute chặn và
+            hướng về POS thông qua trang 403. */}
+        <Route index element={<Navigate to="/dashboard" replace />} />
+
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/branches" element={<BranchesPage />} />
+        <Route path="/employees" element={<EmployeesPage />} />
+        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/suppliers" element={<SuppliersPage />} />
+        <Route path="/inventory" element={<InventoryPage />} />
+        <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+        <Route path="/transfers" element={<TransfersPage />} />
+        <Route path="/stocktakes" element={<StocktakesPage />} />
+        <Route path="/attendance" element={<AttendancePage />} />
+        <Route path="/cashbook" element={<CashbookPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
+
+        {/* Trang tài khoản không thuộc registry module nên mọi vai trò đều
+            vào được — kể cả thu ngân, để tự đổi được mật khẩu. */}
+        <Route path="/account" element={<AccountPage />} />
+
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
+  </BrowserRouter>
+);

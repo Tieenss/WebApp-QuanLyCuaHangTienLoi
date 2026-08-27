@@ -1,221 +1,161 @@
-import React from 'react';
-import { Layout, Menu, Input, Badge, Avatar, Dropdown, Select, Button, Typography, Space } from 'antd';
+import { useMemo, type FC } from 'react';
+import { Breadcrumb, Layout, Menu, Space, Tag, Typography } from 'antd';
+import type { MenuProps } from 'antd';
+import { HomeOutlined } from '@ant-design/icons';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { ModuleIcon } from '@/components/ModuleIcon';
+import { APP_FULL_NAME, APP_NAME, APP_VERSION } from '@/config/brand';
 import {
-    DashboardOutlined,
-    ShoppingCartOutlined,
-    AppstoreOutlined,
-    InboxOutlined,
-    FileTextOutlined,
-    UsergroupAddOutlined,
-    BarChartOutlined,
-    MenuFoldOutlined,
-    MenuUnfoldOutlined,
-    BellOutlined,
-    SearchOutlined,
-    LogoutOutlined,
-    ShopOutlined,
-    SettingOutlined,
-    UserOutlined,
-} from '@ant-design/icons';
-import { useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import type { RootState } from '../store';
-import { toggleSidebar, setSelectedBranch, clearNotifications } from '../store/slices/dashboardSlice';
+  MODULE_BY_PATH,
+  MODULE_GROUP_LABEL,
+  MODULE_GROUP_ORDER,
+  getModulesForRole,
+  type ModuleDefinition,
+} from '@/config/modules';
+import { useAppSelector } from '@/store/hooks';
+import { USER_ROLE, type UserRole } from '@/types';
+import { AdminTopbar } from './AdminTopbar';
+import logo from '@/assets/logo.png';
 import './AdminLayout.css';
-import logo from '../assets/logo.png';
 
-const { Header, Sider, Content, Footer } = Layout;
+const { Sider, Content, Footer } = Layout;
 const { Text } = Typography;
 
-export const AdminLayout: React.FC = () => {
-    const navigate = useNavigate();
-    const location = useLocation();
-    const dispatch = useDispatch();
+/**
+ * Khung giao diện khu quản trị: sidebar điều hướng 13 module + vùng nội dung.
+ *
+ * Topbar được tách sang `AdminTopbar` — nó là một khối chức năng độc lập
+ * (chọn chi nhánh, tìm kiếm, thông báo, tài khoản) và không chia sẻ state nào
+ * với sidebar ngoài `isSidebarCollapsed`, thứ đã nằm trong Redux.
+ *
+ * Quầy bán hàng dùng `PosLayout`, khu đăng nhập dùng `AuthLayout` — cả hai
+ * không đi qua đây.
+ */
+export const AdminLayout: FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-    const { isSidebarCollapsed, selectedBranchId, notificationCount } = useSelector(
-        (state: RootState) => state.dashboard
-    );
+  const role: UserRole = useAppSelector(
+    (state) => state.auth.user?.role ?? USER_ROLE.Cashier,
+  );
+  const isSidebarCollapsed = useAppSelector((state) => state.ui.isSidebarCollapsed);
 
-    const menuItems = [
-        {
-            key: '/',
-            icon: <DashboardOutlined className="menu-item-icon" />,
-            label: 'Tổng Quan Dashboard',
-        },
-        {
-            key: '/pos',
-            icon: <ShoppingCartOutlined className="menu-item-icon" />,
-            label: 'Bán Hàng POS',
-        },
-        {
-            key: '/products',
-            icon: <AppstoreOutlined className="menu-item-icon" />,
-            label: 'Quản Lý Sản Phẩm',
-        },
-        {
-            key: '/inventory',
-            icon: <InboxOutlined className="menu-item-icon" />,
-            label: 'Quản Lý Tồn Kho',
-        },
-        {
-            key: '/suppliers',
-            icon: <ShopOutlined className="menu-item-icon" />,
-            label: 'Quản Lý Nhà Cung Cấp',
-        },
-        {
-            key: '/orders',
-            icon: <FileTextOutlined className="menu-item-icon" />,
-            label: 'Đơn Hàng & Doanh Thu',
-        },
-        {
-            key: '/customers',
-            icon: <UsergroupAddOutlined className="menu-item-icon" />,
-            label: 'Khách Hàng Thân Thiết',
-        },
-        {
-            key: '/reports',
-            icon: <BarChartOutlined className="menu-item-icon" />,
-            label: 'Báo Cáo & Thống Kê',
-        },
+  /** Module mà vai trò hiện tại được phép thấy. */
+  const visibleModules = useMemo(() => getModulesForRole(role), [role]);
+
+  /** Menu sidebar, nhóm theo `MODULE_GROUP_ORDER`. */
+  const menuItems = useMemo<MenuProps['items']>(() => {
+    const grouped = MODULE_GROUP_ORDER.map((groupKey) => {
+      const modulesInGroup = visibleModules.filter(
+        (module) => module.group === groupKey,
+      );
+      if (modulesInGroup.length === 0) return null;
+
+      return {
+        key: `group-${groupKey}`,
+        type: 'group' as const,
+        label: MODULE_GROUP_LABEL[groupKey],
+        children: modulesInGroup.map((module: ModuleDefinition) => ({
+          key: module.path,
+          icon: <ModuleIcon name={module.icon} />,
+          label: module.label,
+        })),
+      };
+    });
+
+    return grouped.filter((group) => group !== null);
+  }, [visibleModules]);
+
+  /** Module tương ứng URL hiện tại, dùng cho breadcrumb. */
+  const currentModule = MODULE_BY_PATH[location.pathname];
+
+  const breadcrumbItems = useMemo(() => {
+    const items = [
+      {
+        title: (
+          <>
+            <HomeOutlined /> <span>{APP_NAME}</span>
+          </>
+        ),
+      },
     ];
 
-    const userMenuItems = [
-        {
-            key: 'profile',
-            icon: <UserOutlined />,
-            label: 'Thông tin tài khoản',
-        },
-        {
-            key: 'settings',
-            icon: <SettingOutlined />,
-            label: 'Cấu hình chi nhánh',
-        },
-        {
-            type: 'divider' as const,
-        },
-        {
-            key: 'logout',
-            icon: <LogoutOutlined className="logout-icon" />,
-            label: <span className="logout-label">Đăng xuất</span>,
-        },
-    ];
+    if (currentModule) {
+      items.push({
+        title: <span>{MODULE_GROUP_LABEL[currentModule.group]}</span>,
+      });
+      items.push({
+        title: <span className="breadcrumb-current">{currentModule.shortLabel}</span>,
+      });
+    }
 
-    return (
-        <Layout className="admin-layout">
-            {/* Sider Sidebar Navigation */}
-            <Sider
-                trigger={null}
-                collapsible
-                collapsed={isSidebarCollapsed}
-                width={250}
-                theme="dark"
-                className="admin-sider"
-            >
-                <div className="brand-logo-container">
-                    <img src={logo} alt="Circle K" className="brand-logo-img" />
-                    {!isSidebarCollapsed && (
-                        <div>
-                            <h1 className="brand-title">CIRCLE K</h1>
-                            <span className="brand-subtitle">CONVENIENCE ERP</span>
-                        </div>
-                    )}
-                </div>
+    return items;
+  }, [currentModule]);
 
-                <Menu
-                    theme="dark"
-                    mode="inline"
-                    selectedKeys={[location.pathname]}
-                    items={menuItems}
-                    onClick={({ key }) => navigate(key)}
-                    className="sider-menu"
-                />
-            </Sider>
+  return (
+    <Layout className="app-layout">
+      <Sider
+        theme="dark"
+        trigger={null}
+        collapsible
+        collapsed={isSidebarCollapsed}
+        width={256}
+        collapsedWidth={72}
+        className="app-sider"
+      >
+        <div className="brand-block">
+          <img src={logo} alt="Circle K" className="brand-logo" />
+          {!isSidebarCollapsed && (
+            <div>
+              <h1 className="brand-name">CIRCLE K</h1>
+              <span className="brand-tagline">Convenience ERP</span>
+            </div>
+          )}
+        </div>
 
-            {/* Main Layout Area */}
-            <Layout className="main-area">
-                {/* Top Header */}
-                <Header className="admin-header">
-                    <Space size={16}>
-                        <Button
-                            type="text"
-                            icon={isSidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                            onClick={() => dispatch(toggleSidebar())}
-                            className="collapse-btn"
-                        />
+        <Menu
+          theme="dark"
+          mode="inline"
+          items={menuItems}
+          selectedKeys={[location.pathname]}
+          onClick={({ key }) => navigate(key)}
+          className="sider-menu"
+        />
 
-                        <Select
-                            defaultValue={selectedBranchId}
-                            className="branch-select"
-                            prefix={<ShopOutlined className="branch-icon" />}
-                            onChange={(value, option: any) =>
-                                dispatch(setSelectedBranch({ id: value, name: option.label }))
-                            }
-                            options={[
-                                { value: 'CK-0101', label: 'Circle K - Quận 1 (Bùi Viện)' },
-                                { value: 'CK-0102', label: 'Circle K - Quận 3 (Trần Quốc Thảo)' },
-                                { value: 'CK-0103', label: 'Circle K - TP.Thủ Đức (Thảo Điền)' },
-                                { value: 'CK-0201', label: 'Circle K - Hà Nội (Hoàn Kiếm)' },
-                            ]}
-                        />
-                    </Space>
+        {!isSidebarCollapsed && (
+          <div className="sider-footer">
+            {APP_FULL_NAME}
+            <br />
+            Phiên bản {APP_VERSION}
+          </div>
+        )}
+      </Sider>
 
-                    {/* Search bar & User Profile */}
-                    <Space size={20}>
-                        <Input
-                            placeholder="Search product, order, SKU..."
-                            prefix={<SearchOutlined className="search-icon" />}
-                            className="header-search"
-                        />
+      <Layout>
+        <AdminTopbar />
 
-                        <Button
-                            type="primary"
-                            icon={<ShoppingCartOutlined />}
-                            onClick={() => navigate('/pos')}
-                            className="pos-btn"
-                        >
-                            Màn Hình POS
-                        </Button>
+        <div className="app-breadcrumb">
+          <Space size={12} wrap>
+            <Breadcrumb items={breadcrumbItems} />
+            {currentModule !== undefined && !currentModule.implemented && (
+              <Tag color="gold" className="dev-status-tag">
+                Đang phát triển
+              </Tag>
+            )}
+          </Space>
+        </div>
 
-                        <Badge count={notificationCount} overflowCount={99}>
-                            <Button
-                                type="text"
-                                shape="circle"
-                                icon={<BellOutlined className="bell-icon" />}
-                                onClick={() => dispatch(clearNotifications())}
-                            />
-                        </Badge>
+        <Content className="app-content">
+          <Outlet />
+        </Content>
 
-                        <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow>
-                            <Space className="user-profile">
-                                <Avatar
-                                    className="user-avatar"
-                                    size="medium"
-                                >
-                                    AK
-                                </Avatar>
-                                <div className="user-info">
-                                    <Text className="user-name">
-                                        Trần Văn Anh
-                                    </Text>
-                                    <Text type="secondary" className="user-role">
-                                        Store Manager
-                                    </Text>
-                                </div>
-                            </Space>
-                        </Dropdown>
-                    </Space>
-                </Header>
-
-                {/* Content Outlet */}
-                <Content className="admin-content">
-                    <Outlet />
-                </Content>
-
-                {/* Footer */}
-                <Footer className="admin-footer">
-                    Circle K Convenience Store ERP System © {new Date().getFullYear()} — Designed with Circle K Red Identity (`#E31837`)
-                </Footer>
-            </Layout>
-        </Layout>
-    );
+        <Footer className="app-footer">
+          <Text type="secondary" className="app-footer-text">
+            {APP_FULL_NAME} — © {new Date().getFullYear()} Circle K Việt Nam. Dữ liệu
+            trong bản {APP_VERSION} là dữ liệu mô phỏng.
+          </Text>
+        </Footer>
+      </Layout>
+    </Layout>
+  );
 };

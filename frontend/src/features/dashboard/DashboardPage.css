@@ -1,0 +1,103 @@
+/*
+ * DashboardPage.css — style cho Module 1: Tổng quan
+ * (features/dashboard/DashboardPage). Tách từ inline style trong TSX.
+ *
+ * Màu cảnh báo tồn là giá trị động theo mức khẩn cấp, nên dùng biến
+ * `--alert-color` do component truyền xuống.
+ */
+
+/* ── Bảng hàng bán chạy ──────────────────────────────────────────── */
+
+/* Hạng top 3 tô đỏ thương hiệu. */
+.rank-top {
+  color: #e31837;
+}
+
+/* Khối chữ cạnh ảnh sản phẩm. */
+.dash-product-info {
+  min-width: 0;
+}
+
+.dash-product-name {
+  display: block;
+  font-size: 13px;
+}
+
+.dash-product-sub {
+  font-size: 11.5px;
+}
+
+/* Nhóm giá trị xếp dọc căn phải. */
+.cell-stack-right {
+  align-items: flex-end;
+}
+
+.profit-value {
+  color: #10b981;
+}
+
+.cell-note {
+  font-size: 11px;
+}
+
+/* Tồn còn dưới 20 đơn vị — cảnh báo đỏ. */
+.stock-low {
+  color: #dc2626;
+}
+
+/* ── Bảng giao dịch gần nhất ─────────────────────────────────────── */
+.dash-text-12-5 {
+  font-size: 12.5px;
+}
+
+.total-red {
+  color: #e31837;
+}
+
+/* Icon đồng hồ cạnh bộ lọc thời gian. */
+.time-icon {
+  color: #6b7280;
+}
+
+/* ── Card mục tiêu chi nhánh & cảnh báo tồn kho ──────────────────── */
+
+/* Space bọc danh sách chiếm hết chiều rộng card. */
+.dash-list-full {
+  width: 100%;
+}
+
+/* Hàng thông tin trên thanh tiến trình. */
+.dash-progress-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.dash-progress-row.with-gap {
+  gap: 8px;
+}
+
+.dash-branch-name {
+  font-size: 12.5px;
+}
+
+.dash-branch-revenue {
+  font-size: 12px;
+}
+
+/* Icon cảnh báo trong tiêu đề card tồn kho. */
+.alert-title-icon {
+  color: #f59e0b;
+}
+
+/* Số tồn hiện tại/tối thiểu — màu theo mức khẩn cấp qua biến. */
+.alert-stock-value {
+  font-size: 12.5px;
+  color: var(--alert-color, #6b7280);
+  flex-shrink: 0;
+}
+
+/* Ghi chú đề xuất nhập thêm dưới mỗi cảnh báo. */
+.alert-note {
+  font-size: 11px;
+}
