@@ -77,9 +77,12 @@ export const ReportsPage: FC = () => {
   const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [range, setRange] = useState<TimeRange>('30days');
 
+  /** Tồn kho hiện hành — cột "Tồn còn lại" ở báo cáo hàng bán chạy. */
+  const balances = useAppSelector((state) => state.stock.balances);
+
   const metrics = useMemo(
-    () => buildDashboardMetrics(branchId, range),
-    [branchId, range],
+    () => buildDashboardMetrics(branchId, range, balances),
+    [branchId, range, balances],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
@@ -128,8 +131,8 @@ export const ReportsPage: FC = () => {
 
   // ── Báo cáo 3: Hàng bán chạy ──────────────────────────────────────────────────
   const topSelling = useMemo(
-    () => buildTopSelling(branchId, range, 20),
-    [branchId, range],
+    () => buildTopSelling(branchId, range, balances, 20),
+    [branchId, range, balances],
   );
 
   // ── Báo cáo 4: Hao hụt / huỷ hàng ─────────────────────────────────────────────

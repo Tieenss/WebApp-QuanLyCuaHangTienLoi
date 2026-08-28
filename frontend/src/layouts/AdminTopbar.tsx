@@ -41,7 +41,7 @@ import {
   type UserRole,
 } from '@/types';
 import { mockBranches } from '@/mockData/branches';
-import { lowStockBalances } from '@/mockData/inventory';
+import { lowStockBalances } from '@/store/slices/stockSlice';
 import './AdminTopbar.css';
 
 const { Header } = Layout;
@@ -89,9 +89,10 @@ export const AdminTopbar: FC = () => {
   }, [isSystemWide, user?.allowedBranchIds]);
 
   /** Số mặt hàng dưới ngưỡng tồn tối thiểu — dùng làm badge thông báo. */
+  const balances = useAppSelector((state) => state.stock.balances);
   const alertCount = useMemo(
-    () => lowStockBalances(activeBranchId).length,
-    [activeBranchId],
+    () => lowStockBalances(balances, activeBranchId).length,
+    [balances, activeBranchId],
   );
 
   /** Menu tài khoản: hồ sơ, đổi mật khẩu, đổi vai trò nhanh (demo), đăng xuất. */

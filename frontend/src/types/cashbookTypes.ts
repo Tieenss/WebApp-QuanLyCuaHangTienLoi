@@ -20,47 +20,44 @@ export const CASH_FLOW_DIRECTION_LABEL: Record<CashFlowDirection, string> = {
   PAYMENT: 'Phiếu chi',
 };
 
-/** Hạng mục thu/chi, phục vụ báo cáo cấu trúc chi phí. */
+/**
+ * Hạng mục thu/chi theo `so_quy.hang_muc` — đúng 5 giá trị của đặc tả.
+ *
+ * Bản trước có 9 hạng mục (thêm Rent / Utilities / Marketing / Maintenance /
+ * BankTransferIn) nhưng cơ sở dữ liệu không có cột nào lưu được chúng; mọi chi
+ * phí vận hành nay gom vào `KHAC` và phân biệt bằng `description`.
+ *
+ * `CAP_VON` là hạng mục Admin dùng để cấp vốn cho quỹ — cơ chế "khoá van" kiểm
+ * soát dòng tiền (`luong_nghiep_vu.md` mục 5.1).
+ */
 export const CASH_CATEGORY = {
-  SalesRevenue: 'SALES_REVENUE',
-  SupplierPayment: 'SUPPLIER_PAYMENT',
-  Salary: 'SALARY',
-  Rent: 'RENT',
-  Utilities: 'UTILITIES',
-  Marketing: 'MARKETING',
-  Maintenance: 'MAINTENANCE',
-  BankTransferIn: 'BANK_TRANSFER_IN',
-  Other: 'OTHER',
+  SalesRevenue: 'BAN_HANG',
+  Salary: 'TRA_LUONG',
+  PurchaseGoods: 'NHAP_HANG',
+  CapitalInjection: 'CAP_VON',
+  Other: 'KHAC',
 } as const;
 
 export type CashCategory = (typeof CASH_CATEGORY)[keyof typeof CASH_CATEGORY];
 
 export const CASH_CATEGORY_LABEL: Record<CashCategory, string> = {
-  SALES_REVENUE: 'Doanh thu bán hàng',
-  SUPPLIER_PAYMENT: 'Thanh toán nhà cung cấp',
-  SALARY: 'Chi lương nhân viên',
-  RENT: 'Tiền thuê mặt bằng',
-  UTILITIES: 'Điện / Nước / Internet',
-  MARKETING: 'Marketing & Khuyến mãi',
-  MAINTENANCE: 'Bảo trì thiết bị',
-  BANK_TRANSFER_IN: 'Nộp tiền vào ngân hàng',
-  OTHER: 'Khác',
+  BAN_HANG: 'Doanh thu bán hàng',
+  TRA_LUONG: 'Chi lương nhân viên',
+  NHAP_HANG: 'Chi nhập hàng',
+  CAP_VON: 'Cấp vốn',
+  KHAC: 'Khác',
 };
 
 /** Hạng mục nào hợp lệ với chiều thu, hạng mục nào với chiều chi. */
 export const CASH_CATEGORY_BY_DIRECTION: Record<CashFlowDirection, CashCategory[]> = {
   RECEIPT: [
     CASH_CATEGORY.SalesRevenue,
-    CASH_CATEGORY.BankTransferIn,
+    CASH_CATEGORY.CapitalInjection,
     CASH_CATEGORY.Other,
   ],
   PAYMENT: [
-    CASH_CATEGORY.SupplierPayment,
+    CASH_CATEGORY.PurchaseGoods,
     CASH_CATEGORY.Salary,
-    CASH_CATEGORY.Rent,
-    CASH_CATEGORY.Utilities,
-    CASH_CATEGORY.Marketing,
-    CASH_CATEGORY.Maintenance,
     CASH_CATEGORY.Other,
   ],
 };

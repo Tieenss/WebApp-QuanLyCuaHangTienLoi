@@ -23,16 +23,17 @@ import {
 import './CartPanel.css';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  checkout,
+  buildSalesOrder,
+  calculateTotals,
   clearCart,
   removeFromCart,
+  saleCompleted,
   setMemberPhone,
   setOrderDiscount,
   setPaymentMethod,
   setTenderedAmount,
   updateLineQuantity,
 } from '@/store/slices/posSlice';
-import { calculateTotals } from '@/store/slices/posSlice';
 import {
   PAYMENT_IS_CASH,
   PAYMENT_METHOD,
@@ -43,6 +44,7 @@ import {
 } from '@/types';
 import { productById } from '@/mockData/products';
 import { cashiersOfBranch } from '@/mockData/employees';
+import { nowIso } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 
 const { Text } = Typography;
@@ -80,6 +82,7 @@ export const CartPanel: FC = () => {
   const { message } = AntdApp.useApp();
 
   const { user } = useAppSelector((state) => state.auth);
+  const posState = useAppSelector((state) => state.pos);
   const {
     branchId,
     lines,
@@ -87,7 +90,7 @@ export const CartPanel: FC = () => {
     paymentMethod,
     tenderedAmount,
     memberPhone,
-  } = useAppSelector((state) => state.pos);
+  } = posState;
 
   const totals = useMemo(
     () => calculateTotals(lines, orderDiscount),
@@ -99,6 +102,10 @@ export const CartPanel: FC = () => {
   const changeAmount = Math.max(0, tenderedAmount - totals.grandTotal);
   const isTenderInsufficient = isCash && tenderedAmount < totals.grandTotal;
 
+  /**
+   * Chốt hoá đơn — một dispatch duy nhất cho cả 4 bước của transaction:
+   * lưu hoá đơn, trừ tồn kho, ghi thẻ kho, tạo phiếu thu sổ quỹ.
+   */
   const handleCheckout = (): void => {
     if (lines.length === 0) {
       message.warning('Giỏ hàng đang trống.');
@@ -120,14 +127,17 @@ export const CartPanel: FC = () => {
       unitCosts[line.productId] = productById(line.productId)?.costPrice ?? 0;
     }
 
-    dispatch(
-      checkout({
-        cashierId,
-        cashierName,
-        shiftCode: currentShift(),
-        unitCosts,
-      }),
-    );
+    const sale = buildSalesOrder({
+      state: posState,
+      cashierId,
+      cashierName,
+      shiftCode: currentShift(),
+      unitCosts,
+      soldAt: nowIso(),
+    });
+    if (sale === null) return;
+
+    dispatch(saleCompleted(sale));
   };
 
   return (

@@ -7,7 +7,6 @@ import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { closeLedgerDrawer } from '@/store/slices/inventorySlice';
 import { LEDGER_TYPE_LABEL, type StockLedgerEntry } from '@/types';
-import { mockStockLedger } from '@/mockData/inventory';
 import { productById } from '@/mockData/products';
 import { formatDateTime } from '@/utils/dateUtils';
 import { formatNumber, formatVND } from '@/utils/formatters';
@@ -25,20 +24,21 @@ export const LedgerDrawer: FC = () => {
   const { selectedProductId, branchFilter } = useAppSelector(
     (state) => state.inventory,
   );
+  const allLedger = useAppSelector((state) => state.stock.ledger);
 
   const product = selectedProductId === null ? undefined : productById(selectedProductId);
 
   /** Thẻ kho của đúng sản phẩm (và chi nhánh nếu đang lọc). */
   const entries = useMemo(() => {
     if (selectedProductId === null) return [];
-    return mockStockLedger
+    return allLedger
       .filter(
         (entry) =>
           entry.productId === selectedProductId &&
           (branchFilter === null || entry.branchId === branchFilter),
       )
       .slice(0, 60);
-  }, [selectedProductId, branchFilter]);
+  }, [allLedger, selectedProductId, branchFilter]);
 
   const columns: ColumnsType<StockLedgerEntry> = [
     {

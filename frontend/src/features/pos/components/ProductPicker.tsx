@@ -22,7 +22,7 @@ import {
 } from '@/store/slices/posSlice';
 import { mockCategories } from '@/mockData/categories';
 import { productByBarcode, sellableProducts } from '@/mockData/products';
-import { stockOf } from '@/mockData/inventory';
+import { stockOf } from '@/store/slices/stockSlice';
 import { formatVND } from '@/utils/formatters';
 import { matchKeyword } from '@/utils/formatters';
 
@@ -43,6 +43,8 @@ export const ProductPicker: FC = () => {
     (state) => state.pos,
   );
   const cartLines = useAppSelector((state) => state.pos.lines);
+  /** Tồn kho hiện hành — cập nhật ngay sau mỗi lần bán. */
+  const balances = useAppSelector((state) => state.stock.balances);
 
   /** Số lượng đang có trong giỏ theo từng sản phẩm, để hiện badge trên thẻ. */
   const cartQuantityMap = useMemo(() => {
@@ -93,7 +95,12 @@ export const ProductPicker: FC = () => {
       return;
     }
 
-    dispatch(addToCart({ product }));
+    dispatch(
+      addToCart({
+        product,
+        availableStock: stockOf(balances, branchId, product.id),
+      }),
+    );
     message.success(`Đã thêm: ${product.name}`);
 
     // Xoá ô để chuẩn bị cho lần quét tiếp theo.
@@ -154,8 +161,8 @@ export const ProductPicker: FC = () => {
           />
         ) : (
           <div className="pos-product-grid">
-            {visibleProducts.map((product) => {
-              const available = stockOf(branchId, product.id);
+              {visibleProducts.map((product) => {
+                const available = stockOf(balances, branchId, product.id);
               // Hàng pha chế tại quầy không quản tồn nên vẫn bán được khi tồn 0.
               const isMadeToOrder = product.categoryId === 'cat-03';
               const isOutOfStock = available <= 0 && !isMadeToOrder;
@@ -170,10 +177,12 @@ export const ProductPicker: FC = () => {
                 >
                   <button
                     type="button"
-                    className="pos-product-card"
-                    disabled={isOutOfStock}
-                    onClick={() => dispatch(addToCart({ product }))}
-                  >
+                      className="pos-product-card"
+                      disabled={isOutOfStock}
+                      onClick={() =>
+                        dispatch(addToCart({ product, availableStock: available }))
+                      }
+                    >
                     <Space size={8} align="start">
                       <ProductThumb
                         categoryId={product.categoryId}

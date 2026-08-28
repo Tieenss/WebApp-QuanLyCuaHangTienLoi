@@ -8,6 +8,7 @@ import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { RecordStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
+import { useAppSelector } from '@/store/hooks';
 import {
   PRODUCT_UNIT_LABEL,
   RECORD_STATUS,
@@ -20,7 +21,7 @@ import {
   marginPercent,
   mockProducts,
 } from '@/mockData/products';
-import { totalStockOf } from '@/mockData/inventory';
+import { totalStockOf } from '@/store/slices/stockSlice';
 import {
   formatNumber,
   formatRatio,
@@ -40,6 +41,9 @@ const { Text } = Typography;
  * trực tiếp từ giá bán trừ giá nhập nên luôn khớp với báo cáo lợi nhuận.
  */
 export const ProductsPage: FC = () => {
+  /** Tồn kho hiện hành để cột "Tồn toàn chuỗi" phản ánh cả hàng vừa bán. */
+  const balances = useAppSelector((state) => state.stock.balances);
+
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -243,7 +247,7 @@ export const ProductsPage: FC = () => {
       align: 'right',
       width: 130,
       render: (_, row) => {
-        const stock = totalStockOf(row.id);
+        const stock = totalStockOf(balances, row.id);
         return (
           <Space direction="vertical" size={0} className="cell-stack-right">
             <Text
@@ -373,7 +377,7 @@ export const ProductsPage: FC = () => {
         { header: 'VAT (%)', accessor: (row) => row.vatPercent },
         { header: 'Tồn tối thiểu', accessor: (row) => row.minStock },
         { header: 'Tồn tối đa', accessor: (row) => row.maxStock },
-        { header: 'Tồn toàn chuỗi', accessor: (row) => totalStockOf(row.id) },
+        { header: 'Tồn toàn chuỗi', accessor: (row) => totalStockOf(balances, row.id) },
         { header: 'HSD (ngày)', accessor: (row) => row.shelfLifeDays },
         { header: 'Nhà cung cấp', accessor: (row) => row.supplierName },
       ],

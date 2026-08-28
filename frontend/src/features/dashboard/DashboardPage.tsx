@@ -75,9 +75,12 @@ export const DashboardPage: FC = () => {
   const isSystemWide = user !== null && SYSTEM_WIDE_ROLES.includes(user.role);
   const compareLabel = COMPARE_LABEL[timeRange];
 
+  /** Tồn kho hiện hành — KPI tồn kho và cảnh báo đọc từ đây. */
+  const balances = useAppSelector((state) => state.stock.balances);
+
   const metrics = useMemo(
-    () => buildDashboardMetrics(activeBranchId, timeRange),
-    [activeBranchId, timeRange],
+    () => buildDashboardMetrics(activeBranchId, timeRange, balances),
+    [activeBranchId, timeRange, balances],
   );
 
   /** 4 thẻ KPI chính theo yêu cầu: doanh số, đơn hàng, giá trị TB, cảnh báo tồn. */
@@ -188,13 +191,13 @@ export const DashboardPage: FC = () => {
   );
 
   const topSelling = useMemo(
-    () => buildTopSelling(activeBranchId, timeRange, 8),
-    [activeBranchId, timeRange],
+    () => buildTopSelling(activeBranchId, timeRange, balances, 8),
+    [activeBranchId, timeRange, balances],
   );
 
   const alerts = useMemo(
-    () => buildInventoryAlerts(activeBranchId, 6),
-    [activeBranchId],
+    () => buildInventoryAlerts(activeBranchId, balances, 6),
+    [activeBranchId, balances],
   );
 
   const latestOrders = useMemo(

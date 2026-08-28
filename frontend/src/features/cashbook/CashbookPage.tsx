@@ -1,9 +1,10 @@
 import { useMemo, useState, type FC } from 'react';
-import { Card, DatePicker, Space, Table, Tag, Typography } from 'antd';
+import { Button, Card, DatePicker, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
@@ -17,14 +18,16 @@ import {
   CASH_FLOW_DIRECTION_LABEL,
   PAYMENT_METHOD,
   PAYMENT_METHOD_LABEL,
+  USER_ROLE,
   type CashEntry,
   type CashFlowDirection,
 } from '@/types';
 import { mockBranches } from '@/mockData/branches';
-import { mockCashEntries, summarizeCashBook } from '@/mockData/cashbook';
+import { summarizeCashBook } from '@/mockData/cashbook';
 import { dayjs, formatDate, lastNDays } from '@/utils/dateUtils';
 import { formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
+import { CapitalInjectionModal } from './components/CapitalInjectionModal';
 import './CashbookPage.css';
 
 const { Text } = Typography;
@@ -35,9 +38,18 @@ const { RangePicker } = DatePicker;
  *
  * Bảng nhấn màu theo chiều tiền: thu màu xanh, chi màu đỏ. Cột "Số dư" là số
  * lũy kế theo thời gian nên chỉ đúng khi xem toàn bộ (không lọc chi nhánh).
+ *
+ * Phiếu được sinh tự động từ 3 nguồn (bán hàng POS, duyệt chi lương, nhập kho);
+ * Admin lập tay phiếu cấp vốn.
  */
 export const CashbookPage: FC = () => {
-  const activeBranchId = useAppSelector((state) => state.auth.activeBranchId);
+  const { user, activeBranchId } = useAppSelector((state) => state.auth);
+  /** Sổ quỹ hiện hành — có cả phiếu vừa sinh từ bán hàng và duyệt lương. */
+  const allEntries = useAppSelector((state) => state.cashbook.entries);
+
+  /** Chỉ Admin được cấp vốn (ma trận phân quyền, dòng "Cấp vốn"). */
+  const canInjectCapital = user?.role === USER_ROLE.Admin;
+  const [isCapitalModalOpen, setCapitalModalOpen] = useState(false);
 
   const [search, setSearch] = useState('');
   const [directionFilter, setDirectionFilter] = useState<string | null>(null);
@@ -47,7 +59,7 @@ export const CashbookPage: FC = () => {
 
   const filtered = useMemo(
     () =>
-      mockCashEntries.filter((entry) => {
+      allEntries.filter((entry) => {
         const matchSearch = matchKeyword(search, [
           entry.code,
           entry.counterparty,
@@ -66,7 +78,7 @@ export const CashbookPage: FC = () => {
           matchSearch && matchDirection && matchCategory && matchBranch && matchRange
         );
       }),
-    [search, directionFilter, categoryFilter, branchFilter, range],
+    [allEntries, search, directionFilter, categoryFilter, branchFilter, range],
   );
 
   /** Tổng hợp trên tập phiếu đang lọc, không phải toàn bộ sổ. */
@@ -307,6 +319,16 @@ export const CashbookPage: FC = () => {
                 });
               }}
             />
+
+            {canInjectCapital && (
+              <Button
+                type="primary"
+                icon={<BankOutlined />}
+                onClick={() => setCapitalModalOpen(true)}
+              >
+                Cấp vốn
+              </Button>
+            )}
           </Space>
         }
       />
@@ -343,6 +365,11 @@ export const CashbookPage: FC = () => {
           }}
         />
       </Card>
+
+      <CapitalInjectionModal
+        open={isCapitalModalOpen}
+        onClose={() => setCapitalModalOpen(false)}
+      />
     </>
   );
 };

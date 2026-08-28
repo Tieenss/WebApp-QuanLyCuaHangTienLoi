@@ -36,11 +36,9 @@ import { productById } from '@/mockData/products';
 import {
   distinctSkuCount,
   lowStockBalances,
-  mockStockBalances,
-  mockStockLedger,
   resolveStockLevel,
   totalStockValue,
-} from '@/mockData/inventory';
+} from '@/store/slices/stockSlice';
 import { daysUntil, formatDate, formatDateTime } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -58,6 +56,9 @@ const NEAR_EXPIRY_DAYS = 7;
  *
  * Tab "Tồn kho" là số liệu hiện tại; tab "Thẻ kho" là lịch sử biến động — đây
  * mới là nguồn sự thật, tồn kho chỉ là kết quả cộng dồn từ thẻ kho.
+ *
+ * Cả hai đọc từ `state.stock` nên phản ánh ngay mọi lần bán hàng, nhập kho hay
+ * cân bằng kiểm kê.
  */
 export const InventoryPage: FC = () => {
   const dispatch = useAppDispatch();
@@ -71,10 +72,14 @@ export const InventoryPage: FC = () => {
     onlyNearExpiry,
   } = useAppSelector((state) => state.inventory);
 
+  /** Dữ liệu kho hiện hành. */
+  const allBalances = useAppSelector((state) => state.stock.balances);
+  const allLedger = useAppSelector((state) => state.stock.ledger);
+
   /** Tồn kho sau khi áp toàn bộ bộ lọc. */
   const balances = useMemo(
     () =>
-      mockStockBalances.filter((balance) => {
+      allBalances.filter((balance) => {
         const matchSearch = matchKeyword(searchKeyword, [
           balance.productName,
           balance.sku,
@@ -100,6 +105,7 @@ export const InventoryPage: FC = () => {
         return matchSearch && matchBranch && matchCategory && matchLevel && matchExpiry;
       }),
     [
+      allBalances,
       searchKeyword,
       branchFilter,
       categoryFilter,
@@ -111,7 +117,7 @@ export const InventoryPage: FC = () => {
   /** Thẻ kho sau khi áp bộ lọc. */
   const ledgerEntries = useMemo(
     () =>
-      mockStockLedger.filter((entry) => {
+      allLedger.filter((entry) => {
         const matchSearch = matchKeyword(searchKeyword, [
           entry.productName,
           entry.sku,
@@ -127,12 +133,12 @@ export const InventoryPage: FC = () => {
 
         return matchSearch && matchBranch && matchType && matchCategory;
       }),
-    [searchKeyword, branchFilter, ledgerTypeFilter, categoryFilter],
+    [allLedger, searchKeyword, branchFilter, ledgerTypeFilter, categoryFilter],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
-    const lowStock = lowStockBalances(branchFilter);
-    const nearExpiry = mockStockBalances.filter((balance) => {
+    const lowStock = lowStockBalances(allBalances, branchFilter);
+    const nearExpiry = allBalances.filter((balance) => {
       if (branchFilter !== null && balance.branchId !== branchFilter) return false;
       const remaining = daysUntil(balance.nearestExpiryDate);
       return remaining !== null && remaining <= NEAR_EXPIRY_DAYS;
@@ -142,13 +148,13 @@ export const InventoryPage: FC = () => {
       {
         key: 'value',
         title: 'Giá trị hàng tồn kho',
-        value: formatVND(totalStockValue(branchFilter)),
+        value: formatVND(totalStockValue(allBalances, branchFilter)),
         color: BRAND.primaryRed,
       },
       {
         key: 'sku',
         title: 'Số SKU đang có tồn',
-        value: formatNumber(distinctSkuCount(branchFilter)),
+        value: formatNumber(distinctSkuCount(allBalances, branchFilter)),
         suffix: 'mặt hàng',
       },
       {
@@ -166,7 +172,7 @@ export const InventoryPage: FC = () => {
         color: BRAND.error,
       },
     ];
-  }, [branchFilter]);
+  }, [allBalances, branchFilter]);
 
   const branchOptions = useMemo(
     () => mockBranches.map((branch) => ({ value: branch.id, label: branch.name })),

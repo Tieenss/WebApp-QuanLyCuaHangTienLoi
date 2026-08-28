@@ -8,14 +8,15 @@ import {
   type SalesOrder,
   type ShrinkageReason,
   type ShrinkageReportRow,
+  type StockBalance,
   type TimeRange,
   type TopSellingRow,
 } from '@/types';
 import { dayjs } from '@/utils/dateUtils';
+import { lowStockBalances, totalStockValue } from '@/store/slices/stockSlice';
 import { activeStores } from './branches';
 import { mockCategories, categoryColorById } from './categories';
 import { productById } from './products';
-import { lowStockBalances, mockStockBalances } from './inventory';
 import {
   completedOrders,
   ordersOfBranch,
@@ -29,8 +30,11 @@ import { createRandom, randomPick } from './seed';
 /**
  * Module 1 & 13 – Lớp tổng hợp (aggregation) cho Dashboard và Báo cáo.
  *
- * Mọi số liệu ở đây đều tính từ `mockSalesOrders` / `mockStockBalances`, nên
+ * Mọi số liệu ở đây đều tính từ `mockSalesOrders` và tồn kho hiện hành, nên
  * dashboard và báo cáo luôn khớp nhau. Không hard-code số tổng ở bất kỳ đâu.
+ *
+ * Các hàm cần tồn kho nhận `balances` qua tham số (không import mảng seed), vì
+ * tồn kho thay đổi lúc chạy — component truyền `state.stock.balances` vào.
  */
 
 const random = createRandom(52061977);
@@ -230,6 +234,8 @@ export const buildCategoryRevenue = (
 export const buildTopSelling = (
   branchId: string | null,
   range: TimeRange,
+  /** Tồn kho hiện tại, truyền từ `state.stock.balances`. */
+  balances: readonly StockBalance[],
   limit = 10,
 ): TopSellingRow[] => {
   const { from, to } = resolveTimeRange(range);
@@ -256,7 +262,7 @@ export const buildTopSelling = (
     .map(([productId, value]) => {
       const product = productById(productId);
       const grossProfit = value.revenue - value.cost;
-      const remainingStock = mockStockBalances
+      const remainingStock = balances
         .filter(
           (balance) =>
             balance.productId === productId &&
@@ -415,9 +421,11 @@ export const buildShrinkageReport = (
 /** Danh sách cảnh báo tồn kho cho dashboard. */
 export const buildInventoryAlerts = (
   branchId: string | null,
+  /** Tồn kho hiện tại, truyền từ `state.stock.balances`. */
+  balances: readonly StockBalance[],
   limit = 8,
 ): InventoryAlertItem[] =>
-  lowStockBalances(branchId)
+  lowStockBalances(balances, branchId)
     .slice(0, limit)
     .map((balance) => {
       const ratio = balance.minStock === 0 ? 1 : balance.quantity / balance.minStock;
@@ -460,6 +468,8 @@ export const percentChange = (current: number, previous: number): number => {
 export const buildDashboardMetrics = (
   branchId: string | null,
   range: TimeRange,
+  /** Tồn kho hiện tại, truyền từ `state.stock.balances`. */
+  balances: readonly StockBalance[],
 ): DashboardMetrics => {
   const { from, to, previousFrom, previousTo } = resolveTimeRange(range);
   const current = filterOrders(branchId, from, to);
@@ -481,10 +491,8 @@ export const buildDashboardMetrics = (
     grossProfit: revenue - cogs,
     previousGrossProfit: previousRevenue - previousCogs,
     itemsSold: sumQuantity(current),
-    lowStockCount: lowStockBalances(branchId).length,
-    stockValue: mockStockBalances
-      .filter((balance) => branchId === null || balance.branchId === branchId)
-      .reduce((sum, balance) => sum + balance.stockValue, 0),
+    lowStockCount: lowStockBalances(balances, branchId).length,
+    stockValue: totalStockValue(balances, branchId),
   };
 };
 
