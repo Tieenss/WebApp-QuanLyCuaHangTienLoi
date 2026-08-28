@@ -16,6 +16,19 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Strict type-checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+
+    /* Path alias (resolved relative to this tsconfig, no baseUrl needed in TS 5.4+) */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

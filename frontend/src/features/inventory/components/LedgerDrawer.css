@@ -1,0 +1,56 @@
+/*
+ * LedgerDrawer.css — style cho Drawer thẻ kho
+ * (features/inventory/components/LedgerDrawer). Tách từ inline style trong TSX.
+ */
+
+/* ── Bảng biến động ──────────────────────────────────────────────── */
+.ledger-text-12 {
+  font-size: 12px;
+}
+
+/* Nhập (+) xanh lá, xuất (−) đỏ. */
+.ledger-delta-in {
+  color: #10b981;
+}
+
+.ledger-delta-out {
+  color: #dc2626;
+}
+
+/* ── Tiêu đề Drawer ──────────────────────────────────────────────── */
+.ledger-drawer-title {
+  font-size: 15px;
+}
+
+.ledger-drawer-subtitle {
+  font-size: 12px;
+}
+
+/* ── Nội dung Drawer ─────────────────────────────────────────────── */
+
+/* Space bọc toàn bộ nội dung chiếm hết chiều rộng. */
+.ledger-drawer-body {
+  width: 100%;
+}
+
+/* Nhãn khối timeline. */
+.ledger-timeline-label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* Dòng loại biến động trên timeline. */
+.ledger-timeline-type {
+  font-size: 12.5px;
+}
+
+/* Tag số lượng thay đổi: màu theo nhập/xuất qua biến `--delta-color`. */
+.ledger-delta-tag {
+  margin: 0;
+  color: var(--delta-color, #6b7280);
+}
+
+/* Ghi chú phụ dưới mỗi mốc timeline. */
+.ledger-timeline-note {
+  font-size: 11.5px;
+}

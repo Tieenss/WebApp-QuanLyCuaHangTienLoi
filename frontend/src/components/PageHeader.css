@@ -1,0 +1,40 @@
+/*
+ * PageHeader.css — style cho đầu trang dùng chung (components/PageHeader).
+ */
+
+/* Card đầu trang: viền đỏ trái 5px là dấu nhận diện Circle K. */
+.page-header-card {
+  border-left: 5px solid #e31837;
+}
+
+/*
+ * Hàng chứa tiêu đề (trái) và khu hành động (phải). Cho phép xuống dòng để
+ * bộ lọc / nút bấm không đè lên tiêu đề trên màn hình hẹp.
+ *
+ * Rule này trước nằm trong CSS của layout quản trị — sai chỗ, vì PageHeader là
+ * component dùng chung, không phụ thuộc layout nào đang hiển thị.
+ */
+.page-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* Nhãn nhóm module hiển thị nhỏ phía trên tiêu đề. */
+.page-header-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+
+/* Tiêu đề trang. */
+.page-header-title {
+  margin: 2px 0 0;
+  font-weight: 800;
+}
+
+/* Mô tả ngắn dưới tiêu đề. */
+.page-header-desc {
+  font-size: 13px;
+}

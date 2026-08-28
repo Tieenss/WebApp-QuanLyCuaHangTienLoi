@@ -1,0 +1,83 @@
+/*
+ * StatCard.css — style cho thẻ KPI dùng chung (components/StatCard).
+ *
+ * Màu nhấn của icon là giá trị động theo từng chỉ số, nên component truyền
+ * biến `--stat-accent` qua style; mọi khai báo khác nằm tại đây.
+ *
+ * Khối bố cục (.stat-card, .stat-card-top, -icon, -value, -trend) trước nằm
+ * trong CSS của layout quản trị — sai chỗ, vì StatCard là component dùng chung
+ * và không phụ thuộc layout nào đang hiển thị.
+ */
+
+/* Thẻ cao bằng nhau khi nằm cùng hàng Row/Col. */
+.stat-card {
+  height: 100%;
+}
+
+/* ── Hàng trên: icon + tiêu đề ───────────────────────────────────── */
+.stat-card .stat-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* Tiêu đề chỉ số phía cạnh icon. */
+.stat-card .stat-card-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/*
+ * Icon nền vuông bo góc. Nền lấy màu thương hiệu của từng KPI với độ mờ ~10%
+ * (tương đương hậu tố alpha "1A" trước đây).
+ */
+.stat-card .stat-card-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--stat-accent, #e31837) 10%, transparent);
+  color: var(--stat-accent, #e31837);
+}
+
+/* ── Con số chính ────────────────────────────────────────────────── */
+.stat-card .stat-card-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.2;
+  /* Số dài (tiền tỷ) không được đẩy vỡ layout thẻ */
+  overflow-wrap: anywhere;
+}
+
+/* ── Hàng dưới: xu hướng tăng/giảm ───────────────────────────────── */
+.stat-card .stat-card-trend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+/* Giá trị % thay đổi — màu quyết định bởi tín hiệu tốt/xấu. */
+.stat-card .stat-card-trend-value {
+  font-weight: 600;
+}
+
+.stat-card .stat-card-trend-value.is-favorable {
+  color: #10b981;
+}
+
+.stat-card .stat-card-trend-value.is-unfavorable {
+  color: #dc2626;
+}
+
+/* Chú thích so sánh với kỳ trước. */
+.stat-card .stat-card-compared {
+  font-size: 12px;
+}

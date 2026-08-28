@@ -1,0 +1,31 @@
+/*
+ * ChartCard.css — style cho khung biểu đồ dùng chung (components/ChartCard).
+ *
+ * Chiều cao vùng vẽ là giá trị động theo prop, nên component truyền biến
+ * `--chart-height` qua style; mọi khai báo khác nằm tại đây.
+ */
+
+/* Khối tiêu đề trong header của Card. */
+.chart-card-title-block {
+  padding: 4px 0;
+}
+
+/* Tên biểu đồ. */
+.chart-card-title {
+  font-size: 15px;
+}
+
+/* Mô tả ngắn dưới tên biểu đồ. */
+.chart-card-desc {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/*
+ * Vùng chứa ResponsiveContainer của recharts — cần chiều cao xác định,
+ * lấy từ biến `--chart-height` (mặc định 300px).
+ */
+.chart-card-plot {
+  width: 100%;
+  height: var(--chart-height, 300px);
+}

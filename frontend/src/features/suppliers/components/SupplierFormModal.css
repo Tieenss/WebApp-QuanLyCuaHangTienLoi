@@ -1,16 +1,9 @@
-/* SupplierFormModal */
+/*
+ * SupplierFormModal.css — style cho form thêm/sửa nhà cung cấp
+ * (features/suppliers/components/SupplierFormModal). Tách từ inline style trong TSX.
+ */
 
-.supplier-modal-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #111827;
-}
-
+/* Form cách tiêu đề modal một khoảng nhỏ. */
 .supplier-form {
-  margin-top: 16px;
-}
-
-.supplier-modal-ok-btn {
-  background-color: #e31837;
-  border-color: #e31837;
+  margin-top: 12px;
 }

@@ -1,0 +1,22 @@
+/*
+ * PosPage.css — bố cục màn hình bán hàng (features/pos/PosPage).
+ *
+ * Chỉ chứa lưới 2 cột của trang. Style của hai panel con nằm ở CSS riêng của
+ * chúng: components/ProductPicker.css và components/CartPanel.css.
+ * Khung ngoài (topbar, nền, padding) thuộc layouts/PosLayout.css.
+ */
+
+.pos-layout {
+  display: grid;
+  /* Lưới sản phẩm rộng, giỏ hàng cố định bên phải để thao tác nhanh */
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* Dưới 1200px không đủ chỗ cho 2 cột: giỏ hàng xuống dưới lưới sản phẩm. */
+@media (max-width: 1200px) {
+  .pos-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

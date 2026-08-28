@@ -1,0 +1,148 @@
+/*
+ * CartPanel.css — giỏ hàng & thanh toán của POS
+ * (features/pos/components/CartPanel).
+ *
+ * Bao gồm cả bố cục panel (sticky, danh sách dòng hàng, khối tổng tiền) —
+ * trước nằm rải trong PosPage.css dù chỉ component này render chúng.
+ */
+
+/* ── Khung panel ─────────────────────────────────────────────────── */
+
+/* Giỏ hàng dính theo màn hình để thu ngân không phải cuộn khi thêm hàng. */
+.pos-cart-panel {
+  position: sticky;
+  /* Dính ngay dưới topbar POS (56px) + padding content (16px). */
+  top: 72px;
+}
+
+/* ── Tiêu đề & empty state ───────────────────────────────────────── */
+.cart-header-count {
+  font-size: 12px;
+}
+
+.cart-empty {
+  padding: 28px 0;
+}
+
+/* ── Danh sách sản phẩm trong giỏ ────────────────────────────────── */
+
+/* Vùng cuộn riêng cho danh sách, giữ khu thanh toán luôn hiện. */
+.pos-cart-lines {
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.pos-cart-line {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px dashed #e5e7eb;
+}
+
+.pos-cart-line:last-child {
+  border-bottom: none;
+}
+
+/* Cột trái: tên + giá, cho phép co lại không tràn. */
+.cart-line-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cart-line-name {
+  font-size: 12.5px;
+  display: block;
+}
+
+.cart-line-price {
+  font-size: 11px;
+}
+
+/* Bộ điều khiển số lượng nằm dưới giá một khoảng nhỏ. */
+.cart-line-qty {
+  margin-top: 6px;
+}
+
+/* Ô nhập số lượng hẹp vừa khớp 3 chữ số. */
+.cart-line-qty-input {
+  width: 56px;
+}
+
+/* Cột phải: thành tiền + nút xoá, căn phải và không bị bóp. */
+.cart-line-total {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.cart-line-amount {
+  font-size: 13px;
+}
+
+/* ── Khu thanh toán dưới giỏ ─────────────────────────────────────── */
+
+/* Space bọc toàn bộ khu thanh toán, cách danh sách hàng phía trên. */
+.cart-footer {
+  width: 100%;
+  margin-top: 14px;
+}
+
+/* Icon người dùng ở ô SĐT thành viên. */
+.cart-member-icon {
+  color: #9ca3af;
+}
+
+/* Ô nhập giảm giá đơn. */
+.cart-discount-input {
+  width: 130px;
+}
+
+/* Nhãn phương thức thanh toán trên Segmented. */
+.cart-payment-label {
+  font-size: 11.5px;
+}
+
+/* ── Dòng tổng tiền ──────────────────────────────────────────────── */
+.pos-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 3px 0;
+}
+
+/* Khối "KHÁCH PHẢI TRẢ" — gạch đậm phía trên để tách khỏi các dòng phụ. */
+.pos-grand-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 2px solid #1c1c1c;
+}
+
+.pos-grand-total-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #e31837;
+}
+
+/* ── Nhận tiền & chốt đơn ────────────────────────────────────────── */
+
+/* Ô nhập tiền khách đưa chiếm hết chiều rộng. */
+.cart-tender-input {
+  width: 100%;
+}
+
+/* Tiền thừa trả khách — xanh lá khi có tiền thừa. */
+.cart-change-positive {
+  color: #10b981;
+}
+
+/* Nút Thanh toán to nổi bật cuối panel. */
+.cart-checkout-btn {
+  height: 48px;
+  font-size: 15px;
+  font-weight: 700;
+}

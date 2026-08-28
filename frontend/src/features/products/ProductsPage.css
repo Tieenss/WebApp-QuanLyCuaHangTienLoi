@@ -1,0 +1,102 @@
+/*
+ * ProductsPage.css — style cho Module 5: Danh mục & Sản phẩm
+ * (features/products/ProductsPage). Tách từ inline style trong TSX.
+ *
+ * Màu danh mục là giá trị động theo từng dòng, nên các rule liên quan dùng
+ * biến `--cat-color` do component truyền xuống.
+ */
+
+/* ── Ô "Sản phẩm" trong bảng ─────────────────────────────────────── */
+
+/* Khối chữ cạnh ảnh: cho phép co lại mà không tràn khung. */
+.product-cell-info {
+  min-width: 0;
+}
+
+/* Tên sản phẩm. */
+.product-name {
+  display: block;
+  font-size: 13px;
+}
+
+/* Dòng phụ: SKU + đơn vị tính. */
+.product-sub {
+  font-size: 11.5px;
+}
+
+/* ── Cột mã vạch ─────────────────────────────────────────────────── */
+.barcode-text {
+  font-size: 12px;
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.barcode-icon {
+  margin-right: 5px;
+  color: #9ca3af;
+}
+
+/* ── Tag danh mục: nền mờ ~8%, viền mờ ~33% theo màu danh mục ────── */
+.category-tag {
+  margin: 0;
+  color: var(--cat-color, #6b7280);
+  background: color-mix(in srgb, var(--cat-color, #6b7280) 8%, transparent);
+  border-color: color-mix(in srgb, var(--cat-color, #6b7280) 33%, transparent);
+}
+
+/* ── Giá bán & lãi gộp ───────────────────────────────────────────── */
+.price-sale {
+  color: #e31837;
+}
+
+.profit-value {
+  color: #10b981;
+}
+
+/* Nhóm giá trị xếp dọc, căn phải trong ô số. */
+.cell-stack-right {
+  align-items: flex-end;
+}
+
+/* Ghi chú nhỏ dưới giá trị chính. */
+.cell-note {
+  font-size: 11px;
+}
+
+/* Tồn dưới ngưỡng tối thiểu — tô đỏ cảnh báo. */
+.stock-below-min {
+  color: #dc2626;
+}
+
+/* ── Hạn sử dụng ─────────────────────────────────────────────────── */
+
+.shelf-life-days {
+  font-size: 12px;
+}
+
+/* Tên nhà cung cấp — cắt ngắn khi quá dài. */
+.supplier-ellipsis {
+  font-size: 12px;
+}
+
+/* ── Tab danh mục ────────────────────────────────────────────────── */
+
+/*
+ * Ô icon emoji của danh mục: nền mờ ~12%, viền mờ ~27%
+ * (tương đương hậu tố alpha "1F" / "44" trước đây).
+ */
+.category-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  background: color-mix(in srgb, var(--cat-color, #6b7280) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cat-color, #6b7280) 27%, transparent);
+}
+
+/* Mô tả danh mục. */
+.cat-desc {
+  font-size: 12.5px;
+}

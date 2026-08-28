@@ -1,0 +1,19 @@
+/*
+ * StatusTag.css — style cho các Tag trạng thái dùng chung
+ * (components/StatusTag).
+ *
+ * Màu của StockLevelTag là giá trị động theo mức tồn, nên component truyền
+ * biến `--stock-color` qua style; mọi khai báo khác nằm tại đây.
+ */
+
+/*
+ * Tag cảnh báo tồn kho: chữ lấy màu gốc, nền mờ ~8% và viền mờ ~33%
+ * (tương đương hậu tố alpha "14" / "55" trước đây).
+ */
+.stock-level-tag {
+  color: var(--stock-color, #e31837);
+  background: color-mix(in srgb, var(--stock-color, #e31837) 8%, transparent);
+  border-color: color-mix(in srgb, var(--stock-color, #e31837) 33%, transparent);
+  font-weight: 600;
+  margin: 0;
+}

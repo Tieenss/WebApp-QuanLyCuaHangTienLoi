@@ -1,0 +1,25 @@
+/*
+ * EmptyState.css — style cho trạng thái rỗng dùng chung (components/EmptyState).
+ * Tách từ inline style trong TSX.
+ */
+
+/* Icon hộp lớn phía trên — màu xám nhạt của viền. */
+.empty-state .empty-state-icon {
+  font-size: 52px;
+  color: #e5e7eb;
+}
+
+/* Tiêu đề trạng thái rỗng. */
+.empty-state-title {
+  display: block;
+}
+
+/* Mô tả bổ sung dưới tiêu đề. */
+.empty-state-desc {
+  font-size: 13px;
+}
+
+/* Khoảng đệm trên/dưới của khối Empty. */
+.empty-state {
+  padding: 32px 0;
+}

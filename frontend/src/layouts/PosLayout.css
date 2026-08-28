@@ -1,0 +1,191 @@
+/*
+ * PosLayout.css — khung giao diện không gian bán hàng (layouts/PosLayout).
+ *
+ * Triết lý khác hẳn AdminLayout: quầy POS cần tối đa diện tích cho lưới sản
+ * phẩm và giỏ hàng, nên không có sidebar, không breadcrumb, không footer.
+ * Topbar mỏng 56px (so với 64px của admin) và chỉ chứa thông tin ca bán hàng.
+ *
+ * Style *nội dung* POS (lưới sản phẩm, giỏ hàng, tổng tiền) không nằm ở đây —
+ * chúng thuộc về features/pos/PosPage.css, ProductPicker.css, CartPanel.css.
+ */
+
+.pos-shell {
+  min-height: 100vh;
+  background: #f4f6f8;
+}
+
+/* ── Topbar ──────────────────────────────────────────────────────── */
+.pos-shell .pos-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 56px;
+  padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  /* Nền tối để phân biệt rõ với không gian quản trị nền sáng, đồng thời
+     giảm mỏi mắt cho thu ngân đứng quầy suốt ca. */
+  background: #111315;
+  border-bottom: 2px solid #e31837;
+}
+
+.pos-topbar-left,
+.pos-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ── Khối thương hiệu ────────────────────────────────────────────── */
+.pos-topbar .pos-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+.pos-topbar .pos-brand-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 3px;
+  flex-shrink: 0;
+}
+
+.pos-topbar .pos-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.pos-topbar .pos-brand-name {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.pos-topbar .pos-brand-tagline {
+  color: #ffc72c;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+/* ── Chọn chi nhánh ──────────────────────────────────────────────── */
+.pos-topbar .pos-branch-select {
+  min-width: 240px;
+}
+
+.pos-topbar .pos-branch-icon {
+  color: #e31837;
+}
+
+/* ── Thẻ thông tin ca ────────────────────────────────────────────── */
+.pos-topbar .pos-chip {
+  margin: 0;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11.5px;
+}
+
+.pos-topbar .pos-chip-shift {
+  background: rgba(255, 199, 44, 0.18);
+  color: #ffc72c;
+  font-weight: 600;
+}
+
+.pos-topbar .pos-chip-count {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* ── Nút quay về khu quản trị ────────────────────────────────────── */
+.pos-topbar .pos-admin-btn {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pos-topbar .pos-admin-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Chip người dùng ─────────────────────────────────────────────── */
+.pos-topbar .pos-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.pos-topbar .pos-user-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.pos-topbar .pos-user-avatar {
+  background: #e31837;
+  color: #ffffff;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pos-topbar .pos-user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.pos-topbar .pos-user-name {
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.pos-topbar .pos-user-role {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10.5px;
+}
+
+/* Mũi tên đổi vai trò trong chip người dùng. */
+.pos-topbar .pos-user-chip-swap {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+}
+
+/* ── Vùng nội dung ───────────────────────────────────────────────── */
+.pos-shell .pos-content {
+  padding: 16px;
+}
+
+/*
+ * Thu hẹp dần trên màn hình nhỏ. Máy POS tại quầy thường 1366px trở lên,
+ * nhưng vẫn cần dùng được trên tablet khi kiểm hàng.
+ */
+@media (max-width: 992px) {
+  .pos-topbar .pos-branch-select {
+    min-width: 150px;
+  }
+  .pos-topbar .pos-brand-text,
+  .pos-topbar .pos-chip-session {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .pos-topbar .pos-user-meta {
+    display: none;
+  }
+  .pos-topbar .pos-admin-btn-text {
+    display: none;
+  }
+}

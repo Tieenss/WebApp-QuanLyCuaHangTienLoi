@@ -1,0 +1,111 @@
+/*
+ * ReportsPage.css — style cho Module 13: Báo cáo quản trị
+ * (features/reports/ReportsPage). Tách từ inline style trong TSX.
+ */
+
+/* ── Bảng lợi nhuận ──────────────────────────────────────────────── */
+
+/* Tên đối tượng (chi nhánh / danh mục). */
+.report-dimension {
+  font-size: 12.5px;
+}
+
+/* Lợi nhuận gộp — xanh lá. */
+.report-profit {
+  color: #10b981;
+}
+
+/* Chi phí vận hành — vàng cảnh báo. */
+.report-opcost {
+  color: #f59e0b;
+}
+
+/* Lợi nhuận thuần dương — đỏ thương hiệu. */
+.report-net-positive {
+  color: #e31837;
+}
+
+/* Lợi nhuận thuần âm — đỏ lỗi. */
+.report-net-negative {
+  color: #dc2626;
+}
+
+/* Tỷ suất thuần theo dấu. */
+.report-margin-positive {
+  color: #10b981;
+}
+
+.report-margin-negative {
+  color: #dc2626;
+}
+
+/* ── Bảng hàng bán chạy ──────────────────────────────────────────── */
+
+/* Hạng top 3 tô đỏ thương hiệu. */
+.rank-top {
+  color: #e31837;
+}
+
+/* Khối chữ cạnh ảnh sản phẩm. */
+.report-product-info {
+  min-width: 0;
+}
+
+.report-product-name {
+  display: block;
+  font-size: 12.5px;
+}
+
+.report-product-sub {
+  font-size: 11.5px;
+}
+
+/* Lãi gộp — xanh lá. */
+.report-gross {
+  color: #10b981;
+}
+
+/* Tồn còn lại dưới 20 đơn vị — đỏ cảnh báo. */
+.stock-low {
+  color: #dc2626;
+}
+
+/* ── Bảng hao hụt ────────────────────────────────────────────────── */
+
+/* Chữ cỡ nhỏ dùng lặp lại trong bảng. */
+.report-text-12-5 {
+  font-size: 12.5px;
+}
+
+/* Tên sản phẩm trong bảng hao hụt. */
+.report-shrink-name {
+  display: block;
+  font-size: 12.5px;
+}
+
+.report-shrink-sub {
+  font-size: 11.5px;
+}
+
+/* Giá trị tổn thất — đỏ lỗi. */
+.report-loss {
+  color: #dc2626;
+}
+
+/* ── Bộ lọc & liên kết xuất Excel ────────────────────────────────── */
+
+/* Select chọn chi nhánh không bị co hẹp khi Space wrap. */
+.report-branch-select {
+  min-width: 230px;
+}
+
+/* Space bọc các card lợi nhuận chiếm hết chiều rộng tab. */
+.report-stack-full {
+  width: 100%;
+}
+
+/* Liên kết "Xuất Excel" trên tiêu đề card. */
+.export-link {
+  cursor: pointer;
+  color: #e31837;
+}

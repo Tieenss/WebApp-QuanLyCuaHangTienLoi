@@ -1,17 +1,17 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
-import dashboardReducer from './slices/dashboardSlice';
+import uiReducer from './slices/uiSlice';
+import posReducer from './slices/posSlice';
+import inventoryReducer from './slices/inventorySlice';
 import supplierReducer from './slices/supplierSlice';
-import internalExportReducer from './slices/internalExportSlice';
-import branchReducer from './slices/branchSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
-    dashboard: dashboardReducer,
+    ui: uiReducer,
+    pos: posReducer,
+    inventory: inventoryReducer,
     supplier: supplierReducer,
-    internalExport: internalExportReducer,
-    branch: branchReducer,
   },
 });
 

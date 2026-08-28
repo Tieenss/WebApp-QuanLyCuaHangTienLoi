@@ -1,0 +1,100 @@
+/*
+ * LoginPage.css — style riêng cho phần form của trang Đăng nhập
+ * (features/auth/LoginPage).
+ *
+ * Khung 2 cột, panel thương hiệu và logo do AuthLayout đảm nhiệm
+ * (layouts/AuthLayout.css). Ở đây chỉ còn style thuộc về nội dung form.
+ * Các rule được scope dưới .login-page để thắng độ ưu tiên so với style
+ * mặc định của Ant Design.
+ */
+
+/* Tiêu đề & mô tả form đăng nhập. */
+.login-page .login-title {
+  margin-bottom: 4px;
+  font-weight: 800;
+}
+
+.login-page .login-subtitle {
+  margin-bottom: 24px;
+}
+
+/* Alert báo lỗi đăng nhập. */
+.login-page .login-alert {
+  margin-bottom: 18px;
+}
+
+/* Icon trong ô nhập tên đăng nhập / mật khẩu. */
+.login-page .login-input-icon {
+  color: #9ca3af;
+}
+
+/* Nút gửi form. */
+.login-page .login-submit-btn {
+  font-weight: 600;
+  height: 44px;
+}
+
+/* Divider phía trên danh sách tài khoản demo. */
+.login-page .login-divider {
+  margin-top: 28px;
+}
+
+.login-page .login-divider-text {
+  font-size: 12px;
+}
+
+/* ── Danh sách tài khoản demo bấm để điền nhanh form ─────────────── */
+.login-page .login-demo-list {
+  width: 100%;
+}
+
+.login-page .demo-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.login-page .demo-account-row:hover {
+  border-color: #e31837;
+  background: #fff1f3;
+}
+
+.login-page .demo-account-info {
+  min-width: 0;
+}
+
+.login-page .demo-account-role {
+  display: block;
+  font-size: 13px;
+}
+
+.login-page .demo-account-desc {
+  font-size: 11.5px;
+}
+
+.login-page .demo-account-tag {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* Card gợi ý mật khẩu dùng chung. */
+.login-page .login-hint-card {
+  margin-top: 14px;
+  background: #f9fafb;
+  border-style: dashed;
+}
+
+.login-page .login-hint-text {
+  font-size: 12px;
+}

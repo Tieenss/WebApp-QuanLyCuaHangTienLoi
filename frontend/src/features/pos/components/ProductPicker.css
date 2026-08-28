@@ -1,0 +1,143 @@
+/*
+ * ProductPicker.css — khu chọn sản phẩm của POS
+ * (features/pos/components/ProductPicker).
+ *
+ * Gồm thanh quét mã vạch / tìm kiếm, dải danh mục, và lưới thẻ sản phẩm.
+ * Toàn bộ style của thẻ sản phẩm nằm ở đây — trước bị xẻ đôi với PosPage.css
+ * (file đó khai báo diện mạo thẻ, file này thêm `width`), khiến việc sửa một
+ * thẻ phải mở hai file và dễ tạo rule xung đột.
+ */
+
+/* Tag đếm số mặt hàng trong tiêu đề card. */
+.picker-count-tag {
+  margin: 0;
+}
+
+/* Space bọc toàn bộ nội dung card chiếm hết chiều rộng. */
+.picker-body {
+  width: 100%;
+}
+
+/* ── Thanh quét mã vạch & tìm kiếm ───────────────────────────────── */
+
+/* Compact gồm ô quét mã vạch + ô tìm kiếm. */
+.picker-compact {
+  width: 100%;
+}
+
+/* Ô quét mã vạch chiếm 52% chiều rộng, phần còn lại là ô tìm kiếm. */
+.picker-barcode-input {
+  width: 52%;
+}
+
+/* Icon mã vạch màu thương hiệu. */
+.picker-barcode-icon {
+  color: #e31837;
+}
+
+/* Icon kính lúp của ô tìm kiếm. */
+.picker-search-icon {
+  color: #9ca3af;
+}
+
+/* Dải Segmented danh mục cho phép cuộn ngang khi hẹp. */
+.picker-category-scroll {
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+/* Empty state khi không có sản phẩm khớp. */
+.picker-empty {
+  padding: 40px 0;
+}
+
+/* ── Lưới sản phẩm ───────────────────────────────────────────────── */
+
+/*
+ * Chiều cao vùng cuộn tính theo viewport trừ topbar POS (56px), padding
+ * content (32px) và chrome của Card, để giỏ hàng luôn nằm trong tầm mắt
+ * thay vì phải cuộn cả trang.
+ */
+.pos-product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 12px;
+  max-height: calc(100vh - 230px);
+  overflow-y: auto;
+  padding: 2px 4px 4px 2px;
+}
+
+/* ── Thẻ sản phẩm ────────────────────────────────────────────────── */
+.pos-product-card {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+
+.pos-product-card:hover:not(:disabled) {
+  border-color: #e31837;
+  box-shadow: 0 4px 14px rgba(227, 24, 55, 0.14);
+  transform: translateY(-2px);
+}
+
+/* Hết hàng: mờ đi và chặn con trỏ để thu ngân không bấm nhầm. */
+.pos-product-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pos-product-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.35;
+  /* Giới hạn 2 dòng để mọi thẻ cao bằng nhau */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 34px;
+}
+
+/* Nhãn tồn kho / hết hàng trên thẻ. */
+.picker-stock-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.picker-stock-label.is-out {
+  color: #dc2626;
+}
+
+/* Hàng giá + SKU dưới cùng của thẻ. */
+.picker-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.pos-product-price {
+  font-size: 14px;
+  font-weight: 800;
+  color: #e31837;
+}
+
+/* SKU nhỏ mờ góc phải thẻ. */
+.picker-sku {
+  font-size: 10px;
+  color: #9ca3af;
+}
