@@ -1,32 +1,60 @@
 import { useMemo, useState, type FC } from 'react';
-import { Card, Table, Tabs, Tag, Tooltip, Typography } from 'antd';
+import {
+  App as AntdApp,
+  Button,
+  Card,
+  Popconfirm,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import {
+  CheckCircleOutlined,
+  DollarOutlined,
+  EditOutlined,
+  UndoOutlined,
+} from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { AttendanceStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  canApprovePayment,
+  canConfirmHours,
+  confirmHours,
+  openHourAdjust,
+  payrollPaid,
+  resetHourAdjust,
+} from '@/store/slices/payrollSlice';
 import {
   ATTENDANCE_STATUS,
   ATTENDANCE_STATUS_LABEL,
   EMPLOYMENT_TYPE_LABEL,
+  PAYROLL_STATUS,
+  PAYROLL_STATUS_COLOR,
+  PAYROLL_STATUS_LABEL,
   SHIFT_CODE,
   SHIFT_SHORT_LABEL,
+  USER_ROLE,
+  USER_ROLE_LABEL,
   type AttendanceRecord,
   type AttendanceStatus,
   type PayrollRow,
+  type PayrollStatus,
   type ShiftCode,
 } from '@/types';
 import { mockBranches } from '@/mockData/branches';
-import {
-  CURRENT_PAYROLL_PERIOD,
-  mockAttendance,
-  mockPayroll,
-} from '@/mockData/employees';
-import { formatDate, formatPeriod, formatTime } from '@/utils/dateUtils';
+import { CURRENT_PAYROLL_PERIOD, mockAttendance } from '@/mockData/employees';
+import { formatDate, formatDateTime, formatPeriod, formatTime, nowIso } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
+import { HourAdjustModal } from './components/HourAdjustModal';
 import './AttendancePage.css';
 
 const { Text } = Typography;
@@ -35,18 +63,38 @@ const { Text } = Typography;
 const ATTENDANCE_DISPLAY_LIMIT = 600;
 
 /**
- * Module 11 — Chấm công & Bảng lương.
+ * Module 11 — Chấm công & Bảng lương (duyệt 2 tầng).
  *
  * Tab chấm công là dữ liệu gốc; tab bảng lương là kết quả tính từ chính dữ liệu
  * đó (giờ làm × lương giờ × hệ số ca, trừ vi phạm), nên hai tab luôn khớp nhau.
+ *
+ * Luồng duyệt: Quản lý chi nhánh xác nhận giờ làm thu ngân (Tầng 1) → Kế toán
+ * duyệt chi (Tầng 2). Lương Kế toán do Admin duyệt. Không ai tự duyệt cho mình.
  */
 export const AttendancePage: FC = () => {
-  const activeBranchId = useAppSelector((state) => state.auth.activeBranchId);
+  const dispatch = useAppDispatch();
+  const { message } = AntdApp.useApp();
+
+  const { user, activeBranchId } = useAppSelector((state) => state.auth);
+  const payrollRows = useAppSelector((state) => state.payroll.rows);
 
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState<string | null>(activeBranchId);
   const [shiftFilter, setShiftFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [payrollStatusFilter, setPayrollStatusFilter] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  /** Người đang thao tác — dùng cho mọi kiểm tra quyền duyệt. */
+  const actor = useMemo(
+    () => ({
+      actorId: user?.id ?? '',
+      actorName:
+        user === null ? 'Không xác định' : `${user.fullName} (${user.employeeCode})`,
+      actorRole: user?.role ?? USER_ROLE.Cashier,
+    }),
+    [user],
+  );
 
   const attendance = useMemo(
     () =>
@@ -70,12 +118,25 @@ export const AttendancePage: FC = () => {
 
   const payroll = useMemo(
     () =>
-      mockPayroll.filter((row) => {
+      payrollRows.filter((row) => {
         const matchSearch = matchKeyword(search, [row.employeeName, row.employeeCode]);
         const matchBranch = branchFilter === null || row.branchId === branchFilter;
-        return matchSearch && matchBranch;
+        const matchStatus =
+          payrollStatusFilter === null || row.status === payrollStatusFilter;
+        return matchSearch && matchBranch && matchStatus;
       }),
-    [search, branchFilter],
+    [payrollRows, search, branchFilter, payrollStatusFilter],
+  );
+
+  /** Dòng đang chọn mà người dùng thực sự được duyệt chi. */
+  const approvableSelected = useMemo(
+    () =>
+      payrollRows.filter(
+        (row) =>
+          selectedIds.includes(row.id) &&
+          canApprovePayment(row, actor.actorId, actor.actorRole),
+      ),
+    [payrollRows, selectedIds, actor],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
@@ -88,10 +149,16 @@ export const AttendancePage: FC = () => {
     );
     const totalHours = scoped.reduce((sum, record) => sum + record.workedHours, 0);
 
-    const scopedPayroll = mockPayroll.filter(
+    const scopedPayroll = payrollRows.filter(
       (row) => branchFilter === null || row.branchId === branchFilter,
     );
     const totalNetPay = scopedPayroll.reduce((sum, row) => sum + row.netPay, 0);
+    const pendingConfirm = scopedPayroll.filter(
+      (row) => row.status === PAYROLL_STATUS.PendingConfirm,
+    );
+    const pendingPayment = scopedPayroll.filter(
+      (row) => row.status === PAYROLL_STATUS.Confirmed,
+    );
 
     return [
       {
@@ -103,17 +170,24 @@ export const AttendancePage: FC = () => {
       },
       {
         key: 'late',
-        title: 'Số lần đi muộn',
-        value: formatNumber(late.length),
+        title: 'Đi muộn / Vắng',
+        value: `${formatNumber(late.length)} / ${formatNumber(absent.length)}`,
         suffix: 'lượt',
         color: BRAND.warning,
       },
       {
-        key: 'absent',
-        title: 'Vắng không phép',
-        value: formatNumber(absent.length),
-        suffix: 'lượt',
-        color: BRAND.error,
+        key: 'pending',
+        title: 'Chờ xác nhận giờ (Tầng 1)',
+        value: formatNumber(pendingConfirm.length),
+        suffix: 'bảng',
+        color: BRAND.warning,
+      },
+      {
+        key: 'awaiting',
+        title: 'Chờ duyệt chi (Tầng 2)',
+        value: formatNumber(pendingPayment.length),
+        suffix: 'bảng',
+        color: BRAND.info,
       },
       {
         key: 'payroll',
@@ -122,7 +196,7 @@ export const AttendancePage: FC = () => {
         color: BRAND.success,
       },
     ];
-  }, [branchFilter]);
+  }, [branchFilter, payrollRows]);
 
   const branchOptions = useMemo(
     () => mockBranches.map((branch) => ({ value: branch.id, label: branch.name })),
@@ -157,6 +231,22 @@ export const AttendancePage: FC = () => {
         value: status,
         label: ATTENDANCE_STATUS_LABEL[status],
       })),
+    },
+  ];
+
+  /** Bộ lọc riêng cho tab bảng lương: chi nhánh + trạng thái duyệt. */
+  const payrollFilters: ToolbarFilter[] = [
+    attendanceFilters[0] as ToolbarFilter,
+    {
+      key: 'payrollStatus',
+      placeholder: 'Trạng thái duyệt',
+      value: payrollStatusFilter,
+      onChange: setPayrollStatusFilter,
+      options: Object.values(PAYROLL_STATUS).map((status) => ({
+        value: status,
+        label: PAYROLL_STATUS_LABEL[status],
+      })),
+      span: 5,
     },
   ];
 
@@ -255,6 +345,53 @@ export const AttendancePage: FC = () => {
     },
   ];
 
+  /** Tầng 1 — Quản lý xác nhận giờ làm. */
+  const handleConfirm = (row: PayrollRow): void => {
+    dispatch(
+      confirmHours({
+        ...actor,
+        id: row.id,
+        actorBranchId: user?.branchId ?? null,
+      }),
+    );
+    message.success(`Đã xác nhận giờ làm của ${row.employeeName}.`);
+  };
+
+  /**
+   * Tầng 2 — Kế toán / Admin duyệt chi.
+   * Một dispatch làm cả hai việc: đổi trạng thái bảng lương và sinh phiếu chi
+   * sổ quỹ (CHI / TRA_LUONG).
+   */
+  const handleApprove = (row: PayrollRow): void => {
+    dispatch(
+      payrollPaid({
+        rows: [row],
+        approvedBy: actor.actorName,
+        paidAt: nowIso(),
+      }),
+    );
+    message.success(
+      `Đã duyệt chi ${formatVND(row.netPay)} cho ${row.employeeName}. Phiếu chi lương đã ghi vào sổ quỹ.`,
+    );
+  };
+
+  const handleApproveBatch = (): void => {
+    const rows = approvableSelected;
+    const total = rows.reduce((sum, row) => sum + row.netPay, 0);
+
+    dispatch(
+      payrollPaid({
+        rows,
+        approvedBy: actor.actorName,
+        paidAt: nowIso(),
+      }),
+    );
+    setSelectedIds([]);
+    message.success(
+      `Đã duyệt chi ${rows.length} bảng lương, tổng ${formatVND(total)}. Đã ghi ${rows.length} phiếu chi vào sổ quỹ.`,
+    );
+  };
+
   const payrollColumns: ColumnsType<PayrollRow> = [
     {
       title: 'Nhân viên',
@@ -267,7 +404,7 @@ export const AttendancePage: FC = () => {
             {name}
           </Text>
           <Text type="secondary" className="pay-sub">
-            {row.employeeCode} · {EMPLOYMENT_TYPE_LABEL[row.employmentType]}
+            {row.employeeCode} · {USER_ROLE_LABEL[row.role]}
           </Text>
         </span>
       ),
@@ -275,8 +412,19 @@ export const AttendancePage: FC = () => {
     {
       title: 'Chi nhánh',
       dataIndex: 'branchName',
-      width: 200,
+      width: 190,
       render: (value: string) => <Text className="pay-text-12-5">{value}</Text>,
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      align: 'center',
+      width: 150,
+      render: (status: PayrollStatus) => (
+        <Tag color={PAYROLL_STATUS_COLOR[status]} className="tag-no-margin">
+          {PAYROLL_STATUS_LABEL[status]}
+        </Tag>
+      ),
     },
     {
       title: 'Số ca',
@@ -287,21 +435,32 @@ export const AttendancePage: FC = () => {
     },
     {
       title: 'Giờ làm',
-      dataIndex: 'totalHours',
+      key: 'hours',
       align: 'right',
-      width: 95,
-      render: (value: number) => (
-        <span className="numeric-cell">{value.toFixed(1)}h</span>
-      ),
+      width: 130,
+      render: (_, row) =>
+        row.adjustedHours === null ? (
+          <span className="numeric-cell">{row.totalHours.toFixed(1)}h</span>
+        ) : (
+          // Giờ đã điều chỉnh: hiện cả số gốc bị gạch để đối chiếu.
+          <Tooltip title={`Lý do: ${row.adjustReason}`}>
+            <Space direction="vertical" size={0} className="pay-hours-stack">
+              <Text strong className="numeric-cell pay-hours-adjusted">
+                {row.adjustedHours.toFixed(1)}h
+              </Text>
+              <Text type="secondary" delete className="pay-hours-origin">
+                {row.totalHours.toFixed(1)}h
+              </Text>
+            </Space>
+          </Tooltip>
+        ),
     },
     {
       title: 'Ngoài giờ',
       dataIndex: 'overtimeHours',
       align: 'right',
       width: 95,
-      render: (value: number) => (
-        <span className="numeric-cell">{value}h</span>
-      ),
+      render: (value: number) => <span className="numeric-cell">{value}h</span>,
     },
     {
       title: 'Lương cứng',
@@ -336,9 +495,7 @@ export const AttendancePage: FC = () => {
         value === 0 ? (
           <Text type="secondary">—</Text>
         ) : (
-          <span className="numeric-cell pay-overtime">
-            {formatVND(value)}
-          </span>
+          <span className="numeric-cell pay-overtime">{formatVND(value)}</span>
         ),
     },
     {
@@ -350,9 +507,7 @@ export const AttendancePage: FC = () => {
         value === 0 ? (
           <Text type="secondary">—</Text>
         ) : (
-          <span className="numeric-cell pay-bonus">
-            +{formatVND(value)}
-          </span>
+          <span className="numeric-cell pay-bonus">+{formatVND(value)}</span>
         ),
     },
     {
@@ -365,9 +520,7 @@ export const AttendancePage: FC = () => {
           <Text type="secondary">—</Text>
         ) : (
           <Tooltip title="Trừ do đi muộn hoặc vắng không phép">
-            <span className="numeric-cell pay-deduction">
-              -{formatVND(value)}
-            </span>
+            <span className="numeric-cell pay-deduction">-{formatVND(value)}</span>
           </Tooltip>
         ),
     },
@@ -376,13 +529,127 @@ export const AttendancePage: FC = () => {
       dataIndex: 'netPay',
       align: 'right',
       width: 150,
-      fixed: 'right',
       sorter: (a, b) => a.netPay - b.netPay,
       render: (value: number) => (
         <Text strong className="numeric-cell pay-net">
           {formatVND(value)}
         </Text>
       ),
+    },
+    {
+      title: 'Duyệt bởi',
+      key: 'approval',
+      width: 230,
+      render: (_, row) => (
+        <Space direction="vertical" size={0}>
+          {row.confirmedBy !== null && (
+            <Text type="secondary" className="pay-approval-line">
+              T1: {row.confirmedBy} · {formatDateTime(row.confirmedAt)}
+            </Text>
+          )}
+          {row.paidBy !== null && (
+            <Text type="secondary" className="pay-approval-line">
+              T2: {row.paidBy} · {formatDateTime(row.paidAt)}
+            </Text>
+          )}
+          {row.confirmedBy === null && row.paidBy === null && (
+            <Text type="secondary">—</Text>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: 'Hành động',
+      key: 'actions',
+      align: 'center',
+      width: 130,
+      fixed: 'right',
+      render: (_, row) => {
+        const canConfirm = canConfirmHours(
+          row,
+          actor.actorId,
+          actor.actorRole,
+          user?.branchId ?? null,
+        );
+        const canApprove = canApprovePayment(row, actor.actorId, actor.actorRole);
+        const isOwnPayroll = row.employeeId === actor.actorId;
+
+        // Đã thanh toán là trạng thái cuối; không có hành động nào nữa.
+        if (row.status === PAYROLL_STATUS.Paid) {
+          return <Text type="secondary">Hoàn tất</Text>;
+        }
+
+        return (
+          <Space size={4}>
+            {row.status === PAYROLL_STATUS.PendingConfirm && canConfirm && (
+              <>
+                <Tooltip title="Điều chỉnh giờ làm">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => dispatch(openHourAdjust(row.id))}
+                  />
+                </Tooltip>
+
+                {row.adjustedHours !== null && (
+                  <Tooltip title="Bỏ điều chỉnh, trả về giờ hệ thống">
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<UndoOutlined />}
+                      onClick={() => dispatch(resetHourAdjust(row.id))}
+                    />
+                  </Tooltip>
+                )}
+
+                <Popconfirm
+                  title="Xác nhận giờ làm?"
+                  description="Bảng lương sẽ chuyển sang chờ Kế toán duyệt chi."
+                  okText="Xác nhận"
+                  cancelText="Huỷ"
+                  onConfirm={() => handleConfirm(row)}
+                >
+                  <Tooltip title="Xác nhận giờ làm (Tầng 1)">
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CheckCircleOutlined className="pay-action-confirm" />}
+                    />
+                  </Tooltip>
+                </Popconfirm>
+              </>
+            )}
+
+            {row.status === PAYROLL_STATUS.Confirmed && canApprove && (
+              <Popconfirm
+                title="Duyệt chi lương?"
+                description={`Chi ${formatVND(row.netPay)} cho ${row.employeeName}.`}
+                okText="Duyệt chi"
+                cancelText="Huỷ"
+                onConfirm={() => handleApprove(row)}
+              >
+                <Button type="primary" size="small" icon={<DollarOutlined />}>
+                  Duyệt chi
+                </Button>
+              </Popconfirm>
+            )}
+
+            {/* Giải thích vì sao không có nút, thay vì để ô trống. */}
+            {isOwnPayroll && (
+              <Tooltip title="Không ai được tự duyệt lương cho chính mình.">
+                <Text type="secondary" className="pay-own-note">
+                  Lương của bạn
+                </Text>
+              </Tooltip>
+            )}
+
+            {!isOwnPayroll && !canConfirm && !canApprove && (
+              <Text type="secondary">—</Text>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -421,13 +688,16 @@ export const AttendancePage: FC = () => {
         { header: 'Kỳ lương', accessor: (row) => row.period },
         { header: 'Mã NV', accessor: (row) => row.employeeCode },
         { header: 'Nhân viên', accessor: (row) => row.employeeName },
+        { header: 'Vai trò', accessor: (row) => USER_ROLE_LABEL[row.role] },
         { header: 'Chi nhánh', accessor: (row) => row.branchName },
         {
           header: 'Loại hợp đồng',
           accessor: (row) => EMPLOYMENT_TYPE_LABEL[row.employmentType],
         },
         { header: 'Số ca', accessor: (row) => row.totalShifts },
-        { header: 'Giờ làm', accessor: (row) => row.totalHours },
+        { header: 'Giờ hệ thống', accessor: (row) => row.totalHours },
+        { header: 'Giờ điều chỉnh', accessor: (row) => row.adjustedHours ?? '' },
+        { header: 'Lý do điều chỉnh', accessor: (row) => row.adjustReason },
         { header: 'Giờ ngoài', accessor: (row) => row.overtimeHours },
         { header: 'Lương cứng', accessor: (row) => row.baseSalary },
         { header: 'Lương theo ca', accessor: (row) => row.shiftPay },
@@ -435,8 +705,14 @@ export const AttendancePage: FC = () => {
         { header: 'Thưởng', accessor: (row) => row.bonus },
         { header: 'Khoản trừ', accessor: (row) => row.deduction },
         { header: 'Thực nhận', accessor: (row) => row.netPay },
+        {
+          header: 'Trạng thái',
+          accessor: (row) => PAYROLL_STATUS_LABEL[row.status],
+        },
+        { header: 'Xác nhận giờ (T1)', accessor: (row) => row.confirmedBy ?? '' },
+        { header: 'Duyệt chi (T2)', accessor: (row) => row.paidBy ?? '' },
       ],
-      `Bang luong ${CURRENT_PAYROLL_PERIOD} Circle K`,
+      `Bang luong ${CURRENT_PAYROLL_PERIOD}`,
     );
   };
 
@@ -497,12 +773,34 @@ export const AttendancePage: FC = () => {
                     searchValue={search}
                     searchPlaceholder="Tìm theo tên hoặc mã nhân viên..."
                     onSearchChange={setSearch}
-                    filters={[attendanceFilters[0] as ToolbarFilter]}
+                    filters={payrollFilters}
                     onExport={handleExportPayroll}
                     onReset={() => {
                       setSearch('');
                       setBranchFilter(null);
+                      setPayrollStatusFilter(null);
+                      setSelectedIds([]);
                     }}
+                    actions={
+                      approvableSelected.length > 0 && (
+                        <Popconfirm
+                          title={`Duyệt chi ${approvableSelected.length} bảng lương?`}
+                          description={`Tổng chi ${formatVND(
+                            approvableSelected.reduce(
+                              (sum, row) => sum + row.netPay,
+                              0,
+                            ),
+                          )}. Hành động này không hoàn tác được.`}
+                          okText="Duyệt chi"
+                          cancelText="Huỷ"
+                          onConfirm={handleApproveBatch}
+                        >
+                          <Button type="primary" icon={<DollarOutlined />}>
+                            Duyệt chi {approvableSelected.length} bảng
+                          </Button>
+                        </Popconfirm>
+                      )
+                    }
                   />
 
                   <Table<PayrollRow>
@@ -510,8 +808,23 @@ export const AttendancePage: FC = () => {
                     dataSource={payroll}
                     rowKey="id"
                     size="small"
-                    scroll={{ x: 1700 }}
+                    scroll={{ x: 2100 }}
                     className="dense-table"
+                    /**
+                     * Chỉ cho chọn dòng đang chờ duyệt chi mà người dùng có quyền —
+                     * tránh việc tick được rồi mới báo lỗi.
+                     */
+                    rowSelection={{
+                      selectedRowKeys: selectedIds,
+                      onChange: (keys) => setSelectedIds(keys as string[]),
+                      getCheckboxProps: (row) => ({
+                        disabled: !canApprovePayment(
+                          row,
+                          actor.actorId,
+                          actor.actorRole,
+                        ),
+                      }),
+                    }}
                     pagination={{
                       pageSize: 15,
                       showSizeChanger: true,
@@ -522,14 +835,15 @@ export const AttendancePage: FC = () => {
                       const totalNet = rows.reduce((sum, row) => sum + row.netPay, 0);
                       return (
                         <Table.Summary.Row>
-                          <Table.Summary.Cell index={0} colSpan={10}>
-                            <Text strong>Tổng chi lương</Text>
+                          <Table.Summary.Cell index={0} colSpan={12}>
+                            <Text strong>Tổng chi lương (trang hiện tại)</Text>
                           </Table.Summary.Cell>
-                          <Table.Summary.Cell index={10} align="right">
+                          <Table.Summary.Cell index={12} align="right">
                             <Text strong className="pay-net">
                               {formatVND(totalNet)}
                             </Text>
                           </Table.Summary.Cell>
+                          <Table.Summary.Cell index={13} colSpan={2} />
                         </Table.Summary.Row>
                       );
                     }}
@@ -540,6 +854,8 @@ export const AttendancePage: FC = () => {
           ]}
         />
       </Card>
+
+      <HourAdjustModal />
     </>
   );
 };

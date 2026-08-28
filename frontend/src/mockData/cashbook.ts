@@ -41,28 +41,37 @@ interface RawCashEntry {
   description: string;
 }
 
-/** Chi phí vận hành định kỳ theo tháng của mỗi cửa hàng. */
+/**
+ * Chi phí vận hành định kỳ theo tháng của mỗi cửa hàng.
+ *
+ * Đặc tả chỉ có 5 hạng mục (`so_quy.hang_muc`), không tách riêng thuê mặt bằng
+ * / điện nước / bảo trì, nên tất cả ghi vào `KHAC` và phân biệt bằng `label`.
+ */
 const monthlyFixedCosts: readonly {
   category: CashCategory;
   label: string;
+  counterparty: string;
   min: number;
   max: number;
 }[] = [
   {
-    category: CASH_CATEGORY.Rent,
+    category: CASH_CATEGORY.Other,
     label: 'Tiền thuê mặt bằng tháng',
+    counterparty: 'Chủ mặt bằng',
     min: 45_000_000,
     max: 95_000_000,
   },
   {
-    category: CASH_CATEGORY.Utilities,
+    category: CASH_CATEGORY.Other,
     label: 'Tiền điện, nước, internet',
+    counterparty: 'Nhà cung cấp dịch vụ',
     min: 12_000_000,
     max: 26_000_000,
   },
   {
-    category: CASH_CATEGORY.Maintenance,
-    label: 'Bảo trì tủ mát, máy Froster',
+    category: CASH_CATEGORY.Other,
+    label: 'Bảo trì tủ mát, máy pha chế',
+    counterparty: 'Nhà cung cấp dịch vụ',
     min: 2_500_000,
     max: 9_000_000,
   },
@@ -132,18 +141,18 @@ const buildRawEntries = (): RawCashEntry[] => {
     const date = dayjs().subtract(randomInt(random, 0, CASHBOOK_DAYS - 1), 'day');
     entries.push({
       direction: CASH_FLOW_DIRECTION.Payment,
-      category: CASH_CATEGORY.SupplierPayment,
+      category: CASH_CATEGORY.PurchaseGoods,
       branchId: null,
       entryDate: date.format('YYYY-MM-DD'),
       amount: roundTo(randomInt(random, 28_000_000, 180_000_000), 100_000),
       paymentMethod: PAYMENT_METHOD.BankTransfer,
       counterparty: randomPick(random, supplierNames),
       referenceCode: `PN-${date.format('YYYYMMDD')}-${String(randomInt(random, 1, 48)).padStart(3, '0')}`,
-      description: 'Thanh toán công nợ đơn nhập hàng',
+      description: 'Thanh toán đơn nhập hàng từ nhà cung cấp',
     });
   }
 
-  // 3) Chi phí cố định hàng tháng của từng cửa hàng.
+  // 3) Chi phí cố định hàng tháng của từng cửa hàng (hạng mục KHAC).
   for (const branch of activeStores) {
     for (const cost of monthlyFixedCosts) {
       const date = dayjs().startOf('month').add(randomInt(random, 0, 6), 'day');
@@ -154,7 +163,7 @@ const buildRawEntries = (): RawCashEntry[] => {
         entryDate: date.format('YYYY-MM-DD'),
         amount: roundTo(randomInt(random, cost.min, cost.max), 100_000),
         paymentMethod: PAYMENT_METHOD.BankTransfer,
-        counterparty: cost.category === CASH_CATEGORY.Rent ? 'Chủ mặt bằng' : 'Nhà cung cấp dịch vụ',
+        counterparty: cost.counterparty,
         referenceCode: null,
         description: `${cost.label} — ${branch.name}`,
       });
@@ -179,29 +188,29 @@ const buildRawEntries = (): RawCashEntry[] => {
     });
   }
 
-  // 5) Chi marketing cấp chuỗi.
+  // 5) Chi marketing cấp chuỗi (hạng mục KHAC).
   for (let index = 0; index < 5; index += 1) {
     const date = dayjs().subtract(randomInt(random, 0, CASHBOOK_DAYS - 1), 'day');
     entries.push({
       direction: CASH_FLOW_DIRECTION.Payment,
-      category: CASH_CATEGORY.Marketing,
+      category: CASH_CATEGORY.Other,
       branchId: null,
       entryDate: date.format('YYYY-MM-DD'),
       amount: roundTo(randomInt(random, 15_000_000, 60_000_000), 500_000),
       paymentMethod: PAYMENT_METHOD.BankTransfer,
       counterparty: 'Agency truyền thông',
       referenceCode: null,
-      description: 'Chi phí chương trình khuyến mãi toàn chuỗi',
+      description: 'Chi phí truyền thông thương hiệu toàn chuỗi',
     });
   }
 
-  // 6) Nộp tiền mặt từ két cửa hàng vào ngân hàng.
+  // 6) Nộp tiền mặt từ két cửa hàng vào ngân hàng (hạng mục KHAC).
   for (const branch of activeStores) {
     for (let index = 0; index < 3; index += 1) {
       const date = dayjs().subtract(randomInt(random, 0, CASHBOOK_DAYS - 1), 'day');
       entries.push({
         direction: CASH_FLOW_DIRECTION.Payment,
-        category: CASH_CATEGORY.BankTransferIn,
+        category: CASH_CATEGORY.Other,
         branchId: branch.id,
         entryDate: date.format('YYYY-MM-DD'),
         amount: roundTo(randomInt(random, 20_000_000, 90_000_000), 1_000_000),
@@ -258,8 +267,14 @@ const buildCashEntries = (): CashEntry[] => {
   return entries.reverse();
 };
 
-/** Sổ quỹ 30 ngày gần nhất. */
-export const mockCashEntries: CashEntry[] = buildCashEntries();
+/**
+ * Sổ quỹ 30 ngày gần nhất.
+ *
+ * Dữ liệu SEED — `cashbookSlice` nạp làm state khởi tạo rồi tự quản lý. Bán
+ * hàng và duyệt chi lương phải ghi thêm phiếu vào đó, nên component đọc từ
+ * `useAppSelector((s) => s.cashbook.entries)` thay vì mảng này.
+ */
+export const seedCashEntries: CashEntry[] = buildCashEntries();
 
 /** Tổng hợp sổ quỹ theo tập phiếu đã lọc. */
 export const summarizeCashBook = (

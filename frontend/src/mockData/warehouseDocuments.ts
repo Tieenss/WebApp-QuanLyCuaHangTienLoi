@@ -12,7 +12,7 @@ import { dayjs } from '@/utils/dateUtils';
 import { activeStores, branchById, DISTRIBUTION_CENTER_ID } from './branches';
 import { mockSuppliers } from './suppliers';
 import { sellableProducts } from './products';
-import { mockStockBalances } from './inventory';
+import { seedStockBalances } from './inventory';
 import { buildDocumentCode, createRandom, randomInt, randomPick, roundTo } from './seed';
 
 /**
@@ -55,11 +55,11 @@ const buildPurchaseOrders = (count: number): PurchaseOrder[] => {
 
   for (let index = 0; index < count; index += 1) {
     const supplier = randomPick(random, activeSuppliers);
-    // 70% đơn nhập về kho tổng, còn lại NCC giao trực tiếp cửa hàng.
-    const branch =
-      random() < 0.7
-        ? (branchById(DISTRIBUTION_CENTER_ID) ?? activeStores[0])
-        : randomPick(random, activeStores);
+    /**
+     * BR-05: nhập hàng từ NCC CHỈ vào Kho Tổng. Cửa hàng bán lẻ nhận hàng qua
+     * phiếu xuất kho nội bộ, không nhận trực tiếp từ nhà cung cấp.
+     */
+    const branch = branchById(DISTRIBUTION_CENTER_ID);
     if (!branch) continue;
 
     const orderDate = dayjs().subtract(randomInt(random, 0, 45), 'day');
@@ -257,8 +257,9 @@ const buildStocktakes = (count: number): Stocktake[] => {
     const countDate = dayjs().subtract(randomInt(random, 0, 60), 'day');
     const status = randomPick(random, documentStatusPool);
 
-    // Chỉ kiểm kê các mặt hàng đang có tồn tại chi nhánh đó.
-    const branchBalances = mockStockBalances.filter(
+    // Chỉ kiểm kê các mặt hàng đang có tồn tại chi nhánh đó. Dùng tồn kho seed
+    // vì đây là dữ liệu lịch sử, sinh một lần lúc khởi tạo.
+    const branchBalances = seedStockBalances.filter(
       (balance) => balance.branchId === branch.id,
     );
     if (branchBalances.length === 0) continue;

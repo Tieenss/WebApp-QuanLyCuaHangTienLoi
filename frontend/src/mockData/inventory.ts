@@ -1,10 +1,8 @@
 import {
   LEDGER_TYPE,
-  STOCK_LEVEL,
   type LedgerType,
   type StockBalance,
   type StockLedgerEntry,
-  type StockLevel,
 } from '@/types';
 import { dayjs } from '@/utils/dateUtils';
 import { activeStores, branchById, DISTRIBUTION_CENTER_ID } from './branches';
@@ -12,10 +10,14 @@ import { mockProducts, sellableProducts } from './products';
 import { createRandom, randomInt, randomPick, roundTo } from './seed';
 
 /**
- * Module 7 — Tồn kho & Thẻ kho.
+ * Module 7 — Dữ liệu seed cho tồn kho & thẻ kho.
  *
  * Dữ liệu được sinh deterministic từ seed để số liệu ổn định giữa các lần load.
  * Kho tổng giữ tồn lớn (hệ số 8x) so với cửa hàng, phản ánh vai trò phân phối.
+ *
+ * File này chỉ sinh trạng thái BAN ĐẦU. Tồn kho lúc chạy do `store/slices/
+ * stockSlice.ts` quản lý, vì bán hàng và kiểm kê phải ghi được vào đó —
+ * `resolveStockLevel` cũng nằm ở slice đó.
  */
 
 const random = createRandom(20260826);
@@ -25,19 +27,6 @@ const stockLocations = [
   branchById(DISTRIBUTION_CENTER_ID),
   ...activeStores,
 ].filter((branch): branch is NonNullable<typeof branch> => branch !== undefined);
-
-/** Xác định mức cảnh báo tồn kho từ số lượng thực tế. */
-export const resolveStockLevel = (
-  quantity: number,
-  minStock: number,
-  maxStock: number,
-): StockLevel => {
-  if (quantity <= 0) return STOCK_LEVEL.OutOfStock;
-  if (quantity < minStock * 0.5) return STOCK_LEVEL.Critical;
-  if (quantity < minStock) return STOCK_LEVEL.Low;
-  if (quantity > maxStock) return STOCK_LEVEL.Overstock;
-  return STOCK_LEVEL.Healthy;
-};
 
 /** Nhân viên thực hiện, gán ngẫu nhiên cho các dòng thẻ kho. */
 const performers = [
@@ -113,8 +102,14 @@ const buildStockBalances = (): StockBalance[] => {
   return balances;
 };
 
-/** Tồn kho hiện tại của toàn hệ thống. */
-export const mockStockBalances: StockBalance[] = buildStockBalances();
+/**
+ * Tồn kho ban đầu của toàn hệ thống.
+ *
+ * Đây là dữ liệu SEED — `stockSlice` nạp làm state khởi tạo rồi tự quản lý từ
+ * đó. Không đọc trực tiếp mảng này ở tầng component: sau lần bán đầu tiên nó đã
+ * lạc hậu so với state thật. Dùng `useAppSelector((s) => s.stock.balances)`.
+ */
+export const seedStockBalances: StockBalance[] = buildStockBalances();
 
 /** Các loại biến động thường gặp và tần suất tương đối khi sinh thẻ kho. */
 const ledgerTypePool: LedgerType[] = [
@@ -164,7 +159,7 @@ const buildLedgerEntries = (count: number): StockLedgerEntry[] => {
     const key = `${branch.id}-${product.id}`;
 
     const seedBalance =
-      mockStockBalances.find((balance) => balance.id === `stk-${key}`)?.quantity ??
+      seedStockBalances.find((balance) => balance.id === `stk-${key}`)?.quantity ??
       product.minStock;
     const balanceAfter = runningBalance.get(key) ?? seedBalance;
 
@@ -224,44 +219,16 @@ const buildLedgerEntries = (count: number): StockLedgerEntry[] => {
   return entries;
 };
 
-/** Thẻ kho toàn hệ thống, sắp xếp mới nhất trước. */
-export const mockStockLedger: StockLedgerEntry[] = buildLedgerEntries(320);
+/**
+ * Thẻ kho ban đầu, sắp xếp mới nhất trước.
+ * Dữ liệu SEED cho `stockSlice` — xem ghi chú ở `seedStockBalances`.
+ */
+export const seedStockLedger: StockLedgerEntry[] = buildLedgerEntries(320);
 
-/** Tồn kho của một sản phẩm tại một chi nhánh. */
-export const stockOf = (branchId: string, productId: string): number =>
-  mockStockBalances.find(
-    (balance) => balance.branchId === branchId && balance.productId === productId,
-  )?.quantity ?? 0;
-
-/** Tổng tồn kho toàn chuỗi của một sản phẩm. */
-export const totalStockOf = (productId: string): number =>
-  mockStockBalances
-    .filter((balance) => balance.productId === productId)
-    .reduce((sum, balance) => sum + balance.quantity, 0);
-
-/** Danh sách mặt hàng dưới ngưỡng tồn tối thiểu. */
-export const lowStockBalances = (branchId: string | null): StockBalance[] =>
-  mockStockBalances
-    .filter((balance) => (branchId === null ? true : balance.branchId === branchId))
-    .filter((balance) => balance.quantity < balance.minStock)
-    .sort((a, b) => a.quantity / a.minStock - b.quantity / b.minStock);
-
-/** Tổng giá trị tồn kho, lọc theo chi nhánh nếu cần. */
-export const totalStockValue = (branchId: string | null): number =>
-  mockStockBalances
-    .filter((balance) => (branchId === null ? true : balance.branchId === branchId))
-    .reduce((sum, balance) => sum + balance.stockValue, 0);
-
-/** Số mặt hàng đang có mặt trong kho (SKU khác nhau). */
-export const distinctSkuCount = (branchId: string | null): number =>
-  new Set(
-    mockStockBalances
-      .filter((balance) => (branchId === null ? true : balance.branchId === branchId))
-      .filter((balance) => balance.quantity > 0)
-      .map((balance) => balance.productId),
-  ).size;
-
-/** Tổng số sản phẩm đang kinh doanh, dùng cho KPI dashboard. */
+/**
+ * Tổng số sản phẩm đang kinh doanh, dùng cho KPI dashboard.
+ * Không phụ thuộc tồn kho nên vẫn để ở đây.
+ */
 export const activeProductCount = sellableProducts.length;
 
 /** Tổng số sản phẩm kể cả ngừng bán. */
