@@ -2,6 +2,7 @@ import { createAction, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   DOCUMENT_STATUS,
+  type DocumentStatus,
   type StockTransfer,
   type TransferLine,
 } from '@/types';
@@ -15,19 +16,19 @@ import { productById } from '@/mockData/products';
  * BR-06: chỉ đi từ Kho Tổng ra cửa hàng bán lẻ. Không có điều chuyển ngang
  * giữa các cửa hàng trong MVP.
  *
- * Khi Thủ kho xác nhận xuất kho, hệ thống làm 4 việc trong cùng một transaction
- * (`luong_nghiep_vu.md` mục 3.2):
- *   1. Tạo phiếu xuất + các dòng chi tiết       → `transferSlice`
- *   2. Trừ tồn kho tại Kho Tổng                  → `stockSlice`
- *   3. Cộng tồn kho tại cửa hàng nhận            → `stockSlice`
- *   4. Ghi 2 dòng thẻ kho: XUAT_CHI_NHANH (âm)   → `stockSlice`
- *      tại Kho Tổng và NHAN_TU_KHO (dương) tại cửa hàng
+ * Vòng đời phiếu (mở rộng để Quản lý chi nhánh cùng tham gia):
+ *   1. Quản lý chi nhánh (hoặc Thủ kho/Admin) tạo yêu cầu với `status = PENDING`
+ *      — chỉ ghi vào `transferSlice`, CHƯA đụng tồn kho.
+ *   2. Thủ kho/Admin duyệt (`approveTransfer`): chuyển `PENDING → COMPLETED`
+ *      và dispatch `transferShipped` để:
+ *        - Trừ tồn kho tại Kho Tổng            → `stockSlice`
+ *        - Cộng tồn kho tại cửa hàng nhận      → `stockSlice`
+ *        - Ghi 2 dòng thẻ kho TransferOut/In   → `stockSlice`
+ *   3. Thủ kho/Admin từ chối (`rejectTransfer`): chuyển `PENDING → CANCELLED`,
+ *      tồn kho hai đầu giữ nguyên.
  *
  * Khác hai transaction kia: KHÔNG sinh phiếu sổ quỹ, vì luân chuyển nội bộ
  * không phát sinh dòng tiền — hàng chỉ đổi chỗ trong cùng một hệ thống.
- *
- * `phieu_xuat_kho.trang_thai` chỉ có duy nhất `HOAN_THANH`: cửa hàng nhận hàng
- * ngay khi Thủ kho xuất, không có bước xác nhận riêng.
  */
 
 export interface TransferState {
@@ -44,7 +45,11 @@ export interface TransferDraftLine {
   quantity: number;
 }
 
-/** Action dùng chung cho cả transaction xuất kho nội bộ. */
+/**
+ * Action dùng chung cho transaction xuất kho — chỉ dispatch khi phiếu được
+ * DUYỆT (PENDING → COMPLETED). Cửa hàng nhận hàng ngay khi Thủ kho duyệt,
+ * không có bước xác nhận riêng.
+ */
 export const transferShipped = createAction<{
   transfer: StockTransfer;
   /** Người thực hiện, dạng "Họ Tên (NV-0003)". */
@@ -60,16 +65,21 @@ export const transferShipped = createAction<{
  * Ba trường số lượng (`requested` / `shipped` / `received`) bằng nhau: Thủ kho
  * xuất bao nhiêu thì cửa hàng nhận đúng bấy nhiêu, không có thất thoát trên
  * đường trong mô hình MVP.
+ *
+ * `initialStatus` cho phép lập phiếu với `PENDING` (yêu cầu chờ duyệt) hoặc
+ * `COMPLETED` (Thủ kho/Admin trực tiếp xuất, bỏ qua bước duyệt). Ngày
+ * xuất/nhận chỉ được gán khi phiếu ở trạng thái COMPLETED.
  */
 export const buildTransfer = (input: {
   toBranchId: string;
   lines: TransferDraftLine[];
   requestDate: string;
   note: string;
-  /** Người tạo phiếu (Thủ kho), dạng "Họ Tên (NV-0003)". */
+  /** Người tạo phiếu, dạng "Họ Tên (NV-0003)". */
   createdBy: string;
   /** Số phiếu đã có, dùng để sinh mã tiếp theo. */
   existingCount: number;
+  initialStatus: DocumentStatus;
 }): StockTransfer | null => {
   const lines: TransferLine[] = [];
 
@@ -93,6 +103,8 @@ export const buildTransfer = (input: {
 
   if (lines.length === 0) return null;
 
+  const isCompleted = input.initialStatus === DOCUMENT_STATUS.Completed;
+
   return {
     id: `tr-live-${Date.now()}`,
     code: `PX-${input.requestDate.replace(/-/g, '')}-${String(
@@ -104,13 +116,13 @@ export const buildTransfer = (input: {
     toBranchId: input.toBranchId,
     toBranchName: branchNameById(input.toBranchId),
     requestDate: input.requestDate,
-    shippedDate: input.requestDate,
-    receivedDate: input.requestDate,
-    status: DOCUMENT_STATUS.Completed,
+    shippedDate: isCompleted ? input.requestDate : null,
+    receivedDate: isCompleted ? input.requestDate : null,
+    status: input.initialStatus,
     lines,
     totalValue: lines.reduce((sum, line) => sum + line.lineTotal, 0),
     requestedBy: branchNameById(input.toBranchId),
-    approvedBy: input.createdBy,
+    approvedBy: null,
     note: input.note,
   };
 };
@@ -128,16 +140,57 @@ export const transferSlice = createSlice({
       if (!transfer) return;
       transfer.note = action.payload.note;
     },
+
+    /**
+     * Duyệt yêu cầu xuất kho: chuyển PENDING → COMPLETED, set ngày xuất/nhận
+     * và người duyệt. KHÔNG đụng tồn kho ở đây — caller phải dispatch
+     * `transferShipped` để stockSlice xử lý transaction trừ/cộng tồn.
+     */
+    approveTransfer: (
+      state,
+      action: PayloadAction<{
+        id: string;
+        approvedBy: string;
+        approvedDate: string;
+      }>,
+    ) => {
+      const transfer = state.transfers.find((item) => item.id === action.payload.id);
+      if (!transfer || transfer.status !== DOCUMENT_STATUS.Pending) return;
+      transfer.status = DOCUMENT_STATUS.Completed;
+      transfer.shippedDate = action.payload.approvedDate;
+      transfer.receivedDate = action.payload.approvedDate;
+      transfer.approvedBy = action.payload.approvedBy;
+    },
+
+    /**
+     * Từ chối yêu cầu xuất kho: chuyển PENDING → CANCELLED. Tồn kho hai đầu
+     * giữ nguyên vì chưa từng bị đụng tới.
+     */
+    rejectTransfer: (
+      state,
+      action: PayloadAction<{ id: string; rejectedBy: string }>,
+    ) => {
+      const transfer = state.transfers.find((item) => item.id === action.payload.id);
+      if (!transfer || transfer.status !== DOCUMENT_STATUS.Pending) return;
+      transfer.status = DOCUMENT_STATUS.Cancelled;
+      transfer.approvedBy = action.payload.rejectedBy;
+    },
   },
 
   extraReducers: (builder) => {
-    // Bước 1: lưu phiếu xuất, mới nhất lên đầu.
+    // Bước 1: lưu phiếu xuất (áp dụng cho cả PENDING và COMPLETED), mới nhất
+    // lên đầu. Khi status = PENDING, tồn kho chưa bị đụng — stockSlice không
+    // lắng nghe action này (xem extraReducers bên dưới).
     builder.addCase(transferShipped, (state, action) => {
       state.transfers.unshift(action.payload.transfer);
     });
   },
 });
 
-export const { updateTransferNote } = transferSlice.actions;
+export const {
+  updateTransferNote,
+  approveTransfer,
+  rejectTransfer,
+} = transferSlice.actions;
 
 export default transferSlice.reducer;

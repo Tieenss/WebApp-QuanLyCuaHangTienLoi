@@ -208,7 +208,11 @@ export const MODULES: readonly ModuleDefinition[] = [
     label: 'Nhập kho từ NCC',
     shortLabel: 'Nhập kho',
     icon: 'purchase',
-    allowedRoles: [USER_ROLE.Admin, USER_ROLE.WarehouseKeeper, USER_ROLE.StoreManager] as const,
+    /**
+     * BR-05: chỉ nhập vào Kho Tổng. Quản lý chi nhánh nhận hàng qua phiếu
+     * xuất kho nội bộ (module 9), không tự nhập trực tiếp từ NCC.
+     */
+    allowedRoles: WAREHOUSE_OPS,
     group: MODULE_GROUP.Warehouse,
     implemented: true,
     description:
@@ -218,14 +222,19 @@ export const MODULES: readonly ModuleDefinition[] = [
     order: 9,
     key: 'transfers',
     path: '/transfers',
-    label: 'Xuất kho nội bộ',
-    shortLabel: 'Xuất kho',
+    label: 'Xuất/Nhập kho nội bộ',
+    shortLabel: 'Xuất/Nhập',
     icon: 'transfer',
-    allowedRoles: WAREHOUSE_OPS,
+    /**
+     * Quản lý chi nhánh được xem và lập yêu cầu xuất cho chi nhánh mình;
+     * Thủ kho/Admin duyệt yêu cầu và xuất kho. Phạm vi dữ liệu của từng vai
+     * trò do trang TransfersPage tự lọc theo `user.branchId`.
+     */
+    allowedRoles: [...WAREHOUSE_OPS, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.Warehouse,
     implemented: true,
     description:
-      'Luân chuyển hàng hoá từ Kho Tổng tới các cửa hàng bán lẻ.',
+      'Luân chuyển hàng hoá từ Kho Tổng tới các cửa hàng bán lẻ. Quản lý chi nhánh tạo yêu cầu, Thủ kho duyệt và xuất kho.',
   },
   {
     order: 10,

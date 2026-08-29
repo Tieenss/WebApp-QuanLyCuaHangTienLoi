@@ -12,12 +12,22 @@ const initialState: AttendanceState = {
   records: seedAttendance,
 };
 
+/**
+ * Payload cho 2 action chấm công.
+ *
+ * `actorId` là mã người thực hiện thao tác (nhân viên tự chấm hoặc quản lý
+ * chấm hộ). Hiện tại chỉ dùng để truyền qua action — chưa ghi vào
+ * `AttendanceRecord` vì schema chưa có cột audit; giữ lại để khi nối API
+ * backend có thể log lại ai đã chấm công.
+ */
 interface ClockInPayload {
-    id: string;
+  id: string;
+  actorId: string;
 }
 
 interface ClockOutPayload {
-    id: string;
+  id: string;
+  actorId: string;
 }
 
 export const attendanceSlice = createSlice({

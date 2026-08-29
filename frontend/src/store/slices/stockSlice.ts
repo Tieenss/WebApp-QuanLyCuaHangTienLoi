@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
+  DOCUMENT_STATUS,
   LEDGER_TYPE,
   STOCK_LEVEL,
   type PurchaseOrder,
@@ -382,7 +383,12 @@ export const stockSlice = createSlice({
 
     // Luân chuyển nội bộ: trừ tồn kho nguồn, cộng tồn kho đích, ghi 2 dòng
     // thẻ kho. Không sinh phiếu sổ quỹ vì không phát sinh dòng tiền.
+    //
+    // Chỉ áp dụng khi phiếu đã được duyệt (COMPLETED) — phiếu PENDING chỉ mới
+    // là yêu cầu, tồn kho chưa bị đụng tới. Cùng action `transferShipped`
+    // nhưng hai bên sẽ lọc theo trạng thái phiếu.
     builder.addCase(transferShipped, (state, action) => {
+      if (action.payload.transfer.status !== DOCUMENT_STATUS.Completed) return;
       applyTransfer(state, action.payload.transfer, action.payload.performedBy);
     });
   },

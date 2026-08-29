@@ -16,7 +16,10 @@ export interface SummaryItem {
 
 interface SummaryStripProps {
   items: SummaryItem[];
-  /** Số cột trên màn hình lớn; mặc định chia đều theo số item. */
+  /**
+   * Số cột cố định trên màn hình lớn; bỏ trống thì flexbox tự co giãn đều
+   * theo số item (xem CSS).
+   */
   columns?: number;
 }
 
@@ -27,8 +30,12 @@ interface SummaryStripProps {
  * hiện tại — phù hợp cho tổng công nợ, tổng giá trị tồn, số phiếu chờ duyệt.
  */
 export const SummaryStrip: FC<SummaryStripProps> = ({ items, columns }) => {
+  const style =
+    columns !== undefined && columns > 0
+      ? ({ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } as const)
+      : undefined;
   return (
-    <div className="summary-strip">
+    <div className="summary-strip" style={style}>
       {items.map((item) => (
         <Card key={item.key} styles={{ body: { padding: '16px 18px' } }}>
           <Statistic

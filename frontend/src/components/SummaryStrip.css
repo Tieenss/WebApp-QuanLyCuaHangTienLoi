@@ -1,9 +1,23 @@
 .summary-strip {
-  display: flex;
+  display: grid;
+  /* Mặc định 4 cột khi không truyền `columns` prop; nếu có prop, inline
+     style sẽ override lưới theo số cột do component truyền vào. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
+@media (max-width: 992px) {
+  .summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 576px) {
+  .summary-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
 .summary-strip .ant-card {
-  flex: 1;
   min-width: 0;
 }

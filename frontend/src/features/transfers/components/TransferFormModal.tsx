@@ -23,7 +23,7 @@ import {
   transferShipped,
   type TransferDraftLine,
 } from '@/store/slices/transferSlice';
-import { STOCK_LEVEL, type StockLevel } from '@/types';
+import { DOCUMENT_STATUS, STOCK_LEVEL, USER_ROLE, type DocumentStatus, type StockLevel } from '@/types';
 import { DISTRIBUTION_CENTER_ID, activeStores, branchNameById } from '@/mockData/branches';
 import { sellableProducts } from '@/mockData/products';
 import { dayjs, today } from '@/utils/dateUtils';
@@ -47,6 +47,14 @@ interface DraftRow extends TransferDraftLine {
 interface TransferFormModalProps {
   open: boolean;
   onClose: () => void;
+  /**
+   * Trạng thái phiếu khi tạo:
+   * - `PENDING`: yêu cầu chờ Thủ kho duyệt (StoreManager dùng).
+   * - `COMPLETED`: Thủ kho/Admin trực tiếp xuất, tồn kho chuyển ngay.
+   *
+   * Mặc định `COMPLETED` để giữ hành vi cũ khi gọi không truyền prop.
+   */
+  initialStatus?: DocumentStatus;
 }
 
 const emptyRow = (): DraftRow => ({
@@ -65,7 +73,11 @@ const emptyRow = (): DraftRow => ({
  * Hàng pha chế tại quầy (danh mục `cat-03`) không luân chuyển: Kho Tổng không
  * giữ tồn cho nhóm này.
  */
-export const TransferFormModal: FC<TransferFormModalProps> = ({ open, onClose }) => {
+export const TransferFormModal: FC<TransferFormModalProps> = ({
+  open,
+  onClose,
+  initialStatus = DOCUMENT_STATUS.Completed,
+}) => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
   const [form] = Form.useForm<TransferFormValues>();
@@ -74,13 +86,31 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({ open, onClose })
   const balances = useAppSelector((state) => state.stock.balances);
   const transferCount = useAppSelector((state) => state.transfer.transfers.length);
 
-  const [toBranchId, setToBranchId] = useState<string | null>(null);
+  const isRequest = initialStatus === DOCUMENT_STATUS.Pending;
+
+  /**
+   * StoreManager chỉ được yêu cầu xuất cho chi nhánh mình phụ trách; Thủ kho
+   * và Admin chọn được mọi cửa hàng.
+   */
+  const availableBranches = useMemo(() => {
+    if (user?.role === USER_ROLE.StoreManager && user.branchId !== null) {
+      return activeStores.filter((branch) => branch.id === user.branchId);
+    }
+    return activeStores;
+  }, [user]);
+
+  const defaultToBranchId =
+    user?.role === USER_ROLE.StoreManager && user.branchId !== null
+      ? user.branchId
+      : null;
+
+  const [toBranchId, setToBranchId] = useState<string | null>(defaultToBranchId);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
 
   /** Dọn form sau khi modal đóng hẳn (dùng sự kiện, không dùng effect). */
   const handleAfterClose = (): void => {
     form.resetFields();
-    setToBranchId(null);
+    setToBranchId(defaultToBranchId);
     setRows([emptyRow()]);
   };
 
@@ -141,7 +171,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({ open, onClose })
         message.error('Phiếu xuất phải có ít nhất một dòng hàng hợp lệ.');
         return;
       }
-      if (overStockRows.length > 0) {
+      // Phiếu xuất trực tiếp (COMPLETED) chặn vượt tồn ngay. Phiếu yêu cầu
+      // (PENDING) chưa đụng tồn nên bỏ qua — Thủ kho sẽ tự kiểm khi duyệt.
+      if (isRequest === false && overStockRows.length > 0) {
         message.error('Không đủ tồn kho: có dòng hàng xuất vượt tồn Kho Tổng.');
         return;
       }
@@ -156,14 +188,21 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({ open, onClose })
         note: values.note?.trim() ?? '',
         createdBy: performedBy,
         existingCount: transferCount,
+        initialStatus,
       });
       if (transfer === null) return;
 
       dispatch(transferShipped({ transfer, performedBy }));
 
-      message.success(
-        `Đã xuất phiếu ${transfer.code} sang ${transfer.toBranchName}: trừ tồn Kho Tổng và cộng tồn cửa hàng.`,
-      );
+      if (isRequest) {
+        message.success(
+          `Đã gửi yêu cầu xuất ${transfer.code} sang ${transfer.toBranchName}. Vui lòng chờ Thủ kho duyệt.`,
+        );
+      } else {
+        message.success(
+          `Đã xuất phiếu ${transfer.code} sang ${transfer.toBranchName}: trừ tồn Kho Tổng và cộng tồn cửa hàng.`,
+        );
+      }
       onClose();
     } catch {
       // antd đã hiển thị lỗi tại từng field.
@@ -298,8 +337,8 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({ open, onClose })
   return (
     <Modal
       open={open}
-      title="Lập phiếu xuất kho nội bộ"
-      okText="Xác nhận xuất kho"
+      title={isRequest ? 'Tạo yêu cầu xuất kho' : 'Lập phiếu xuất kho nội bộ'}
+      okText={isRequest ? 'Gửi yêu cầu' : 'Xác nhận xuất kho'}
       cancelText="Huỷ"
       onOk={handleSubmit}
       onCancel={onClose}
@@ -318,14 +357,22 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({ open, onClose })
             {toBranchId === null ? 'Chọn cửa hàng nhận' : branchNameById(toBranchId)}
           </Space>
         }
-        description="Khi xác nhận, hệ thống trừ tồn Kho Tổng, cộng tồn cửa hàng và ghi 2 dòng thẻ kho. Luân chuyển nội bộ không phát sinh dòng tiền nên không tạo phiếu sổ quỹ."
+        description={
+          isRequest
+            ? 'Yêu cầu sẽ ở trạng thái "Chờ duyệt". Tồn kho hai đầu chưa bị đụng cho tới khi Thủ kho/Admin duyệt. Luân chuyển nội bộ không phát sinh dòng tiền nên không tạo phiếu sổ quỹ.'
+            : 'Khi xác nhận, hệ thống trừ tồn Kho Tổng, cộng tồn cửa hàng và ghi 2 dòng thẻ kho. Luân chuyển nội bộ không phát sinh dòng tiền nên không tạo phiếu sổ quỹ.'
+        }
       />
 
       <Form<TransferFormValues>
         form={form}
         layout="vertical"
         requiredMark={false}
-        initialValues={{ requestDate: dayjs(today()), note: '' }}
+        initialValues={{
+          toBranchId: defaultToBranchId ?? undefined,
+          requestDate: dayjs(today()),
+          note: '',
+        }}
       >
         <Space size={16} wrap className="transfer-head-fields">
           <Form.Item
@@ -338,8 +385,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({ open, onClose })
               placeholder="Chọn cửa hàng bán lẻ"
               showSearch
               optionFilterProp="label"
+              disabled={defaultToBranchId !== null}
               onChange={setToBranchId}
-              options={activeStores.map((branch) => ({
+              options={availableBranches.map((branch) => ({
                 value: branch.id,
                 label: `${branch.code} — ${branch.name}`,
               }))}
@@ -348,7 +396,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({ open, onClose })
 
           <Form.Item
             name="requestDate"
-            label="Ngày xuất kho"
+            label={isRequest ? 'Ngày cần hàng' : 'Ngày xuất kho'}
             rules={[{ required: true, message: 'Vui lòng chọn ngày.' }]}
           >
             <DatePicker
