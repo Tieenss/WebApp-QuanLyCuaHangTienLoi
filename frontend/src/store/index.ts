@@ -8,6 +8,7 @@ import payrollReducer from './slices/payrollSlice';
 import stockReducer from './slices/stockSlice';
 import cashbookReducer from './slices/cashbookSlice';
 import purchaseReducer from './slices/purchaseSlice';
+import transferReducer from './slices/transferSlice';
 
 export const store = configureStore({
   reducer: {
@@ -21,6 +22,7 @@ export const store = configureStore({
     payroll: payrollReducer,
     cashbook: cashbookReducer,
     purchase: purchaseReducer,
+    transfer: transferReducer,
   },
 });
 

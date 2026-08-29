@@ -8,10 +8,12 @@ import {
   type StockBalance,
   type StockLedgerEntry,
   type StockLevel,
+  type StockTransfer,
 } from '@/types';
 import { seedStockBalances, seedStockLedger } from '@/mockData/inventory';
 import { purchaseReceived } from './purchaseSlice';
 import { saleCompleted } from './posSlice';
+import { transferShipped } from './transferSlice';
 
 /**
  * Module 7 — Tồn kho & Thẻ kho (dữ liệu ghi được).
@@ -248,6 +250,77 @@ const applyPurchase = (
   });
 };
 
+/**
+ * Luân chuyển nội bộ: trừ tồn kho nguồn, cộng tồn kho đích, ghi 2 dòng thẻ kho.
+ *
+ * Mỗi mặt hàng sinh đúng 2 dòng sổ cái (`luong_nghiep_vu.md` mục 3.2):
+ *   - `XUAT_CHI_NHANH` số âm tại kho xuất
+ *   - `NHAN_TU_KHO`   số dương tại kho nhận
+ *
+ * Nếu cửa hàng nhận chưa từng có mặt hàng này thì chưa có dòng tồn kho để cộng
+ * vào; khi đó `applyMovement` trả `false` và ta tạo dòng mới, kế thừa ngưỡng
+ * min/max cùng giá vốn từ kho xuất.
+ */
+const applyTransfer = (
+  state: StockState,
+  transfer: StockTransfer,
+  performedBy: string,
+): void => {
+  transfer.lines.forEach((line, index) => {
+    const source = state.balances.find(
+      (item) =>
+        item.branchId === transfer.fromBranchId && item.productId === line.productId,
+    );
+
+    // Bảo đảm kho nhận có dòng tồn kho trước khi cộng vào.
+    const hasTarget = state.balances.some(
+      (item) =>
+        item.branchId === transfer.toBranchId && item.productId === line.productId,
+    );
+    if (!hasTarget && source) {
+      state.balances.push({
+        ...source,
+        id: `stk-${transfer.toBranchId}-${line.productId}`,
+        branchId: transfer.toBranchId,
+        branchName: transfer.toBranchName,
+        quantity: 0,
+        stockValue: 0,
+        // Cửa hàng giữ tồn nhỏ hơn Kho Tổng (hệ số 8x khi sinh dữ liệu seed).
+        minStock: Math.max(1, Math.round(source.minStock / 8)),
+        maxStock: Math.max(2, Math.round(source.maxStock / 8)),
+      });
+    }
+
+    // Xuất khỏi kho nguồn.
+    applyMovement(state, {
+      branchId: transfer.fromBranchId,
+      branchName: transfer.fromBranchName,
+      productId: line.productId,
+      quantityChange: -line.shippedQuantity,
+      type: LEDGER_TYPE.TransferOut,
+      referenceCode: transfer.code,
+      performedBy,
+      note: `Xuất luân chuyển sang ${transfer.toBranchName}`,
+      occurredAt: `${transfer.requestDate}T10:00:00.000Z`,
+      sequence: index * 2,
+    });
+
+    // Nhập vào kho đích.
+    applyMovement(state, {
+      branchId: transfer.toBranchId,
+      branchName: transfer.toBranchName,
+      productId: line.productId,
+      quantityChange: line.receivedQuantity,
+      type: LEDGER_TYPE.TransferIn,
+      referenceCode: transfer.code,
+      performedBy,
+      note: `Nhận hàng luân chuyển từ ${transfer.fromBranchName}`,
+      occurredAt: `${transfer.requestDate}T10:00:00.000Z`,
+      sequence: index * 2 + 1,
+    });
+  });
+};
+
 export const stockSlice = createSlice({
   name: 'stock',
   initialState,
@@ -305,6 +378,12 @@ export const stockSlice = createSlice({
     // kèm tính lại giá vốn bình quân gia quyền.
     builder.addCase(purchaseReceived, (state, action) => {
       applyPurchase(state, action.payload.order, action.payload.performedBy);
+    });
+
+    // Luân chuyển nội bộ: trừ tồn kho nguồn, cộng tồn kho đích, ghi 2 dòng
+    // thẻ kho. Không sinh phiếu sổ quỹ vì không phát sinh dòng tiền.
+    builder.addCase(transferShipped, (state, action) => {
+      applyTransfer(state, action.payload.transfer, action.payload.performedBy);
     });
   },
 });

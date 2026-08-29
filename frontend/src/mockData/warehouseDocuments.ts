@@ -160,21 +160,20 @@ const buildTransfers = (count: number): StockTransfer[] => {
   const transfers: StockTransfer[] = [];
 
   for (let index = 0; index < count; index += 1) {
-    // 80% là kho tổng cấp hàng cho cửa hàng, 20% điều chuyển ngang.
-    const isFromWarehouse = random() < 0.8;
-    const fromBranch = isFromWarehouse
-      ? branchById(DISTRIBUTION_CENTER_ID)
-      : randomPick(random, activeStores);
-    let toBranch = randomPick(random, activeStores);
-    // Tránh xuất và nhập cùng một kho.
-    while (fromBranch && toBranch.id === fromBranch.id) {
-      toBranch = randomPick(random, activeStores);
-    }
+    /**
+     * BR-06: luân chuyển nội bộ CHỈ đi từ Kho Tổng ra cửa hàng bán lẻ. Không có
+     * điều chuyển ngang giữa các cửa hàng trong MVP.
+     */
+    const fromBranch = branchById(DISTRIBUTION_CENTER_ID);
     if (!fromBranch) continue;
+    const toBranch = randomPick(random, activeStores);
 
     const requestDate = dayjs().subtract(randomInt(random, 0, 30), 'day');
-    const status = randomPick(random, documentStatusPool);
-    const settled = isSettled(status);
+    /**
+     * `phieu_xuat_kho.trang_thai` chỉ có duy nhất `HOAN_THANH`: Thủ kho xuất
+     * hàng là tồn kho chuyển ngay, cửa hàng không cần bước xác nhận nhận hàng.
+     */
+    const status = DOCUMENT_STATUS.Completed;
 
     const lineCount = randomInt(random, 2, 7);
     const chosen = new Set<string>();
@@ -188,8 +187,6 @@ const buildTransfers = (count: number): StockTransfer[] => {
       chosen.add(product.id);
 
       const requested = roundTo(randomInt(random, 12, product.maxStock), 6) || 6;
-      const shipped = status === DOCUMENT_STATUS.Draft ? 0 : requested;
-      const received = settled ? shipped : 0;
 
       lines.push({
         id: `tl-${index}-${l}`,
@@ -198,8 +195,8 @@ const buildTransfers = (count: number): StockTransfer[] => {
         productName: product.name,
         unit: product.unit,
         requestedQuantity: requested,
-        shippedQuantity: shipped,
-        receivedQuantity: received,
+        shippedQuantity: requested,
+        receivedQuantity: requested,
         unitCost: product.costPrice,
         lineTotal: requested * product.costPrice,
       });
@@ -215,21 +212,13 @@ const buildTransfers = (count: number): StockTransfer[] => {
       toBranchId: toBranch.id,
       toBranchName: toBranch.name,
       requestDate: requestDate.format('YYYY-MM-DD'),
-      shippedDate:
-        status === DOCUMENT_STATUS.Draft || status === DOCUMENT_STATUS.Pending
-          ? null
-          : requestDate.add(1, 'day').format('YYYY-MM-DD'),
-      receivedDate: settled
-        ? requestDate.add(randomInt(random, 1, 3), 'day').format('YYYY-MM-DD')
-        : null,
+      shippedDate: requestDate.format('YYYY-MM-DD'),
+      receivedDate: requestDate.format('YYYY-MM-DD'),
       status,
       lines,
       totalValue: lines.reduce((sum, line) => sum + line.lineTotal, 0),
       requestedBy: toBranch.managerName,
-      approvedBy:
-        status === DOCUMENT_STATUS.Draft || status === DOCUMENT_STATUS.Pending
-          ? null
-          : fromBranch.managerName,
+      approvedBy: fromBranch.managerName,
       note: '',
     });
   }
@@ -237,8 +226,11 @@ const buildTransfers = (count: number): StockTransfer[] => {
   return transfers.sort((a, b) => b.requestDate.localeCompare(a.requestDate));
 };
 
-/** Danh sách phiếu luân chuyển nội bộ. */
-export const mockTransfers: StockTransfer[] = buildTransfers(36);
+/**
+ * Phiếu luân chuyển nội bộ ban đầu.
+ * Dữ liệu SEED cho `transferSlice` — xem ghi chú ở `seedStockBalances`.
+ */
+export const seedTransfers: StockTransfer[] = buildTransfers(36);
 
 /** Nguyên nhân lệch tồn thường gặp khi kiểm kê. */
 const varianceReasons = [
@@ -325,22 +317,3 @@ const buildStocktakes = (count: number): Stocktake[] => {
 
 /** Danh sách phiếu kiểm kê. */
 export const mockStocktakes: Stocktake[] = buildStocktakes(22);
-
-/** Tổng công nợ còn phải trả nhà cung cấp. */
-export const totalSupplierPayable = (): number =>
-  mockPurchaseOrders
-    .filter((order) => order.status === DOCUMENT_STATUS.Completed)
-    .reduce((sum, order) => sum + (order.grandTotal - order.paidAmount), 0);
-
-/** Số phiếu đang chờ xử lý, hiển thị badge trên menu. */
-export const pendingDocumentCount = (): number =>
-  mockPurchaseOrders.filter(
-    (order) =>
-      order.status === DOCUMENT_STATUS.Pending ||
-      order.status === DOCUMENT_STATUS.Draft,
-  ).length +
-  mockTransfers.filter(
-    (transfer) =>
-      transfer.status === DOCUMENT_STATUS.Pending ||
-      transfer.status === DOCUMENT_STATUS.Draft,
-  ).length;

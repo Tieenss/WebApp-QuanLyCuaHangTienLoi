@@ -1,0 +1,25 @@
+/*
+ * TransfersPage.css — style cho Module 9: Xuất kho nội bộ
+ * (features/transfers/TransfersPage).
+ */
+
+/* Mũi tên giữa kho xuất và cửa hàng nhận ở cột "Tuyến luân chuyển". */
+.tr-route-arrow {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+/* Giá trị hàng luân chuyển — đỏ thương hiệu. */
+.tr-value {
+  color: #e31837;
+}
+
+/* Chữ cỡ nhỏ dùng lặp lại trong bảng. */
+.tr-text-12-5 {
+  font-size: 12.5px;
+}
+
+/* Space bọc chi tiết phiếu chiếm hết chiều rộng. */
+.tr-detail-full {
+  width: 100%;
+}
