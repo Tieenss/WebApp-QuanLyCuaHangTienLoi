@@ -17,7 +17,7 @@ import {
   type ShiftCode,
   type UserRole,
 } from '@/types';
-import { dayjs } from '@/utils/dateUtils';
+import { dayjs, today } from '@/utils/dateUtils';
 import { initialsOf } from '@/utils/formatters';
 import { accountByRole } from './accounts';
 import { activeStores, branchById, DISTRIBUTION_CENTER_ID } from './branches';
@@ -348,16 +348,24 @@ const buildAttendance = (): AttendanceRecord[] => {
 
   for (let dayOffset = ATTENDANCE_HISTORY_DAYS - 1; dayOffset >= 0; dayOffset -= 1) {
     const workDate = dayjs().subtract(dayOffset, 'day');
+    /**
+     * Ca của hôm nay để trống giờ vào/ra: nhân viên phải tự bấm Check-in tại
+     * trang Chấm công. Nếu sinh sẵn thì không ai chấm công được trong phiên demo.
+     */
+    const isToday = dayOffset === 0;
 
     for (const employee of activeEmployees) {
-      const status = randomPick(random, attendanceStatusPool);
+      const status = isToday
+        ? ATTENDANCE_STATUS.Present
+        : randomPick(random, attendanceStatusPool);
       const startHour = SHIFT_START_HOUR[employee.defaultShift];
       const isWorking =
-        status === ATTENDANCE_STATUS.Present || status === ATTENDANCE_STATUS.Late;
+        !isToday &&
+        (status === ATTENDANCE_STATUS.Present || status === ATTENDANCE_STATUS.Late);
 
       // Đi muộn 5-25 phút, đủ giờ thì vào sớm 0-8 phút.
       const lateMinutes =
-        status === ATTENDANCE_STATUS.Late ? randomInt(random, 5, 25) : 0;
+        status === ATTENDANCE_STATUS.Late && !isToday ? randomInt(random, 5, 25) : 0;
       const checkIn = isWorking
         ? workDate
             .hour(startHour)
@@ -374,47 +382,75 @@ const buildAttendance = (): AttendanceRecord[] => {
         ? SHIFT_HOURS + overtimeHours - lateMinutes / 60
         : 0;
 
-       const breakDuration = isWorking ? (random() < 0.5 ? 0.5 : 1) : 0;
-       const actualHours = isWorking
-         ? Number((workedHours - breakDuration).toFixed(2))
-         : 0;
+      const breakDuration = isWorking ? (random() < 0.5 ? 0.5 : 1) : 0;
+      const actualHours = isWorking
+        ? Number((workedHours - breakDuration).toFixed(2))
+        : 0;
 
-       records.push({
-         id: `att-${String(sequence).padStart(5, '0')}`,
-         employeeId: employee.id,
-         employeeName: employee.fullName,
-         employeeCode: employee.code,
-         branchId: employee.branchId,
-         workDate: workDate.format('YYYY-MM-DD'),
-         shift: employee.defaultShift,
-         checkInAt: checkIn ? checkIn.toISOString() : null,
-         checkOutAt: checkOut ? checkOut.toISOString() : null,
-         clockInAt: checkIn ? checkIn.toISOString() : null,
-         clockOutAt: checkOut ? checkOut.toISOString() : null,
-         breakDuration,
-         actualHours,
-         workedHours: Number(workedHours.toFixed(2)),
-         overtimeHours,
-         isPaid: false,
-         status,
-         note:
-           status === ATTENDANCE_STATUS.Late
-             ? `Đi muộn ${lateMinutes} phút`
-             : status === ATTENDANCE_STATUS.Leave
-               ? 'Nghỉ phép đã được duyệt'
-               : status === ATTENDANCE_STATUS.Absent
-                 ? 'Vắng không thông báo'
-                 : '',
-       });
-       sequence += 1;
+      records.push({
+        id: `att-${String(sequence).padStart(5, '0')}`,
+        employeeId: employee.id,
+        employeeName: employee.fullName,
+        employeeCode: employee.code,
+        branchId: employee.branchId,
+        workDate: workDate.format('YYYY-MM-DD'),
+        shift: employee.defaultShift,
+        checkInAt: checkIn ? checkIn.toISOString() : null,
+        checkOutAt: checkOut ? checkOut.toISOString() : null,
+        clockInAt: checkIn ? checkIn.toISOString() : null,
+        clockOutAt: checkOut ? checkOut.toISOString() : null,
+        breakDuration,
+        actualHours,
+        workedHours: Number(workedHours.toFixed(2)),
+        overtimeHours,
+        isPaid: false,
+        status,
+        note: isToday
+          ? 'Chưa chấm công'
+          : status === ATTENDANCE_STATUS.Late
+            ? `Đi muộn ${lateMinutes} phút`
+            : status === ATTENDANCE_STATUS.Leave
+              ? 'Nghỉ phép đã được duyệt'
+              : status === ATTENDANCE_STATUS.Absent
+                ? 'Vắng không thông báo'
+                : '',
+      });
+      sequence += 1;
     }
   }
 
   return records;
 };
 
-/** Bản ghi chấm công 30 ngày gần nhất. */
-export const mockAttendance: AttendanceRecord[] = buildAttendance();
+/**
+ * Bản ghi chấm công 30 ngày gần nhất.
+ *
+ * Dữ liệu SEED — `attendanceSlice` nạp làm state khởi tạo rồi tự quản lý, vì
+ * check-in/check-out phải ghi được vào đó.
+ */
+export const seedAttendance: AttendanceRecord[] = [
+  ...buildAttendance(),
+  {
+    id: 'att-test-00001',
+    employeeId: 'usr-005',
+    employeeName: 'Nguyễn Văn Minh',
+    employeeCode: 'NV-0014',
+    branchId: 'br-0101',
+    workDate: today(),
+    shift: SHIFT_CODE.Morning,
+    checkInAt: null,
+    checkOutAt: null,
+    clockInAt: null,
+    clockOutAt: null,
+    breakDuration: 0,
+    actualHours: 0,
+    workedHours: 0,
+    overtimeHours: 0,
+    isPaid: false,
+    status: ATTENDANCE_STATUS.Present,
+    note: 'Chưa chấm công',
+  },
+];
 
 /** Kỳ lương hiện tại dạng MM-YYYY theo `bang_luong.thang_nam`. */
 export const CURRENT_PAYROLL_PERIOD = dayjs().format('MM-YYYY');
@@ -458,15 +494,15 @@ const seedPayrollStatus = (role: UserRole, index: number): PayrollStatus => {
  * Giờ dùng để tính tiền là `adjustedHours ?? totalHours` — khi Quản lý sửa giờ
  * thì toàn bộ con số phía sau được tính lại (xem `payrollSlice`).
  */
-const buildPayroll = (): PayrollRow[] =>
+export const buildPayrollFromRecords = (records: AttendanceRecord[]): PayrollRow[] =>
   activeEmployees.map((employee, index) => {
-    const records = mockAttendance.filter(
+    const employeeRecords = records.filter(
       (record) =>
         record.employeeId === employee.id &&
         record.workDate.startsWith(CURRENT_PERIOD_ISO_PREFIX),
     );
 
-    const workedRecords = records.filter(
+    const workedRecords = employeeRecords.filter(
       (record) =>
         record.status === ATTENDANCE_STATUS.Present ||
         record.status === ATTENDANCE_STATUS.Late,
@@ -481,7 +517,6 @@ const buildPayroll = (): PayrollRow[] =>
       0,
     );
 
-    // Ca đêm hưởng hệ số phụ cấp cao hơn.
     const shiftPay = workedRecords.reduce(
       (sum, record) =>
         sum +
@@ -491,24 +526,21 @@ const buildPayroll = (): PayrollRow[] =>
       0,
     );
 
-    // Ngoài giờ tính 1,5 lần lương giờ cơ bản.
     const overtimePay = overtimeHours * employee.hourlyWage * 1.5;
 
-    const lateCount = records.filter(
+    const lateCount = employeeRecords.filter(
       (record) => record.status === ATTENDANCE_STATUS.Late,
     ).length;
-    const absentCount = records.filter(
+    const absentCount = employeeRecords.filter(
       (record) => record.status === ATTENDANCE_STATUS.Absent,
     ).length;
 
-    // Trừ 50.000đ mỗi lần muộn, 1 ngày lương cho mỗi ngày vắng không phép.
     const deduction =
       lateCount * 50_000 + absentCount * employee.hourlyWage * SHIFT_HOURS;
 
     const bonus = index % 4 === 0 ? roundTo(random() * 1_500_000, 50_000) : 0;
 
-    // Lương cứng chia theo tỷ lệ ngày làm thực tế trong kỳ.
-    const expectedShifts = records.length || 1;
+    const expectedShifts = employeeRecords.length || 1;
     const proratedBase = Math.round(
       (employee.baseSalary * workedRecords.length) / expectedShifts,
     );
@@ -517,10 +549,6 @@ const buildPayroll = (): PayrollRow[] =>
     const isConfirmed = status !== PAYROLL_STATUS.PendingConfirm;
     const isPaid = status === PAYROLL_STATUS.Paid;
 
-    /**
-     * Người xác nhận Tầng 1. Vai trò bỏ qua tầng này giữ `null` — đúng đặc tả
-     * "Bỏ qua Tầng 1", chứ không gán người xác nhận giả.
-     */
     const confirmedBy =
       isConfirmed && requiresHourConfirmation(employee.role)
         ? branchManagerNameOf(employee.branchId)
@@ -566,4 +594,4 @@ const buildPayroll = (): PayrollRow[] =>
   });
 
 /** Bảng lương kỳ hiện tại. */
-export const mockPayroll: PayrollRow[] = buildPayroll();
+export const mockPayroll: PayrollRow[] = buildPayrollFromRecords(seedAttendance);

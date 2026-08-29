@@ -8,7 +8,7 @@ import {
   type PayrollRow,
   type UserRole,
 } from '@/types';
-import { mockPayroll } from '@/mockData/employees';
+import { buildPayrollFromRecords, seedAttendance } from '@/mockData/employees';
 import { nowIso } from '@/utils/dateUtils';
 
 /**
@@ -38,7 +38,7 @@ export interface PayrollState {
 }
 
 const initialState: PayrollState = {
-  rows: mockPayroll,
+  rows: buildPayrollFromRecords(seedAttendance),
   adjustingId: null,
   error: null,
 };

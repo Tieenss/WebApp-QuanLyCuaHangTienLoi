@@ -34,6 +34,7 @@ import {
   payrollPaid,
   resetHourAdjust,
 } from '@/store/slices/payrollSlice';
+import { clockIn, clockOut } from '@/store/slices/attendanceSlice';
 import {
   ATTENDANCE_STATUS,
   ATTENDANCE_STATUS_LABEL,
@@ -52,8 +53,8 @@ import {
   type ShiftCode,
 } from '@/types';
 import { mockBranches } from '@/mockData/branches';
-import { CURRENT_PAYROLL_PERIOD, mockAttendance } from '@/mockData/employees';
-import { dayjs } from '@/utils/dateUtils';
+import { CURRENT_PAYROLL_PERIOD } from '@/mockData/employees';
+import { today } from '@/utils/dateUtils';
 import { formatDate, formatDateTime, formatPeriod, formatTime, nowIso } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -62,24 +63,15 @@ import './AttendancePage.css';
 
 const { Text } = Typography;
 
-/** Số bản ghi chấm công tối đa hiển thị — 30 ngày × ~30 nhân sự là rất lớn. */
 const ATTENDANCE_DISPLAY_LIMIT = 600;
 
-/**
- * Module 11 — Chấm công & Bảng lương (duyệt 2 tầng).
- *
- * Tab chấm công là dữ liệu gốc; tab bảng lương là kết quả tính từ chính dữ liệu
- * đó (giờ làm × lương giờ × hệ số ca, trừ vi phạm), nên hai tab luôn khớp nhau.
- *
- * Luồng duyệt: Quản lý chi nhánh xác nhận giờ làm thu ngân (Tầng 1) → Kế toán
- * duyệt chi (Tầng 2). Lương Kế toán do Admin duyệt. Không ai tự duyệt cho mình.
- */
 export const AttendancePage: FC = () => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
 
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
   const payrollRows = useAppSelector((state) => state.payroll.rows);
+  const attendanceRecords = useAppSelector((state) => state.attendance.records);
 
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState<string | null>(activeBranchId);
@@ -87,27 +79,15 @@ export const AttendancePage: FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [payrollStatusFilter, setPayrollStatusFilter] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [attendanceRecords, setAttendanceRecords] = useState(mockAttendance);
+  const [activeTab, setActiveTab] = useState('my-shifts');
 
   const handleClockIn = (id: string): void => {
-    setAttendanceRecords((prev) =>
-      prev.map((record) =>
-        record.id === id
-          ? { ...record, clockInAt: dayjs().toISOString() }
-          : record,
-      ),
-    );
+    dispatch(clockIn({ id, actorId: user?.id ?? '' }));
     message.success('Đã check-in thành công.');
   };
 
   const handleClockOut = (id: string): void => {
-    setAttendanceRecords((prev) =>
-      prev.map((record) =>
-        record.id === id
-          ? { ...record, clockOutAt: dayjs().toISOString() }
-          : record,
-      ),
-    );
+    dispatch(clockOut({ id, actorId: user?.id ?? '' }));
     message.success('Đã check-out thành công.');
   };
 
@@ -122,7 +102,16 @@ export const AttendancePage: FC = () => {
     [user],
   );
 
-  const attendance = useMemo(
+  const myAttendance = useMemo(
+    () =>
+      attendanceRecords
+        .filter((record) => record.employeeId === user?.id)
+        .sort((a, b) => b.workDate.localeCompare(a.workDate))
+        .slice(0, ATTENDANCE_DISPLAY_LIMIT),
+    [attendanceRecords, user?.id],
+  );
+
+  const attendanceRegister = useMemo(
     () =>
       attendanceRecords
         .filter((record) => {
@@ -165,7 +154,7 @@ export const AttendancePage: FC = () => {
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
-    const scoped = mockAttendance.filter(
+    const scoped = attendanceRecords.filter(
       (record) => branchFilter === null || record.branchId === branchFilter,
     );
     const late = scoped.filter((record) => record.status === ATTENDANCE_STATUS.Late);
@@ -221,7 +210,7 @@ export const AttendancePage: FC = () => {
         color: BRAND.success,
       },
     ];
-  }, [branchFilter, payrollRows]);
+  }, [attendanceRecords, branchFilter, payrollRows]);
 
   const branchOptions = useMemo(
     () => mockBranches.map((branch) => ({ value: branch.id, label: branch.name })),
@@ -259,7 +248,6 @@ export const AttendancePage: FC = () => {
     },
   ];
 
-  /** Bộ lọc riêng cho tab bảng lương: chi nhánh + trạng thái duyệt. */
   const payrollFilters: ToolbarFilter[] = [
     attendanceFilters[0] as ToolbarFilter,
     {
@@ -274,6 +262,44 @@ export const AttendancePage: FC = () => {
       span: 5,
     },
   ];
+
+  const isOwnAndToday = (row: AttendanceRecord): boolean =>
+    row.employeeId === user?.id && row.workDate === today();
+
+  const renderClockIn = (value: string | null, row: AttendanceRecord) => {
+    if (value === null && isOwnAndToday(row)) {
+      return (
+        <Button
+          type="primary"
+          size="small"
+          icon={<LoginOutlined />}
+          onClick={() => handleClockIn(row.id)}
+        >
+          Check In
+        </Button>
+      );
+    }
+    return formatTime(value);
+  };
+
+  const renderClockOut = (value: string | null, row: AttendanceRecord) => {
+    if (value === null && isOwnAndToday(row) && row.clockInAt !== null) {
+      return (
+        <Button
+          type="primary"
+          size="small"
+          icon={<LogoutOutlined />}
+          onClick={() => handleClockOut(row.id)}
+        >
+          Check Out
+        </Button>
+      );
+    }
+    if (value === null && row.clockInAt === null) {
+      return <Text type="secondary">Chưa check-in</Text>;
+    }
+    return formatTime(value);
+  };
 
   const attendanceColumns: ColumnsType<AttendanceRecord> = [
     {
@@ -314,42 +340,14 @@ export const AttendancePage: FC = () => {
       dataIndex: 'clockInAt',
       align: 'center',
       width: 90,
-      render: (value: string | null, row: AttendanceRecord) =>
-        value === null ? (
-          <Button
-            type="primary"
-            size="small"
-            icon={<LoginOutlined />}
-            onClick={() => handleClockIn(row.id)}
-          >
-            Check In
-          </Button>
-        ) : (
-          formatTime(value)
-        ),
+      render: renderClockIn,
     },
     {
       title: 'Check Out',
       dataIndex: 'clockOutAt',
       align: 'center',
       width: 90,
-      render: (value: string | null, row: AttendanceRecord) =>
-        value === null ? (
-          row.clockInAt !== null ? (
-            <Button
-              type="primary"
-              size="small"
-              icon={<LogoutOutlined />}
-              onClick={() => handleClockOut(row.id)}
-            >
-              Check Out
-            </Button>
-          ) : (
-            <Text type="secondary">Chưa check-in</Text>
-          )
-        ) : (
-          formatTime(value)
-        ),
+      render: renderClockOut,
     },
     {
       title: 'Nghỉ',
@@ -406,6 +404,83 @@ export const AttendancePage: FC = () => {
     },
   ];
 
+  /** Tab "Ca của tôi" — chỉ hiện ca của người đang đăng nhập, nút chấm công bật. */
+  const myShiftColumns: ColumnsType<AttendanceRecord> = [
+    {
+      title: 'Ngày',
+      dataIndex: 'workDate',
+      width: 110,
+      fixed: 'left',
+      render: (value: string) => formatDate(value),
+    },
+    {
+      title: 'Ca',
+      dataIndex: 'shift',
+      align: 'center',
+      width: 90,
+      render: (shift: ShiftCode) => (
+        <Tag color={shift === SHIFT_CODE.Night ? 'geekblue' : 'gold'} className="tag-no-margin">
+          {SHIFT_SHORT_LABEL[shift]}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Check In',
+      dataIndex: 'clockInAt',
+      align: 'center',
+      width: 90,
+      render: renderClockIn,
+    },
+    {
+      title: 'Check Out',
+      dataIndex: 'clockOutAt',
+      align: 'center',
+      width: 90,
+      render: renderClockOut,
+    },
+    {
+      title: 'Nghỉ',
+      dataIndex: 'breakDuration',
+      align: 'right',
+      width: 70,
+      render: (value: number) =>
+        value === 0 ? (
+          <Text type="secondary">—</Text>
+        ) : (
+          <Text className="numeric-cell">{value}h</Text>
+        ),
+    },
+    {
+      title: 'Thực tế',
+      dataIndex: 'actualHours',
+      align: 'right',
+      width: 90,
+      render: (value: number) => (
+        <Text strong className="numeric-cell">
+          {value.toFixed(1)}h
+        </Text>
+      ),
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      align: 'center',
+      width: 120,
+      render: (status: AttendanceStatus) => <AttendanceStatusTag status={status} />,
+    },
+    {
+      title: 'Ghi chú',
+      dataIndex: 'note',
+      width: 200,
+      render: (value: string) =>
+        value === '' ? (
+          <Text type="secondary">—</Text>
+        ) : (
+          <Text className="att-note">{value}</Text>
+        ),
+    },
+  ];
+
   /** Tầng 1 — Quản lý xác nhận giờ làm. */
   const handleConfirm = (row: PayrollRow): void => {
     dispatch(
@@ -418,11 +493,6 @@ export const AttendancePage: FC = () => {
     message.success(`Đã xác nhận giờ làm của ${row.employeeName}.`);
   };
 
-  /**
-   * Tầng 2 — Kế toán / Admin duyệt chi.
-   * Một dispatch làm cả hai việc: đổi trạng thái bảng lương và sinh phiếu chi
-   * sổ quỹ (CHI / TRA_LUONG).
-   */
   const handleApprove = (row: PayrollRow): void => {
     dispatch(
       payrollPaid({
@@ -503,7 +573,6 @@ export const AttendancePage: FC = () => {
         row.adjustedHours === null ? (
           <span className="numeric-cell">{row.totalHours.toFixed(1)}h</span>
         ) : (
-          // Giờ đã điều chỉnh: hiện cả số gốc bị gạch để đối chiếu.
           <Tooltip title={`Lý do: ${row.adjustReason}`}>
             <Space direction="vertical" size={0} className="pay-hours-stack">
               <Text strong className="numeric-cell pay-hours-adjusted">
@@ -635,7 +704,6 @@ export const AttendancePage: FC = () => {
         const canApprove = canApprovePayment(row, actor.actorId, actor.actorRole);
         const isOwnPayroll = row.employeeId === actor.actorId;
 
-        // Đã thanh toán là trạng thái cuối; không có hành động nào nữa.
         if (row.status === PAYROLL_STATUS.Paid) {
           return <Text type="secondary">Hoàn tất</Text>;
         }
@@ -696,7 +764,6 @@ export const AttendancePage: FC = () => {
               </Popconfirm>
             )}
 
-            {/* Giải thích vì sao không có nút, thay vì để ô trống. */}
             {isOwnPayroll && (
               <Tooltip title="Không ai được tự duyệt lương cho chính mình.">
                 <Text type="secondary" className="pay-own-note">
@@ -715,8 +782,9 @@ export const AttendancePage: FC = () => {
   ];
 
   const handleExportAttendance = (): void => {
+    const data = activeTab === 'my-shifts' ? myAttendance : attendanceRegister;
     exportToExcel(
-      attendance,
+      data,
       [
         { header: 'Ngày', accessor: (row) => row.workDate },
         { header: 'Mã NV', accessor: (row) => row.employeeCode },
@@ -777,6 +845,9 @@ export const AttendancePage: FC = () => {
     );
   };
 
+  const myShiftCount = myAttendance.length;
+  const registerCount = attendanceRegister.length;
+
   return (
     <>
       <PageHeader
@@ -789,11 +860,44 @@ export const AttendancePage: FC = () => {
 
       <Card styles={{ body: { padding: '8px 18px 8px' } }}>
         <Tabs
-          defaultActiveKey="attendance"
+          activeKey={activeTab}
+          onChange={setActiveTab}
           items={[
             {
-              key: 'attendance',
-              label: `Chấm công (${attendance.length})`,
+              key: 'my-shifts',
+              label: `Ca của tôi (${myShiftCount})`,
+              children: (
+                <>
+                  <TableToolbar
+                    searchValue={search}
+                    searchPlaceholder="Tìm theo tên hoặc mã nhân viên..."
+                    onSearchChange={setSearch}
+                    filters={[]}
+                    onExport={handleExportAttendance}
+                    onReset={() => {
+                      setSearch('');
+                    }}
+                  />
+
+                  <Table<AttendanceRecord>
+                    columns={myShiftColumns}
+                    dataSource={myAttendance}
+                    rowKey="id"
+                    size="small"
+                    scroll={{ x: 1000 }}
+                    pagination={{
+                      pageSize: 15,
+                      showSizeChanger: true,
+                      showTotal: (total) => `${total} bản ghi`,
+                    }}
+                    locale={{ emptyText: 'Chưa có dữ liệu chấm công ca của bạn.' }}
+                  />
+                </>
+              ),
+            },
+            {
+              key: 'register',
+              label: `Bảng chấm công (${registerCount})`,
               children: (
                 <>
                   <TableToolbar
@@ -812,7 +916,7 @@ export const AttendancePage: FC = () => {
 
                   <Table<AttendanceRecord>
                     columns={attendanceColumns}
-                    dataSource={attendance}
+                    dataSource={attendanceRegister}
                     rowKey="id"
                     size="small"
                     scroll={{ x: 1420 }}
@@ -871,10 +975,6 @@ export const AttendancePage: FC = () => {
                     size="small"
                     scroll={{ x: 2100 }}
                     className="dense-table"
-                    /**
-                     * Chỉ cho chọn dòng đang chờ duyệt chi mà người dùng có quyền —
-                     * tránh việc tick được rồi mới báo lỗi.
-                     */
                     rowSelection={{
                       selectedRowKeys: selectedIds,
                       onChange: (keys) => setSelectedIds(keys as string[]),
@@ -892,7 +992,6 @@ export const AttendancePage: FC = () => {
                       showTotal: (total) => `${total} nhân sự`,
                     }}
                     summary={(rows) => {
-                      // Dòng tổng giúp đối chiếu nhanh với phiếu chi lương ở sổ quỹ.
                       const totalNet = rows.reduce((sum, row) => sum + row.netPay, 0);
                       return (
                         <Table.Summary.Row>

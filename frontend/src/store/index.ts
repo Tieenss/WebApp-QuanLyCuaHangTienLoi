@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
+import attendanceReducer from './slices/attendanceSlice';
 import uiReducer from './slices/uiSlice';
 import posReducer from './slices/posSlice';
 import inventoryReducer from './slices/inventorySlice';
@@ -16,6 +17,7 @@ import employeeReducer from './slices/employeeSlice';
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    attendance: attendanceReducer,
     ui: uiReducer,
     pos: posReducer,
     // `inventory` giữ bộ lọc UI của trang Kho; `stock` giữ dữ liệu tồn kho thật.

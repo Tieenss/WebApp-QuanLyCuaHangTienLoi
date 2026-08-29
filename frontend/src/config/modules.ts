@@ -117,7 +117,7 @@ export const MODULES: readonly ModuleDefinition[] = [
     label: 'Tổng quan',
     shortLabel: 'Tổng quan',
     icon: 'dashboard',
-    allowedRoles: FINANCE_VIEW,
+    allowedRoles: [...FINANCE_VIEW, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.Operation,
     implemented: true,
     description:
@@ -300,16 +300,18 @@ export const getModulesForRole = (role: UserRole): ModuleDefinition[] =>
  * Trang mặc định sau khi đăng nhập, tuỳ theo vai trò.
  *
  * Không dùng chung một trang được vì mỗi vai trò có mối quan tâm khác nhau và
- * Dashboard chỉ mở cho Admin / Kế toán:
- * - THU_NGAN, QUAN_LY → quầy bán hàng.
+ * Dashboard chỉ mở cho Admin / Kế toán / Quản lý:
+ * - THU_NGAN → quầy bán hàng.
+ * - QUAN_LY → Dashboard.
  * - THU_KHO → tồn kho Kho Tổng.
  * - ADMIN, KE_TOAN → Dashboard.
  */
 export const getLandingPath = (role: UserRole): string => {
   switch (role) {
     case USER_ROLE.Cashier:
-    case USER_ROLE.StoreManager:
       return '/pos';
+    case USER_ROLE.StoreManager:
+      return '/dashboard';
     case USER_ROLE.WarehouseKeeper:
       return '/inventory';
     default:
