@@ -1,0 +1,42 @@
+/*
+ * EmployeesPage.css — style cho Module 4: Quản lý Nhân viên
+ * (features/employees/EmployeesPage). Tách từ inline style trong TSX.
+ */
+
+/* Avatar nhân viên — nền đỏ thương hiệu, không bị bóp méo. */
+.employee-avatar {
+  background: #e31837;
+  flex-shrink: 0;
+}
+
+/* Khối chữ cạnh avatar. */
+.employee-info {
+  min-width: 0;
+}
+
+/* Tên nhân viên — dòng chính hiển thị block. */
+.employee-name {
+  display: block;
+  font-size: 13px;
+}
+
+/* Dòng phụ: mã NV + vị trí. */
+.employee-sub {
+  font-size: 11.5px;
+}
+
+/* Chữ cỡ nhỏ dùng lặp lại trong bảng. */
+.emp-text-12-5 {
+  font-size: 12.5px;
+}
+
+/* Dòng chính của ô liên hệ. */
+.emp-line {
+  font-size: 12px;
+  display: block;
+}
+
+/* Dòng phụ: email. */
+.emp-email {
+  font-size: 11px;
+}

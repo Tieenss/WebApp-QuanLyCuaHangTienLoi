@@ -1,0 +1,9 @@
+/*
+ * SupplierFormModal.css — style cho form thêm/sửa nhà cung cấp
+ * (features/suppliers/components/SupplierFormModal). Tách từ inline style trong TSX.
+ */
+
+/* Form cách tiêu đề modal một khoảng nhỏ. */
+.supplier-form {
+  margin-top: 12px;
+}

@@ -1,0 +1,59 @@
+/*
+ * PurchaseFormModal.css — form lập phiếu nhập hàng
+ * (features/purchaseOrders/components/PurchaseFormModal).
+ */
+
+/* Alert nhắc kho nhận và các bước hệ thống sẽ thực hiện. */
+.purchase-alert {
+  margin-bottom: 18px;
+}
+
+/* Hàng chứa ô chọn NCC và ngày nhập. */
+.purchase-head-fields {
+  width: 100%;
+}
+
+/* Ô chọn nhà cung cấp cần rộng vì tên công ty dài. */
+.purchase-field-supplier {
+  min-width: 420px;
+}
+
+.purchase-field-supplier .ant-select {
+  width: 100%;
+}
+
+/* ── Bảng dòng hàng ──────────────────────────────────────────────── */
+.purchase-line-table {
+  margin-bottom: 12px;
+}
+
+/* Ô chọn sản phẩm và các ô số chiếm hết chiều rộng cột. */
+.purchase-line-product,
+.purchase-line-input {
+  width: 100%;
+}
+
+.purchase-line-unit {
+  font-size: 12px;
+}
+
+/* Nút thêm dòng hàng nằm ngay dưới bảng. */
+.purchase-add-row {
+  margin-bottom: 18px;
+}
+
+/* ── Khối tổng tiền ──────────────────────────────────────────────── */
+.purchase-totals {
+  margin-bottom: 12px;
+}
+
+.purchase-grand-total {
+  color: #e31837;
+  font-size: 15px;
+}
+
+/* Ghi chú cuối form. */
+.purchase-foot-note {
+  margin: 0;
+  font-size: 12px;
+}

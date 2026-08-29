@@ -1,0 +1,148 @@
+/*
+ * AuthLayout.css — khung giao diện khu vực xác thực (layouts/AuthLayout).
+ *
+ * Bố cục 2 cột: panel thương hiệu bên trái, vùng form bên phải. Các rule ở đây
+ * chỉ mô tả *khung*; style riêng của từng trang auth nằm trong CSS của trang đó
+ * (ví dụ features/auth/LoginPage.css).
+ *
+ * Trước đây khối này nằm trong CSS của layout quản trị — sai chỗ, vì trang
+ * đăng nhập render ngoài AdminLayout nên không có quan hệ phụ thuộc nào với đó.
+ */
+
+.auth-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  background: #f4f6f8;
+}
+
+/* ── Panel thương hiệu ───────────────────────────────────────────── */
+.auth-brand-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 56px 56px 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #ffffff;
+  background: linear-gradient(150deg, #e31837 0%, #a60f28 55%, #1c1c1c 100%);
+}
+
+/* Hai vòng tròn mờ gợi hình logo Circle K */
+.auth-brand-panel::before,
+.auth-brand-panel::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 199, 44, 0.22);
+}
+
+.auth-brand-panel::before {
+  width: 460px;
+  height: 460px;
+  right: -170px;
+  top: -120px;
+}
+
+.auth-brand-panel::after {
+  width: 300px;
+  height: 300px;
+  left: -110px;
+  bottom: -110px;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.auth-brand-content {
+  position: relative;
+  z-index: 1;
+  max-width: 460px;
+}
+
+.auth-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 199, 44, 0.16);
+  border: 1px solid rgba(255, 199, 44, 0.4);
+  color: #ffc72c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.auth-brand-title {
+  color: #ffffff;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 20px 0 12px;
+}
+
+.auth-brand-desc {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.auth-feature-list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+  margin-top: 36px;
+}
+
+.auth-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.auth-feature-item .anticon {
+  color: #ffc72c;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+/* Dòng bản quyền dưới panel thương hiệu. */
+.auth-layout .auth-copyright {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  z-index: 1;
+}
+
+/* ── Vùng form ───────────────────────────────────────────────────── */
+.auth-form-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+}
+
+.auth-form-inner {
+  width: 100%;
+  max-width: 400px;
+}
+
+.auth-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  margin-bottom: 18px;
+}
+
+/* Trên màn hình hẹp, ẩn panel thương hiệu để dành chỗ cho form */
+@media (max-width: 900px) {
+  .auth-layout {
+    grid-template-columns: 1fr;
+  }
+  .auth-brand-panel {
+    display: none;
+  }
+}

@@ -1,0 +1,62 @@
+/*
+ * SuppliersPage.css — style cho Module 6: Nhà cung cấp
+ * (features/suppliers/SuppliersPage). Tách từ inline style trong TSX.
+ */
+
+/* Tên nhà cung cấp — dòng chính hiển thị block. */
+.supplier-name {
+  display: block;
+  font-size: 13px;
+}
+
+/* Dòng phụ: mã số thuế. */
+.supplier-tax {
+  font-size: 11.5px;
+}
+
+/* Tag nhóm hàng cung ứng — nhỏ gọn, không margin. */
+.supplier-category-tag {
+  font-size: 11px;
+  margin: 0;
+}
+
+/* Dòng chính của ô liên hệ. */
+.supplier-line {
+  font-size: 12px;
+  display: block;
+}
+
+/* Icon điện thoại màu thương hiệu. */
+.supplier-phone-icon {
+  color: #e31837;
+  margin-right: 5px;
+}
+
+/* Icon email. */
+.supplier-mail-icon {
+  margin-right: 5px;
+}
+
+/* Dòng phụ: email. */
+.supplier-email {
+  font-size: 11.5px;
+}
+
+/* Công nợ còn phải trả — đỏ cảnh báo. */
+.debt-outstanding {
+  color: #dc2626;
+}
+
+/* Công nợ đã tất toán — xanh lá. */
+.debt-clear {
+  color: #10b981;
+}
+
+/* Icon hành động sửa / xoá. */
+.action-edit-icon {
+  color: #2563eb;
+}
+
+.action-delete-icon {
+  color: #dc2626;
+}

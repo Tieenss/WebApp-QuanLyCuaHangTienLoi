@@ -1,0 +1,79 @@
+/*
+ * AccountPage.css — style cho trang Tài khoản của tôi
+ * (features/account/AccountPage).
+ */
+
+/* ── Thẻ nhận diện (cột trái) ────────────────────────────────────── */
+
+/* Thẻ cao bằng cột phải khi hai cột nằm cạnh nhau. */
+.account-identity-card {
+  height: 100%;
+}
+
+.account-identity-inner {
+  width: 100%;
+  align-items: center;
+  text-align: center;
+}
+
+.account-avatar {
+  background: #e31837;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.account-name-block {
+  align-items: center;
+}
+
+.account-fullname {
+  font-size: 17px;
+}
+
+/* Mô tả quyền hạn của vai trò. */
+.account-role-desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.account-divider {
+  margin: 4px 0;
+}
+
+/* ── Thông tin do quản trị cấp ───────────────────────────────────── */
+.account-meta {
+  width: 100%;
+  text-align: left;
+}
+
+/* Nhãn cột trái cần đủ rộng để không ngắt dòng giữa từ. */
+.account-meta .ant-descriptions-item-label {
+  width: 110px;
+  font-size: 12.5px;
+}
+
+.account-meta .ant-descriptions-item-content {
+  font-size: 12.5px;
+}
+
+/* Ghi chú nhắc liên hệ quản trị nếu cần đổi vai trò / chi nhánh. */
+.account-meta-note {
+  font-size: 11.5px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+/* ── Form (cột phải) ─────────────────────────────────────────────── */
+
+/* Icon trong các ô nhập của form hồ sơ và đổi mật khẩu. */
+.account-input-icon {
+  color: #9ca3af;
+}
+
+/* Alert cảnh báo / lỗi phía trên form đổi mật khẩu. */
+.account-alert {
+  margin-bottom: 18px;
+}

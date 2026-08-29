@@ -1,0 +1,21 @@
+/*
+ * CapitalInjectionModal.css — modal Admin cấp vốn cho quỹ
+ * (features/cashbook/components/CapitalInjectionModal).
+ */
+
+/* Dòng giải thích phía trên form. */
+.capital-intro {
+  margin-bottom: 12px;
+  font-size: 12.5px;
+}
+
+/* Alert hiện số dư quỹ hiện tại. */
+.capital-alert {
+  margin-bottom: 18px;
+}
+
+/* Ô nhập số tiền và ngày chiếm hết chiều rộng cho dễ bấm. */
+.capital-amount-input,
+.capital-date-input {
+  width: 100%;
+}
