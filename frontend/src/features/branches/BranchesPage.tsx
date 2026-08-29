@@ -1,12 +1,33 @@
 import { useMemo, useState, type FC } from 'react';
-import { Card, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import {
+  Button,
+  Card,
+  Popconfirm,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { EnvironmentOutlined, PhoneOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  EnvironmentOutlined,
+  PhoneOutlined,
+  PlusOutlined,
+} from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { RecordStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  deleteBranch,
+  setBranchModalOpen,
+  setSelectedBranch,
+} from '@/store/slices/branchSlice';
 import {
   BRANCH_KIND,
   BRANCH_KIND_LABEL,
@@ -15,21 +36,18 @@ import {
   REGION_LABEL,
   type Branch,
 } from '@/types';
-import { mockBranches } from '@/mockData/branches';
 import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
+import { BranchFormModal } from './components/BranchFormModal';
 import './BranchesPage.css';
 
 const { Text } = Typography;
 
-/**
- * Module 3 — Quản lý Chi nhánh.
- *
- * Danh sách gồm cả kho tổng và cửa hàng bán lẻ; cột "Doanh thu tháng" để trống
- * với kho tổng vì kho không phát sinh doanh thu bán lẻ.
- */
 export const BranchesPage: FC = () => {
+  const dispatch = useAppDispatch();
+  const { branches } = useAppSelector((state) => state.branch);
+
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [kindFilter, setKindFilter] = useState<string | null>(null);
@@ -37,7 +55,7 @@ export const BranchesPage: FC = () => {
 
   const filtered = useMemo(
     () =>
-      mockBranches.filter((branch) => {
+      branches.filter((branch) => {
         const matchSearch = matchKeyword(search, [
           branch.name,
           branch.code,
@@ -51,21 +69,21 @@ export const BranchesPage: FC = () => {
         const matchStatus = statusFilter === null || branch.status === statusFilter;
         return matchSearch && matchRegion && matchKind && matchStatus;
       }),
-    [search, regionFilter, kindFilter, statusFilter],
+    [branches, search, regionFilter, kindFilter, statusFilter],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
-    const stores = mockBranches.filter(
+    const stores = branches.filter(
       (branch) => branch.kind === BRANCH_KIND.Store,
     );
-    const active = mockBranches.filter(
+    const active = branches.filter(
       (branch) => branch.status === RECORD_STATUS.Active,
     );
-    const totalRevenue = mockBranches.reduce(
+    const totalRevenue = branches.reduce(
       (sum, branch) => sum + branch.monthlyRevenue,
       0,
     );
-    const totalEmployees = mockBranches.reduce(
+    const totalEmployees = branches.reduce(
       (sum, branch) => sum + branch.employeeCount,
       0,
     );
@@ -82,7 +100,7 @@ export const BranchesPage: FC = () => {
         key: 'active',
         title: 'Đang hoạt động',
         value: formatNumber(active.length),
-        suffix: `/ ${mockBranches.length}`,
+        suffix: `/ ${branches.length}`,
         color: BRAND.success,
       },
       {
@@ -98,7 +116,7 @@ export const BranchesPage: FC = () => {
         color: BRAND.primaryRed,
       },
     ];
-  }, []);
+  }, [branches]);
 
   const filters: ToolbarFilter[] = [
     {
@@ -132,6 +150,20 @@ export const BranchesPage: FC = () => {
       ],
     },
   ];
+
+  const handleEdit = (branch: Branch): void => {
+    dispatch(setSelectedBranch(branch));
+    dispatch(setBranchModalOpen(true));
+  };
+
+  const handleAdd = (): void => {
+    dispatch(setSelectedBranch(null));
+    dispatch(setBranchModalOpen(true));
+  };
+
+  const handleDelete = (id: string): void => {
+    dispatch(deleteBranch(id));
+  };
 
   const columns: ColumnsType<Branch> = [
     {
@@ -246,6 +278,32 @@ export const BranchesPage: FC = () => {
       fixed: 'right',
       render: (status: Branch['status']) => <RecordStatusTag status={status} />,
     },
+    {
+      title: '',
+      key: 'actions',
+      align: 'center',
+      width: 90,
+      fixed: 'right',
+      render: (_, row) => (
+        <Space size={0}>
+          <Button
+            type="text"
+            icon={<EditOutlined className="action-edit-icon" />}
+            onClick={() => handleEdit(row)}
+          />
+          <Popconfirm
+            title="Xoá chi nhánh?"
+            description={`Xoá "${row.name}" khỏi danh sách?`}
+            okText="Xoá"
+            cancelText="Huỷ"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete(row.id)}
+          >
+            <Button type="text" icon={<DeleteOutlined className="action-delete-icon" />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
 
   const handleExport = (): void => {
@@ -278,9 +336,12 @@ export const BranchesPage: FC = () => {
         title="Quản lý chi nhánh"
         description="Danh sách cửa hàng Circle K và kho tổng trên toàn quốc."
         extra={
-          <Space>
+          <Space wrap>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              Thêm chi nhánh
+            </Button>
             <Tag color="red" className="tag-no-margin">
-              {filtered.length} / {mockBranches.length} điểm
+              {filtered.length} / {branches.length} điểm
             </Tag>
           </Space>
         }
@@ -312,6 +373,8 @@ export const BranchesPage: FC = () => {
           pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `${total} điểm bán` }}
         />
       </Card>
+
+      <BranchFormModal />
     </>
   );
 };

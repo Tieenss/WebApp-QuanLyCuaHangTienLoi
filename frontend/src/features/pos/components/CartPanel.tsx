@@ -43,6 +43,7 @@ import {
   type ShiftCode,
 } from '@/types';
 import { productById } from '@/mockData/products';
+import { stockOf } from '@/store/slices/stockSlice';
 import { cashiersOfBranch } from '@/mockData/employees';
 import { nowIso } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
@@ -83,6 +84,7 @@ export const CartPanel: FC = () => {
 
   const { user } = useAppSelector((state) => state.auth);
   const posState = useAppSelector((state) => state.pos);
+  const balances = useAppSelector((state) => state.stock.balances);
   const {
     branchId,
     lines,
@@ -102,6 +104,16 @@ export const CartPanel: FC = () => {
   const changeAmount = Math.max(0, tenderedAmount - totals.grandTotal);
   const isTenderInsufficient = isCash && tenderedAmount < totals.grandTotal;
 
+  /** Kiểm tra tồn kho tại thời điểm thanh toán (BR-01). */
+  const hasOutOfStockLines = useMemo(() => {
+    return lines.some((line) => {
+      const currentStock = stockOf(balances, branchId, line.productId);
+      if (currentStock > 0) return false;
+      const product = productById(line.productId);
+      return product?.categoryId !== 'cat-03';
+    });
+  }, [lines, balances, branchId]);
+
   /**
    * Chốt hoá đơn — một dispatch duy nhất cho cả 4 bước của transaction:
    * lưu hoá đơn, trừ tồn kho, ghi thẻ kho, tạo phiếu thu sổ quỹ.
@@ -113,6 +125,18 @@ export const CartPanel: FC = () => {
     }
     if (isTenderInsufficient) {
       message.error('Số tiền khách đưa chưa đủ để thanh toán.');
+      return;
+    }
+    if (hasOutOfStockLines) {
+      const outOfStockLine = lines.find((line) => {
+        const currentStock = stockOf(balances, branchId, line.productId);
+        if (currentStock > 0) return false;
+        const product = productById(line.productId);
+        return product?.categoryId !== 'cat-03';
+      });
+      message.error(
+        `Sản phẩm "${outOfStockLine?.productName}" đã hết hàng, không thể thanh toán.`,
+      );
       return;
     }
 
@@ -354,7 +378,7 @@ export const CartPanel: FC = () => {
           size="large"
           block
           className="cart-checkout-btn"
-          disabled={lines.length === 0 || isTenderInsufficient}
+          disabled={lines.length === 0 || isTenderInsufficient || hasOutOfStockLines}
           onClick={handleCheckout}
         >
           Thanh toán {totals.grandTotal > 0 && formatVND(totals.grandTotal)}

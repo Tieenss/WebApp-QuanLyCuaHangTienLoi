@@ -374,29 +374,39 @@ const buildAttendance = (): AttendanceRecord[] => {
         ? SHIFT_HOURS + overtimeHours - lateMinutes / 60
         : 0;
 
-      records.push({
-        id: `att-${String(sequence).padStart(5, '0')}`,
-        employeeId: employee.id,
-        employeeName: employee.fullName,
-        employeeCode: employee.code,
-        branchId: employee.branchId,
-        workDate: workDate.format('YYYY-MM-DD'),
-        shift: employee.defaultShift,
-        checkInAt: checkIn ? checkIn.toISOString() : null,
-        checkOutAt: checkOut ? checkOut.toISOString() : null,
-        workedHours: Number(workedHours.toFixed(2)),
-        overtimeHours,
-        status,
-        note:
-          status === ATTENDANCE_STATUS.Late
-            ? `Đi muộn ${lateMinutes} phút`
-            : status === ATTENDANCE_STATUS.Leave
-              ? 'Nghỉ phép đã được duyệt'
-              : status === ATTENDANCE_STATUS.Absent
-                ? 'Vắng không thông báo'
-                : '',
-      });
-      sequence += 1;
+       const breakDuration = isWorking ? (random() < 0.5 ? 0.5 : 1) : 0;
+       const actualHours = isWorking
+         ? Number((workedHours - breakDuration).toFixed(2))
+         : 0;
+
+       records.push({
+         id: `att-${String(sequence).padStart(5, '0')}`,
+         employeeId: employee.id,
+         employeeName: employee.fullName,
+         employeeCode: employee.code,
+         branchId: employee.branchId,
+         workDate: workDate.format('YYYY-MM-DD'),
+         shift: employee.defaultShift,
+         checkInAt: checkIn ? checkIn.toISOString() : null,
+         checkOutAt: checkOut ? checkOut.toISOString() : null,
+         clockInAt: checkIn ? checkIn.toISOString() : null,
+         clockOutAt: checkOut ? checkOut.toISOString() : null,
+         breakDuration,
+         actualHours,
+         workedHours: Number(workedHours.toFixed(2)),
+         overtimeHours,
+         isPaid: false,
+         status,
+         note:
+           status === ATTENDANCE_STATUS.Late
+             ? `Đi muộn ${lateMinutes} phút`
+             : status === ATTENDANCE_STATUS.Leave
+               ? 'Nghỉ phép đã được duyệt'
+               : status === ATTENDANCE_STATUS.Absent
+                 ? 'Vắng không thông báo'
+                 : '',
+       });
+       sequence += 1;
     }
   }
 

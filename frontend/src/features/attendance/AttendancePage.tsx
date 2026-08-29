@@ -16,6 +16,8 @@ import {
   CheckCircleOutlined,
   DollarOutlined,
   EditOutlined,
+  LoginOutlined,
+  LogoutOutlined,
   UndoOutlined,
 } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
@@ -51,6 +53,7 @@ import {
 } from '@/types';
 import { mockBranches } from '@/mockData/branches';
 import { CURRENT_PAYROLL_PERIOD, mockAttendance } from '@/mockData/employees';
+import { dayjs } from '@/utils/dateUtils';
 import { formatDate, formatDateTime, formatPeriod, formatTime, nowIso } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -84,6 +87,29 @@ export const AttendancePage: FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [payrollStatusFilter, setPayrollStatusFilter] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState(mockAttendance);
+
+  const handleClockIn = (id: string): void => {
+    setAttendanceRecords((prev) =>
+      prev.map((record) =>
+        record.id === id
+          ? { ...record, clockInAt: dayjs().toISOString() }
+          : record,
+      ),
+    );
+    message.success('Đã check-in thành công.');
+  };
+
+  const handleClockOut = (id: string): void => {
+    setAttendanceRecords((prev) =>
+      prev.map((record) =>
+        record.id === id
+          ? { ...record, clockOutAt: dayjs().toISOString() }
+          : record,
+      ),
+    );
+    message.success('Đã check-out thành công.');
+  };
 
   /** Người đang thao tác — dùng cho mọi kiểm tra quyền duyệt. */
   const actor = useMemo(
@@ -98,7 +124,7 @@ export const AttendancePage: FC = () => {
 
   const attendance = useMemo(
     () =>
-      mockAttendance
+      attendanceRecords
         .filter((record) => {
           const matchSearch = matchKeyword(search, [
             record.employeeName,
@@ -110,10 +136,9 @@ export const AttendancePage: FC = () => {
           const matchStatus = statusFilter === null || record.status === statusFilter;
           return matchSearch && matchBranch && matchShift && matchStatus;
         })
-        // Mới nhất trước để nhân sự trực ca hiện tại nằm trên đầu.
         .sort((a, b) => b.workDate.localeCompare(a.workDate))
         .slice(0, ATTENDANCE_DISPLAY_LIMIT),
-    [search, branchFilter, shiftFilter, statusFilter],
+    [search, branchFilter, shiftFilter, statusFilter, attendanceRecords],
   );
 
   const payroll = useMemo(
@@ -285,26 +310,64 @@ export const AttendancePage: FC = () => {
       ),
     },
     {
-      title: 'Giờ vào',
-      dataIndex: 'checkInAt',
+      title: 'Check In',
+      dataIndex: 'clockInAt',
       align: 'center',
       width: 90,
-      render: (value: string | null) =>
-        value === null ? <Text type="secondary">—</Text> : formatTime(value),
+      render: (value: string | null, row: AttendanceRecord) =>
+        value === null ? (
+          <Button
+            type="primary"
+            size="small"
+            icon={<LoginOutlined />}
+            onClick={() => handleClockIn(row.id)}
+          >
+            Check In
+          </Button>
+        ) : (
+          formatTime(value)
+        ),
     },
     {
-      title: 'Giờ ra',
-      dataIndex: 'checkOutAt',
+      title: 'Check Out',
+      dataIndex: 'clockOutAt',
       align: 'center',
       width: 90,
-      render: (value: string | null) =>
-        value === null ? <Text type="secondary">—</Text> : formatTime(value),
+      render: (value: string | null, row: AttendanceRecord) =>
+        value === null ? (
+          row.clockInAt !== null ? (
+            <Button
+              type="primary"
+              size="small"
+              icon={<LogoutOutlined />}
+              onClick={() => handleClockOut(row.id)}
+            >
+              Check Out
+            </Button>
+          ) : (
+            <Text type="secondary">Chưa check-in</Text>
+          )
+        ) : (
+          formatTime(value)
+        ),
     },
     {
-      title: 'Giờ làm',
-      dataIndex: 'workedHours',
+      title: 'Nghỉ',
+      dataIndex: 'breakDuration',
       align: 'right',
-      width: 95,
+      width: 70,
+      render: (value: number) =>
+        value === 0 ? (
+          <Text type="secondary">—</Text>
+        ) : (
+          <Text className="numeric-cell">{value}h</Text>
+        ),
+    },
+    {
+      title: 'Thực tế',
+      dataIndex: 'actualHours',
+      align: 'right',
+      width: 90,
       render: (value: number) => (
         <Text strong className="numeric-cell">
           {value.toFixed(1)}h
@@ -312,17 +375,15 @@ export const AttendancePage: FC = () => {
       ),
     },
     {
-      title: 'Ngoài giờ',
-      dataIndex: 'overtimeHours',
-      align: 'right',
-      width: 95,
-      render: (value: number) =>
-        value === 0 ? (
-          <Text type="secondary">—</Text>
+      title: 'Đã trả lương',
+      dataIndex: 'isPaid',
+      align: 'center',
+      width: 90,
+      render: (value: boolean) =>
+        value ? (
+          <Tag color="green">Có</Tag>
         ) : (
-          <Text className="numeric-cell overtime-info">
-            +{value}h
-          </Text>
+          <Tag>Không</Tag>
         ),
     },
     {

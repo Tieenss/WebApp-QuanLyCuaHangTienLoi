@@ -5,6 +5,7 @@ import {
   ArrowDownOutlined,
   ArrowUpOutlined,
   BankOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
@@ -28,6 +29,7 @@ import { dayjs, formatDate, lastNDays } from '@/utils/dateUtils';
 import { formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { CapitalInjectionModal } from './components/CapitalInjectionModal';
+import { ManualEntryModal } from './components/ManualEntryModal';
 import './CashbookPage.css';
 
 const { Text } = Typography;
@@ -44,12 +46,11 @@ const { RangePicker } = DatePicker;
  */
 export const CashbookPage: FC = () => {
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
-  /** Sổ quỹ hiện hành — có cả phiếu vừa sinh từ bán hàng và duyệt lương. */
   const allEntries = useAppSelector((state) => state.cashbook.entries);
 
-  /** Chỉ Admin được cấp vốn (ma trận phân quyền, dòng "Cấp vốn"). */
   const canInjectCapital = user?.role === USER_ROLE.Admin;
   const [isCapitalModalOpen, setCapitalModalOpen] = useState(false);
+  const [isManualModalOpen, setManualModalOpen] = useState(false);
 
   const [search, setSearch] = useState('');
   const [directionFilter, setDirectionFilter] = useState<string | null>(null);
@@ -304,22 +305,12 @@ export const CashbookPage: FC = () => {
         description="Theo dõi dòng tiền mặt và chuyển khoản tại cửa hàng cùng tổng công ty."
         extra={
           <Space wrap>
-            <RangePicker
-              value={[dayjs(range.from), dayjs(range.to)]}
-              format="DD/MM/YYYY"
-              allowClear={false}
-              onChange={(values) => {
-                // `allowClear={false}` nên values luôn có 2 phần tử hợp lệ.
-                if (values === null) return;
-                const [from, to] = values;
-                if (from === null || to === null) return;
-                setRange({
-                  from: from.format('YYYY-MM-DD'),
-                  to: to.format('YYYY-MM-DD'),
-                });
-              }}
-            />
-
+            <Button
+              icon={<PlusOutlined />}
+              onClick={() => setManualModalOpen(true)}
+            >
+              Thêm phiếu
+            </Button>
             {canInjectCapital && (
               <Button
                 type="primary"
@@ -329,6 +320,20 @@ export const CashbookPage: FC = () => {
                 Cấp vốn
               </Button>
             )}
+            <RangePicker
+              value={[dayjs(range.from), dayjs(range.to)]}
+              format="DD/MM/YYYY"
+              allowClear={false}
+              onChange={(values) => {
+                if (values === null) return;
+                const [from, to] = values;
+                if (from === null || to === null) return;
+                setRange({
+                  from: from.format('YYYY-MM-DD'),
+                  to: to.format('YYYY-MM-DD'),
+                });
+              }}
+            />
           </Space>
         }
       />
@@ -369,6 +374,10 @@ export const CashbookPage: FC = () => {
       <CapitalInjectionModal
         open={isCapitalModalOpen}
         onClose={() => setCapitalModalOpen(false)}
+      />
+      <ManualEntryModal
+        open={isManualModalOpen}
+        onClose={() => setManualModalOpen(false)}
       />
     </>
   );

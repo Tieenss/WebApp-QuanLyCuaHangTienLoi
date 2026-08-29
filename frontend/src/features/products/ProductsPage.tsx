@@ -1,14 +1,37 @@
-import { useMemo, useState, type FC } from 'react';
-import { Card, Col, Row, Space, Table, Tabs, Tag, Tooltip, Typography } from 'antd';
+import { useMemo, useState, type CSSProperties, type FC } from 'react';
+import {
+  Button,
+  Card,
+  Col,
+  Popconfirm,
+  Row,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { BarcodeOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import {
+  BarcodeOutlined,
+  ClockCircleOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+} from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { ProductThumb } from '@/components/ProductThumb';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { RecordStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  deleteProduct,
+  setProductModalOpen,
+  setSelectedProduct,
+} from '@/store/slices/productSlice';
 import {
   PRODUCT_UNIT_LABEL,
   RECORD_STATUS,
@@ -19,7 +42,6 @@ import { mockCategories } from '@/mockData/categories';
 import {
   grossProfitPerUnit,
   marginPercent,
-  mockProducts,
 } from '@/mockData/products';
 import { totalStockOf } from '@/store/slices/stockSlice';
 import {
@@ -29,8 +51,7 @@ import {
   matchKeyword,
 } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
-import type { CSSProperties } from 'react';
-import './ProductsPage.css';
+import { ProductFormModal } from './components/ProductFormModal';
 
 const { Text } = Typography;
 
@@ -41,7 +62,8 @@ const { Text } = Typography;
  * trực tiếp từ giá bán trừ giá nhập nên luôn khớp với báo cáo lợi nhuận.
  */
 export const ProductsPage: FC = () => {
-  /** Tồn kho hiện hành để cột "Tồn toàn chuỗi" phản ánh cả hàng vừa bán. */
+  const dispatch = useAppDispatch();
+  const { products } = useAppSelector((state) => state.product);
   const balances = useAppSelector((state) => state.stock.balances);
 
   const [search, setSearch] = useState('');
@@ -51,7 +73,7 @@ export const ProductsPage: FC = () => {
 
   const filtered = useMemo(
     () =>
-      mockProducts.filter((product) => {
+      products.filter((product) => {
         const matchSearch = matchKeyword(search, [
           product.name,
           product.sku,
@@ -67,11 +89,11 @@ export const ProductsPage: FC = () => {
           (perishableFilter === 'yes' ? product.isPerishable : !product.isPerishable);
         return matchSearch && matchCategory && matchStatus && matchPerishable;
       }),
-    [search, categoryFilter, statusFilter, perishableFilter],
+    [products, search, categoryFilter, statusFilter, perishableFilter],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
-    const active = mockProducts.filter(
+    const active = products.filter(
       (product) => product.status === RECORD_STATUS.Active,
     );
     const perishable = active.filter((product) => product.isPerishable);
@@ -84,7 +106,7 @@ export const ProductsPage: FC = () => {
         key: 'products',
         title: 'Sản phẩm đang kinh doanh',
         value: formatNumber(active.length),
-        suffix: `/ ${mockProducts.length} SKU`,
+        suffix: `/ ${products.length} SKU`,
         color: BRAND.primaryRed,
       },
       {
@@ -107,7 +129,7 @@ export const ProductsPage: FC = () => {
         color: BRAND.success,
       },
     ];
-  }, []);
+  }, [products]);
 
   const filters: ToolbarFilter[] = [
     {
@@ -142,6 +164,20 @@ export const ProductsPage: FC = () => {
       ],
     },
   ];
+
+  const handleEdit = (product: Product): void => {
+    dispatch(setSelectedProduct(product));
+    dispatch(setProductModalOpen(true));
+  };
+
+  const handleAdd = (): void => {
+    dispatch(setSelectedProduct(null));
+    dispatch(setProductModalOpen(true));
+  };
+
+  const handleDelete = (id: string): void => {
+    dispatch(deleteProduct(id));
+  };
 
   const productColumns: ColumnsType<Product> = [
     {
@@ -300,6 +336,32 @@ export const ProductsPage: FC = () => {
       fixed: 'right',
       render: (status: Product['status']) => <RecordStatusTag status={status} />,
     },
+    {
+      title: '',
+      key: 'actions',
+      align: 'center',
+      width: 90,
+      fixed: 'right',
+      render: (_, row) => (
+        <Space size={0}>
+          <Button
+            type="text"
+            icon={<EditOutlined className="action-edit-icon" />}
+            onClick={() => handleEdit(row)}
+          />
+          <Popconfirm
+            title="Xoá sản phẩm?"
+            description={`Xoá "${row.name}" khỏi danh sách?`}
+            okText="Xoá"
+            cancelText="Huỷ"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete(row.id)}
+          >
+            <Button type="text" icon={<DeleteOutlined className="action-delete-icon" />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
 
   const categoryColumns: ColumnsType<Category> = [
@@ -340,9 +402,9 @@ export const ProductsPage: FC = () => {
       align: 'center',
       width: 100,
       render: (_, row) => {
-        const count = mockProducts.filter(
-          (product) => product.categoryId === row.id,
-        ).length;
+         const count = products.filter(
+           (product) => product.categoryId === row.id,
+         ).length;
         return <Text strong className="numeric-cell">{count}</Text>;
       },
     },
@@ -392,9 +454,14 @@ export const ProductsPage: FC = () => {
         title="Danh mục & sản phẩm"
         description="Phân loại nhóm hàng, quản lý SKU, mã vạch, giá bán và biên lợi nhuận."
         extra={
-          <Tag color="red" className="tag-no-margin">
-            {filtered.length} / {mockProducts.length} SKU
-          </Tag>
+          <Space wrap>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              Thêm sản phẩm
+            </Button>
+            <Tag color="red" className="tag-no-margin">
+              {filtered.length} / {products.length} SKU
+            </Tag>
+          </Space>
         }
       />
 
@@ -406,7 +473,7 @@ export const ProductsPage: FC = () => {
           items={[
             {
               key: 'products',
-              label: `Sản phẩm (${mockProducts.length})`,
+               label: `Sản phẩm (${products.length})`,
               children: (
                 <>
                   <TableToolbar
@@ -459,6 +526,8 @@ export const ProductsPage: FC = () => {
           ]}
         />
       </Card>
+
+      <ProductFormModal />
     </>
   );
 };
