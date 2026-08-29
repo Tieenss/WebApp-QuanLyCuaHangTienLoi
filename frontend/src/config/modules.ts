@@ -156,7 +156,7 @@ export const MODULES: readonly ModuleDefinition[] = [
     label: 'Quản lý Nhân viên',
     shortLabel: 'Nhân viên',
     icon: 'employee',
-    allowedRoles: ADMIN_ONLY,
+    allowedRoles: [USER_ROLE.Admin, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.MasterData,
     implemented: true,
     description:
@@ -169,7 +169,7 @@ export const MODULES: readonly ModuleDefinition[] = [
     label: 'Danh mục & Sản phẩm',
     shortLabel: 'Sản phẩm',
     icon: 'product',
-    allowedRoles: ADMIN_ONLY,
+    allowedRoles: [USER_ROLE.Admin, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.MasterData,
     implemented: true,
     description:
@@ -182,7 +182,7 @@ export const MODULES: readonly ModuleDefinition[] = [
     label: 'Nhà cung cấp',
     shortLabel: 'Nhà cung cấp',
     icon: 'supplier',
-    allowedRoles: ADMIN_ONLY,
+    allowedRoles: [USER_ROLE.Admin, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.MasterData,
     implemented: true,
     description:
