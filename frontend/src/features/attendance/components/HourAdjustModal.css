@@ -1,0 +1,20 @@
+/*
+ * HourAdjustModal.css — modal điều chỉnh giờ làm
+ * (features/attendance/components/HourAdjustModal).
+ */
+
+/* Dòng thông tin nhân viên trên đầu modal. */
+.hour-adjust-intro {
+  margin-bottom: 12px;
+  font-size: 12.5px;
+}
+
+/* Alert nhắc giờ hệ thống và thực nhận hiện tại. */
+.hour-adjust-alert {
+  margin-bottom: 18px;
+}
+
+/* Ô nhập số giờ chiếm hết chiều rộng để dễ bấm mũi tên tăng/giảm. */
+.hour-adjust-input {
+  width: 100%;
+}

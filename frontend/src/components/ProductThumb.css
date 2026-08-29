@@ -1,0 +1,32 @@
+/*
+ * ProductThumb.css — style cho ảnh đại diện sản phẩm
+ * (components/ProductThumb).
+ *
+ * Kích thước và màu danh mục là giá trị động theo prop, nên component truyền
+ * biến `--thumb-size` / `--thumb-color` qua style; mọi khai báo khác nằm tại đây.
+ */
+
+/* Ảnh thật của sản phẩm. */
+.product-thumb-img {
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+}
+
+/*
+ * Khối emoji đại diện khi chưa có ảnh: nền mờ ~12% và viền mờ ~24%
+ * (tương đương hậu tố alpha "1F" / "3D" trước đây).
+ */
+.product-thumb-emoji {
+  width: var(--thumb-size, 44px);
+  height: var(--thumb-size, 44px);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--thumb-color, #6b7280) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--thumb-color, #6b7280) 24%, transparent);
+  font-size: calc(var(--thumb-size, 44px) * 0.5);
+  line-height: 1;
+  flex-shrink: 0;
+}

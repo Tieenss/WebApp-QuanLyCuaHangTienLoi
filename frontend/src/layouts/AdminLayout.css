@@ -1,0 +1,129 @@
+
+.app-layout {
+  min-height: 100vh;
+}
+
+.app-sider {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.app-sider::-webkit-scrollbar {
+  width: 6px;
+}
+.app-sider::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  /* Dải gradient đỏ mờ tạo điểm nhấn thương hiệu ở đầu sidebar */
+  background: linear-gradient(135deg, rgba(227, 24, 55, 0.22), transparent 70%);
+}
+
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 3px;
+  flex-shrink: 0;
+}
+
+.brand-name {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.brand-tagline {
+  color: #ffc72c;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.sider-menu {
+  border-inline-end: none !important;
+  padding: 8px 0 24px;
+}
+
+/* Nhãn nhóm module trong sidebar */
+.sider-menu .ant-menu-item-group-title {
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding-inline: 22px;
+  margin-top: 10px;
+}
+
+/* Vạch vàng bên trái item đang chọn */
+.sider-menu .ant-menu-item-selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 3px 3px 0;
+  background: #ffc72c;
+}
+
+.sider-footer {
+  padding: 12px 18px 20px;
+  color: rgba(255, 255, 255, 0.34);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ── Vùng nội dung ────────────────────────────────────────────────── */
+.app-breadcrumb {
+  padding: 14px 24px 0;
+}
+
+.app-content {
+  padding: 16px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.app-footer {
+  text-align: center;
+  color: #6b7280;
+  font-size: 12px;
+  padding: 14px 24px 20px;
+}
+
+/* ── Style tách từ inline trong AdminLayout.tsx ──────────────────── */
+
+/* Mục cuối cùng của breadcrumb (trang hiện tại) — đậm hơn các mục trước. */
+.app-breadcrumb .breadcrumb-current {
+  color: #111827;
+  font-weight: 600;
+}
+
+/* Tag "Đang phát triển" cạnh breadcrumb — không thêm margin gây lệch hàng. */
+.app-breadcrumb .dev-status-tag {
+  margin: 0;
+}
+
+/* Chữ mô tả trong footer ứng dụng. */
+.app-footer .app-footer-text {
+  font-size: 12px;
+}

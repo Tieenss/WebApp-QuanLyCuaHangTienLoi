@@ -1,0 +1,37 @@
+/*
+ * CheckoutSuccessModal.css — style cho modal thanh toán thành công
+ * (features/pos/components/CheckoutSuccessModal). Tách từ inline style trong TSX.
+ */
+
+/* Tên sản phẩm trong bảng chi tiết hoá đơn. */
+.checkout-line-name {
+  font-size: 12.5px;
+}
+
+/* SKU dưới tên sản phẩm. */
+.checkout-line-sku {
+  font-size: 11px;
+}
+
+/* Dòng tiền thừa trả khách — nổi bật để thu ngân đọc ngay. */
+.checkout-change {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e31837;
+}
+
+/* Result component gọn lại so với mặc định. */
+.checkout-result {
+  padding: 12px 0 20px;
+}
+
+/* Bảng sản phẩm cách khối Descriptions phía dưới. */
+.checkout-lines-table {
+  margin-bottom: 16px;
+}
+
+/* Tổng cộng trong Descriptions — đỏ thương hiệu, cỡ lớn. */
+.checkout-grand-total {
+  color: #e31837;
+  font-size: 15px;
+}

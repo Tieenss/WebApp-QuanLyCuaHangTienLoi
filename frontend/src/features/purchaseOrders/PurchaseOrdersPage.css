@@ -1,0 +1,31 @@
+/*
+ * PurchaseOrdersPage.css — style cho Module 8: Nhập kho từ nhà cung cấp
+ * (features/purchaseOrders/PurchaseOrdersPage). Tách từ inline style trong TSX.
+ */
+
+/* ── Bảng phiếu nhập ─────────────────────────────────────────────── */
+
+/* Chữ cỡ nhỏ dùng lặp lại trong bảng (nhà cung cấp, kho nhận, số tiền). */
+.po-text-12-5 {
+  font-size: 12.5px;
+}
+
+/* Tổng phải trả — đỏ thương hiệu. */
+.po-total-due {
+  color: #e31837;
+}
+
+/* ── Chi tiết phiếu (dòng mở rộng) ───────────────────────────────── */
+
+/* Space bọc chi tiết chiếm hết chiều rộng. */
+.po-detail-full {
+  width: 100%;
+}
+
+/*
+ * Thực nhận ít hơn số đặt — vàng cảnh báo, là tín hiệu cần đối chiếu
+ * lại với nhà cung cấp.
+ */
+.po-received-short {
+  color: #f59e0b;
+}

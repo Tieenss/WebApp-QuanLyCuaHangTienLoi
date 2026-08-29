@@ -1,0 +1,63 @@
+/*
+ * StocktakesPage.css — style cho Module 10: Kiểm kê & Cân bằng kho
+ * (features/stocktakes/StocktakesPage). Tách từ inline style trong TSX.
+ */
+
+/* ── Bảng phiếu kiểm kê ──────────────────────────────────────────── */
+
+/* Chữ cỡ nhỏ dùng lặp lại trong bảng. */
+.stk-text-12-5 {
+  font-size: 12.5px;
+}
+
+/* Nhóm số dòng lệch xếp dọc, căn giữa. */
+.stk-cell-center {
+  align-items: center;
+}
+
+/* Số dòng có lệch > 0 — vàng cảnh báo. */
+.variance-warn {
+  color: #f59e0b;
+}
+
+/* Không có lệch — xanh lá. */
+.variance-ok {
+  color: #10b981;
+}
+
+/* Tỷ lệ lệch dưới số dòng. */
+.variance-note {
+  font-size: 11px;
+}
+
+/* Giá trị lệch âm (thiếu) — đỏ lỗi. */
+.value-loss {
+  color: #dc2626;
+}
+
+/* Giá trị lệch dương (thừa) — xanh lá. */
+.value-gain {
+  color: #10b981;
+}
+
+/* ── Chi tiết phiếu (dòng mở rộng) ───────────────────────────────── */
+
+/* Space bọc chi tiết chiếm hết chiều rộng. */
+.stk-detail-full {
+  width: 100%;
+}
+
+/* Lệch số lượng âm — đỏ lỗi. */
+.qty-loss {
+  color: #dc2626;
+}
+
+/* Lệch số lượng dương — xanh lá. */
+.qty-gain {
+  color: #10b981;
+}
+
+/* Nguyên nhân lệch cột cuối. */
+.stk-reason {
+  font-size: 12px;
+}

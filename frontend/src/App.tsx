@@ -1,24 +1,21 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ConfigProvider, Layout, Typography } from 'antd';
+import type { FC } from 'react';
+import { App as AntdApp, ConfigProvider } from 'antd';
+import viVN from 'antd/locale/vi_VN';
 import { Provider } from 'react-redux';
-import { store } from './store';
+import { store } from '@/store';
+import { circleKTheme } from '@/config/themeConfig';
+import { AppRouter } from '@/router';
+import './index.css';
 
-const { Title } = Typography;
 
-function App() {
-  return (
-    <Provider store={store}>
-      <ConfigProvider theme={{ token: { colorPrimary: '#7C3AED' } }}>
-        <Router>
-          <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Routes>
-              <Route path="/" element={<Title level={2}>ERP Cửa Hàng Tiện Lợi (Sắp ra mắt)</Title>} />
-            </Routes>
-          </Layout>
-        </Router>
-      </ConfigProvider>
-    </Provider>
-  );
-}
+const App: FC = () => (
+  <Provider store={store}>
+    <ConfigProvider theme={circleKTheme} locale={viVN}>
+      <AntdApp>
+        <AppRouter />
+      </AntdApp>
+    </ConfigProvider>
+  </Provider>
+);
 
 export default App;

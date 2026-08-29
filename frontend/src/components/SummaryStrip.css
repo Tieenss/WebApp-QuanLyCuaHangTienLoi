@@ -1,0 +1,9 @@
+.summary-strip {
+  display: flex;
+  gap: 16px;
+}
+
+.summary-strip .ant-card {
+  flex: 1;
+  min-width: 0;
+}

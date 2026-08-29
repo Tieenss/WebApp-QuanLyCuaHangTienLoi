@@ -1,0 +1,103 @@
+/*
+ * AttendancePage.css — style cho Module 11: Chấm công & Bảng lương
+ * (features/attendance/AttendancePage). Tách từ inline style trong TSX.
+ */
+
+/* ── Tab chấm công ───────────────────────────────────────────────── */
+
+/* Tên nhân viên — dòng chính hiển thị block. */
+.att-name {
+  display: block;
+  font-size: 12.5px;
+}
+
+/* Dòng phụ: mã NV. */
+.att-sub {
+  font-size: 11.5px;
+}
+
+/* Tag ca làm việc — xem `.tag-no-margin` dùng chung ở index.css. */
+
+/* Giờ ngoài giờ (+) — xanh dương nhấn mạnh. */
+.overtime-info {
+  color: #2563eb;
+}
+
+/* Ghi chú cột cuối. */
+.att-note {
+  font-size: 12px;
+}
+
+/* ── Tab bảng lương ──────────────────────────────────────────────── */
+
+/* Tên nhân viên trong bảng lương. */
+.pay-name {
+  display: block;
+  font-size: 12.5px;
+}
+
+/* Dòng phụ: mã NV + vai trò. */
+.pay-sub {
+  font-size: 11.5px;
+}
+
+/* Chữ cỡ nhỏ dùng lặp lại trong bảng lương. */
+.pay-text-12-5 {
+  font-size: 12.5px;
+}
+
+/* ── Cột giờ làm khi đã điều chỉnh ───────────────────────────────── */
+
+/* Xếp giờ mới trên, giờ gốc bị gạch dưới; căn phải theo cột số. */
+.pay-hours-stack {
+  align-items: flex-end;
+}
+
+/* Giờ sau điều chỉnh — vàng cảnh báo để thấy ngay là số đã sửa. */
+.pay-hours-adjusted {
+  color: #f59e0b;
+}
+
+/* Giờ hệ thống gốc, hiển thị nhỏ và gạch ngang. */
+.pay-hours-origin {
+  font-size: 11px;
+}
+
+/* Lương ngoài giờ — xanh dương. */
+.pay-overtime {
+  color: #2563eb;
+}
+
+/* Thưởng (+) — xanh lá. */
+.pay-bonus {
+  color: #10b981;
+}
+
+/* Khoản trừ (−) — đỏ cảnh báo. */
+.pay-deduction {
+  color: #dc2626;
+}
+
+/* Cột thực nhận & dòng tổng chi lương — đỏ thương hiệu. */
+.pay-net {
+  color: #e31837;
+}
+
+/* ── Cột duyệt & hành động ───────────────────────────────────────── */
+
+/* Dòng thông tin người duyệt từng tầng. */
+.pay-approval-line {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* Icon nút xác nhận giờ (Tầng 1) — xanh lá. */
+.pay-action-confirm {
+  color: #10b981;
+}
+
+/* Nhắc "Lương của bạn" ở cột hành động — không ai tự duyệt cho mình. */
+.pay-own-note {
+  font-size: 11px;
+  font-style: italic;
+}

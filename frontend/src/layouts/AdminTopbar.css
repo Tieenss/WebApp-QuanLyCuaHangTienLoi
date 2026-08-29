@@ -1,0 +1,126 @@
+/*
+ * AdminTopbar.css — thanh công cụ trên cùng của khu quản trị
+ * (layouts/AdminTopbar).
+ *
+ * Tách khỏi CSS của AdminLayout cùng lúc với việc tách component: topbar là
+ * một khối độc lập (chọn chi nhánh, tìm kiếm, thông báo, tài khoản), không dính
+ * gì tới sidebar hay vùng nội dung.
+ *
+ * Mọi rule scope dưới .app-header để không đụng tới các class cùng tên
+ * ở nơi khác — ví dụ .user-chip của PosLayout.
+ */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.app-header .header-left,
+.app-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ── Nút gập sidebar ─────────────────────────────────────────────── */
+.app-header .collapse-btn {
+  font-size: 17px;
+}
+
+/* ── Chọn chi nhánh ──────────────────────────────────────────────── */
+.app-header .branch-select {
+  min-width: 250px;
+}
+
+.app-header .branch-select-icon {
+  color: #e31837;
+}
+
+/* ── Ô tìm kiếm toàn cục ─────────────────────────────────────────── */
+.app-header .header-search {
+  width: 260px;
+}
+
+.app-header .header-search-icon {
+  color: #9ca3af;
+}
+
+/* ── Chuông thông báo ────────────────────────────────────────────── */
+.app-header .bell-icon {
+  font-size: 17px;
+}
+
+/* ── Chip người dùng ─────────────────────────────────────────────── */
+.app-header .user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.app-header .user-chip:hover {
+  background: #fff1f3;
+}
+
+.app-header .user-avatar {
+  background: #e31837;
+  color: #ffffff;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.app-header .user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.app-header .user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.app-header .user-role {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+/* Mũi tên đổi vai trò trong chip người dùng. */
+.app-header .user-chip-swap {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* ── Thu hẹp dần trên màn hình nhỏ để header không tràn ──────────── */
+@media (max-width: 1280px) {
+  .app-header .header-search {
+    display: none;
+  }
+}
+
+@media (max-width: 992px) {
+  .app-header .branch-select {
+    min-width: 150px;
+  }
+  .app-header .pos-quick-btn span:not(.anticon) {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header .user-meta {
+    display: none;
+  }
+}
