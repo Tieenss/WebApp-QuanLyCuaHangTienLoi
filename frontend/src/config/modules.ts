@@ -182,7 +182,7 @@ export const MODULES: readonly ModuleDefinition[] = [
     label: 'Nhà cung cấp',
     shortLabel: 'Nhà cung cấp',
     icon: 'supplier',
-    allowedRoles: [USER_ROLE.Admin, USER_ROLE.StoreManager] as const,
+    allowedRoles: ADMIN_ONLY,
     group: MODULE_GROUP.MasterData,
     implemented: true,
     description:
@@ -208,7 +208,7 @@ export const MODULES: readonly ModuleDefinition[] = [
     label: 'Nhập kho từ NCC',
     shortLabel: 'Nhập kho',
     icon: 'purchase',
-    allowedRoles: WAREHOUSE_OPS,
+    allowedRoles: [USER_ROLE.Admin, USER_ROLE.WarehouseKeeper, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.Warehouse,
     implemented: true,
     description:
