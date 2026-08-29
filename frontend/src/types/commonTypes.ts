@@ -26,6 +26,7 @@ export const DOCUMENT_STATUS = {
   Approved: 'APPROVED',
   Completed: 'COMPLETED',
   Cancelled: 'CANCELLED',
+  Balanced: 'BALANCED',
 } as const;
 
 export type DocumentStatus = (typeof DOCUMENT_STATUS)[keyof typeof DOCUMENT_STATUS];
@@ -36,6 +37,7 @@ export const DOCUMENT_STATUS_LABEL: Record<DocumentStatus, string> = {
   APPROVED: 'Đã duyệt',
   COMPLETED: 'Hoàn tất',
   CANCELLED: 'Đã huỷ',
+  BALANCED: 'Đã cân bằng',
 };
 
 /** Màu Tag của antd tương ứng từng trạng thái phiếu. */
@@ -45,6 +47,7 @@ export const DOCUMENT_STATUS_COLOR: Record<DocumentStatus, string> = {
   APPROVED: 'blue',
   COMPLETED: 'green',
   CANCELLED: 'red',
+  BALANCED: 'purple',
 };
 
 /** Option chuẩn cho Select/Segmented của antd. */

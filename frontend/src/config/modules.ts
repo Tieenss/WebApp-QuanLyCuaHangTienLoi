@@ -99,7 +99,7 @@ const STOCK_VIEW = [
 ] as const;
 
 /** Bán hàng tại quầy — Admin KHÔNG có quyền này theo ma trận phân quyền. */
-const POS_OPS = [USER_ROLE.StoreManager, USER_ROLE.Cashier] as const;
+const POS_OPS = [USER_ROLE.Cashier] as const;
 
 /** Sổ quỹ: Admin và Kế toán xem toàn hệ thống, Quản lý chỉ chi nhánh mình. */
 const CASHBOOK_VIEW = [

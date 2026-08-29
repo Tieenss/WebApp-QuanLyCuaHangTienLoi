@@ -1,6 +1,8 @@
 import { useMemo, useState, type FC, type ReactElement } from 'react';
-import { Card, Descriptions, Space, Statistic, Table, Tag, Typography } from 'antd';
+import { Button, Card, Descriptions, Modal, Space, Statistic, Table, Tag, Typography, message } from 'antd';
+const { Paragraph } = Typography;
 import type { ColumnsType } from 'antd/es/table';
+import { PlusOutlined } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
@@ -18,6 +20,7 @@ import { mockStocktakes } from '@/mockData/warehouseDocuments';
 import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
+import { StocktakeFormModal } from './components/StocktakeFormModal';
 import './StocktakesPage.css';
 
 const { Text } = Typography;
@@ -32,6 +35,8 @@ export const StocktakesPage: FC = () => {
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [balanceModal, setBalanceModal] = useState<Stocktake | null>(null);
+  const [createModal, setCreateModal] = useState(false);
 
   const filtered = useMemo(
     () =>
@@ -215,6 +220,33 @@ export const StocktakesPage: FC = () => {
       fixed: 'right',
       render: (status: DocumentStatus) => <DocumentStatusTag status={status} />,
     },
+    {
+      title: 'Thao tác',
+      key: 'actions',
+      align: 'center',
+      width: 160,
+      fixed: 'right',
+      render: (_: unknown, stocktake: Stocktake) =>
+        canApprove(stocktake) ? (
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => handleApprove(stocktake)}
+          >
+            Duyệt
+          </Button>
+        ) : canBalance(stocktake) ? (
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => handleBalance(stocktake)}
+          >
+            Cân bằng kho
+          </Button>
+        ) : (
+          <Text type="secondary">—</Text>
+        ),
+    },
   ];
 
   const renderDetail = (stocktake: Stocktake): ReactElement => {
@@ -281,7 +313,6 @@ export const StocktakesPage: FC = () => {
       },
     ];
 
-    // Chỉ đưa dòng có lệch lên đầu để người duyệt xử lý trước.
     const sortedLines = [...stocktake.lines].sort(
       (a, b) => Math.abs(b.varianceQuantity) - Math.abs(a.varianceQuantity),
     );
@@ -352,6 +383,48 @@ export const StocktakesPage: FC = () => {
     );
   };
 
+  const canBalance = (stocktake: Stocktake): boolean => {
+    return stocktake.status === DOCUMENT_STATUS.Approved;
+  };
+
+  const canApprove = (stocktake: Stocktake): boolean => {
+    return stocktake.status === DOCUMENT_STATUS.Pending;
+  };
+
+  const handleApprove = (stocktake: Stocktake): void => {
+    const index = mockStocktakes.findIndex((s) => s.id === stocktake.id);
+    if (index !== -1) {
+      mockStocktakes[index] = {
+        ...mockStocktakes[index],
+        status: DOCUMENT_STATUS.Approved,
+        approvedBy: 'Quản lý cửa hàng',
+      };
+      message.success(`Đã duyệt phiếu ${stocktake.code}`);
+    }
+  };
+
+  const handleBalance = (stocktake: Stocktake): void => {
+    setBalanceModal(stocktake);
+  };
+
+  const confirmBalance = (): void => {
+    if (!balanceModal) return;
+    const index = mockStocktakes.findIndex((s) => s.id === balanceModal.id);
+    if (index !== -1) {
+      mockStocktakes[index] = {
+        ...mockStocktakes[index],
+        status: DOCUMENT_STATUS.Balanced,
+      };
+      message.success(`Đã cân bằng kho cho phiếu ${balanceModal.code}`);
+    }
+    setBalanceModal(null);
+  };
+
+  const handleCreateSuccess = (stocktake: unknown): void => {
+    mockStocktakes.unshift(stocktake as (typeof mockStocktakes)[number]);
+    message.success('Đã tạo phiếu kiểm kê');
+  };
+
   return (
     <>
       <PageHeader
@@ -359,9 +432,18 @@ export const StocktakesPage: FC = () => {
         title="Kiểm kê & cân bằng kho"
         description="Đối chiếu tồn thực tế với sổ sách, xác định nguyên nhân lệch và cân bằng lại số liệu kho."
         extra={
-          <Tag color="red" className="tag-no-margin">
-            {filtered.length} / {mockStocktakes.length} phiếu
-          </Tag>
+          <Space>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setCreateModal(true)}
+            >
+              Tạo phiếu kiểm kê
+            </Button>
+            <Tag color="red" className="tag-no-margin">
+              {filtered.length} / {mockStocktakes.length} phiếu
+            </Tag>
+          </Space>
         }
       />
 
@@ -395,6 +477,41 @@ export const StocktakesPage: FC = () => {
           }}
         />
       </Card>
+
+      <Modal
+        title="Xác nhận cân bằng kho"
+        open={!!balanceModal}
+        onOk={confirmBalance}
+        onCancel={() => setBalanceModal(null)}
+        okText="Xác nhận cân bằng"
+        cancelText="Huỷ"
+      >
+        {balanceModal && (
+          <Space direction="vertical" size={16}>
+            <Paragraph>
+              Bạn có chắc chắn muốn cân bằng kho cho phiếu{' '}
+              <strong>{balanceModal.code}</strong> không?
+            </Paragraph>
+            <Paragraph type="secondary">
+              Hành động này sẽ thực hiện:
+            </Paragraph>
+            <ul>
+              <li>Cập nhật tồn kho = tồn thực tế</li>
+              <li>Ghi vào sổ kho (CAN_BANG_KIEM_KE)</li>
+              <li>Chuyển trạng thái phiếu → Đã cân bằng</li>
+            </ul>
+            <Paragraph type="warning">
+              Hành động này không thể hoàn tác.
+            </Paragraph>
+          </Space>
+        )}
+      </Modal>
+
+      <StocktakeFormModal
+        open={createModal}
+        onClose={() => setCreateModal(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </>
   );
 };
