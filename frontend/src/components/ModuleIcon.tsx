@@ -11,6 +11,7 @@ import {
   ScanOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
+  TagsOutlined,
   TeamOutlined,
   TruckOutlined,
 } from '@ant-design/icons';
@@ -28,6 +29,7 @@ const ICON_MAP: Record<ModuleIconKey, FC> = {
   branch: ShopOutlined,
   employee: TeamOutlined,
   product: AppstoreOutlined,
+  category: TagsOutlined,
   supplier: TruckOutlined,
   warehouse: DeploymentUnitOutlined,
   purchase: ImportOutlined,

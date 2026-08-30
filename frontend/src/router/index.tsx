@@ -10,6 +10,7 @@ import { PosPage } from '@/features/pos/PosPage';
 import { BranchesPage } from '@/features/branches/BranchesPage';
 import { EmployeesPage } from '@/features/employees/EmployeesPage';
 import { ProductsPage } from '@/features/products/ProductsPage';
+import { CategoriesPage } from '@/features/categories/CategoriesPage';
 import { SuppliersPage } from '@/features/suppliers/SuppliersPage';
 import { InventoryPage } from '@/features/inventory/InventoryPage';
 import { PurchaseOrdersPage } from '@/features/purchaseOrders/PurchaseOrdersPage';
@@ -58,6 +59,7 @@ export const AppRouter: FC = () => (
         <Route path="/branches" element={<BranchesPage />} />
         <Route path="/employees" element={<EmployeesPage />} />
         <Route path="/products" element={<ProductsPage />} />
+        <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/suppliers" element={<SuppliersPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
         <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />

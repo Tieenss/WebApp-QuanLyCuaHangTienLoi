@@ -1,0 +1,12 @@
+/*
+ * CategoryFormModal — style riêng cho form danh mục (tách từ inline style).
+ */
+
+.category-form {
+  padding-top: 4px;
+}
+
+/* Input số thứ tự — full width cho cân với field bên cạnh. */
+.category-order-input {
+  width: 100%;
+}

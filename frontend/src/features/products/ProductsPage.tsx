@@ -2,12 +2,9 @@ import { useMemo, useState, type CSSProperties, type FC } from 'react';
 import {
   Button,
   Card,
-  Col,
   Popconfirm,
-  Row,
   Space,
   Table,
-  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -32,18 +29,16 @@ import {
   setProductModalOpen,
   setSelectedProduct,
 } from '@/store/slices/productSlice';
+import { totalStockOf } from '@/store/slices/stockSlice';
 import {
   PRODUCT_UNIT_LABEL,
   RECORD_STATUS,
-  type Category,
   type Product,
 } from '@/types';
-import { mockCategories } from '@/mockData/categories';
 import {
   grossProfitPerUnit,
   marginPercent,
 } from '@/mockData/products';
-import { totalStockOf } from '@/store/slices/stockSlice';
 import {
   formatNumber,
   formatRatio,
@@ -52,18 +47,25 @@ import {
 } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { ProductFormModal } from './components/ProductFormModal';
+import './ProductsPage.css';
 
 const { Text } = Typography;
 
 /**
- * Module 5 — Danh mục & Sản phẩm.
+ * Module 5 — Sản phẩm.
  *
- * Hai tab: danh sách sản phẩm (mặc định) và cây danh mục. Cột "Lãi gộp" tính
- * trực tiếp từ giá bán trừ giá nhập nên luôn khớp với báo cáo lợi nhuận.
+ * Trước đây gộp chung với quản lý danh mục trong một trang có 2 tab; nay tách
+ * thành hai module độc lập (`/products` và `/categories`) để dễ quản trị.
+ * Trang này chỉ chịu trách nhiệm về SKU; danh mục tra cứu qua Redux store
+ * để luôn đồng bộ với trang `/categories`.
+ *
+ * Cột "Lãi gộp" tính trực tiếp từ giá bán trừ giá nhập nên luôn khớp với báo
+ * cáo lợi nhuận.
  */
 export const ProductsPage: FC = () => {
   const dispatch = useAppDispatch();
   const { products } = useAppSelector((state) => state.product);
+  const categories = useAppSelector((state) => state.category.categories);
   const balances = useAppSelector((state) => state.stock.balances);
 
   const [search, setSearch] = useState('');
@@ -112,7 +114,7 @@ export const ProductsPage: FC = () => {
       {
         key: 'categories',
         title: 'Số danh mục',
-        value: formatNumber(mockCategories.length),
+        value: formatNumber(categories.length),
         suffix: 'nhóm hàng',
       },
       {
@@ -129,7 +131,7 @@ export const ProductsPage: FC = () => {
         color: BRAND.success,
       },
     ];
-  }, [products]);
+  }, [products, categories]);
 
   const filters: ToolbarFilter[] = [
     {
@@ -137,7 +139,7 @@ export const ProductsPage: FC = () => {
       placeholder: 'Danh mục',
       value: categoryFilter,
       onChange: setCategoryFilter,
-      options: mockCategories.map((category) => ({
+      options: categories.map((category) => ({
         value: category.id,
         label: `${category.icon} ${category.name}`,
       })),
@@ -220,7 +222,7 @@ export const ProductsPage: FC = () => {
       dataIndex: 'categoryName',
       width: 160,
       render: (value: string, row) => {
-        const category = mockCategories.find((item) => item.id === row.categoryId);
+        const category = categories.find((item) => item.id === row.categoryId);
         return (
           <Tag
             className="category-tag"
@@ -364,65 +366,6 @@ export const ProductsPage: FC = () => {
     },
   ];
 
-  const categoryColumns: ColumnsType<Category> = [
-    {
-      title: 'Danh mục',
-      dataIndex: 'name',
-      render: (name: string, row) => (
-        <Space size={10}>
-          <div
-            className="category-icon-box"
-            style={{ '--cat-color': row.color } as CSSProperties}
-          >
-            {row.icon}
-          </div>
-          <span>
-            <Text strong className="product-name">
-              {name}
-            </Text>
-            <Text type="secondary" className="product-sub">
-              {row.code}
-            </Text>
-          </span>
-        </Space>
-      ),
-    },
-    {
-      title: 'Mô tả',
-      dataIndex: 'description',
-      render: (value: string) => (
-        <Text type="secondary" className="cat-desc">
-          {value}
-        </Text>
-      ),
-    },
-    {
-      title: 'Số SKU',
-      key: 'skuCount',
-      align: 'center',
-      width: 100,
-      render: (_, row) => {
-         const count = products.filter(
-           (product) => product.categoryId === row.id,
-         ).length;
-        return <Text strong className="numeric-cell">{count}</Text>;
-      },
-    },
-    {
-      title: 'Thứ tự',
-      dataIndex: 'displayOrder',
-      align: 'center',
-      width: 90,
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      align: 'center',
-      width: 140,
-      render: (status: Category['status']) => <RecordStatusTag status={status} />,
-    },
-  ];
-
   const handleExport = (): void => {
     exportToExcel(
       filtered,
@@ -451,8 +394,8 @@ export const ProductsPage: FC = () => {
     <>
       <PageHeader
         eyebrow="DANH MỤC & NHÂN SỰ / MODULE 5"
-        title="Danh mục & sản phẩm"
-        description="Phân loại nhóm hàng, quản lý SKU, mã vạch, giá bán và biên lợi nhuận."
+        title="Quản lý sản phẩm"
+        description="Danh sách SKU, mã vạch, giá bán và biên lợi nhuận. Quản lý danh mục hàng hoá ở trang riêng."
         extra={
           <Space wrap>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
@@ -467,63 +410,32 @@ export const ProductsPage: FC = () => {
 
       <SummaryStrip items={summary} />
 
-      <Card styles={{ body: { padding: '8px 18px 8px' } }}>
-        <Tabs
-          defaultActiveKey="products"
-          items={[
-            {
-              key: 'products',
-               label: `Sản phẩm (${products.length})`,
-              children: (
-                <>
-                  <TableToolbar
-                    searchValue={search}
-                    searchPlaceholder="Tìm theo tên, SKU, mã vạch, nhà cung cấp..."
-                    onSearchChange={setSearch}
-                    filters={filters}
-                    onExport={handleExport}
-                    onReset={() => {
-                      setSearch('');
-                      setCategoryFilter(null);
-                      setStatusFilter(null);
-                      setPerishableFilter(null);
-                    }}
-                  />
+      <Card styles={{ body: { padding: '18px 18px 8px' } }}>
+        <TableToolbar
+          searchValue={search}
+          searchPlaceholder="Tìm theo tên, SKU, mã vạch, nhà cung cấp..."
+          onSearchChange={setSearch}
+          filters={filters}
+          onExport={handleExport}
+          onReset={() => {
+            setSearch('');
+            setCategoryFilter(null);
+            setStatusFilter(null);
+            setPerishableFilter(null);
+          }}
+        />
 
-                  <Table<Product>
-                    columns={productColumns}
-                    dataSource={filtered}
-                    rowKey="id"
-                    size="middle"
-                    scroll={{ x: 1900 }}
-                    pagination={{
-                      pageSize: 12,
-                      showSizeChanger: true,
-                      showTotal: (total) => `${total} sản phẩm`,
-                    }}
-                  />
-                </>
-              ),
-            },
-            {
-              key: 'categories',
-              label: `Danh mục (${mockCategories.length})`,
-              children: (
-                <Row gutter={[16, 16]}>
-                  <Col span={24}>
-                    <Table<Category>
-                      columns={categoryColumns}
-                      dataSource={mockCategories}
-                      rowKey="id"
-                      size="middle"
-                      pagination={false}
-                      scroll={{ x: 900 }}
-                    />
-                  </Col>
-                </Row>
-              ),
-            },
-          ]}
+        <Table<Product>
+          columns={productColumns}
+          dataSource={filtered}
+          rowKey="id"
+          size="middle"
+          scroll={{ x: 1900 }}
+          pagination={{
+            pageSize: 12,
+            showSizeChanger: true,
+            showTotal: (total) => `${total} sản phẩm`,
+          }}
         />
       </Card>
 

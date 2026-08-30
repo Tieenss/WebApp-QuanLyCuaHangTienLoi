@@ -14,6 +14,7 @@ export type ModuleIconKey =
   | 'branch'
   | 'employee'
   | 'product'
+  | 'category'
   | 'supplier'
   | 'warehouse'
   | 'purchase'
@@ -166,17 +167,30 @@ export const MODULES: readonly ModuleDefinition[] = [
     order: 5,
     key: 'products',
     path: '/products',
-    label: 'Danh mục & Sản phẩm',
+    label: 'Quản lý Sản phẩm',
     shortLabel: 'Sản phẩm',
     icon: 'product',
     allowedRoles: [USER_ROLE.Admin, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.MasterData,
     implemented: true,
     description:
-      'Phân loại danh mục hàng hoá, danh sách sản phẩm, giá bán, mã vạch và SKU.',
+      'Danh sách SKU, mã vạch, giá bán và biên lợi nhuận.',
   },
   {
     order: 6,
+    key: 'categories',
+    path: '/categories',
+    label: 'Quản lý Danh mục',
+    shortLabel: 'Danh mục',
+    icon: 'category',
+    allowedRoles: [USER_ROLE.Admin, USER_ROLE.StoreManager] as const,
+    group: MODULE_GROUP.MasterData,
+    implemented: true,
+    description:
+      'Phân nhóm hàng hoá, đặt màu và icon cho từng danh mục hiển thị trên POS.',
+  },
+  {
+    order: 7,
     key: 'suppliers',
     path: '/suppliers',
     label: 'Nhà cung cấp',
@@ -189,7 +203,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Danh sách nhà cung cấp, thông tin liên hệ, danh mục hàng cung ứng.',
   },
   {
-    order: 7,
+    order: 8,
     key: 'inventory',
     path: '/inventory',
     label: 'Kho hàng (Tồn kho & Thẻ kho)',
@@ -202,7 +216,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Bảng tồn kho theo từng chi nhánh và Kho Tổng, lịch sử biến động thẻ kho (nhập/xuất/điều chỉnh).',
   },
   {
-    order: 8,
+    order: 9,
     key: 'purchase-orders',
     path: '/purchase-orders',
     label: 'Nhập kho từ NCC',
@@ -219,7 +233,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Tạo phiếu nhập hàng từ nhà cung cấp vào Kho Tổng, xác nhận số lượng thực nhận.',
   },
   {
-    order: 9,
+    order: 10,
     key: 'transfers',
     path: '/transfers',
     label: 'Xuất/Nhập kho nội bộ',
@@ -237,7 +251,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Luân chuyển hàng hoá từ Kho Tổng tới các cửa hàng bán lẻ. Quản lý chi nhánh tạo yêu cầu, Thủ kho duyệt và xuất kho.',
   },
   {
-    order: 10,
+    order: 11,
     key: 'stocktakes',
     path: '/stocktakes',
     label: 'Kiểm kê & Cân bằng kho',
@@ -251,7 +265,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Tạo phiếu kiểm kê thực tế, so sánh lệch tồn kho và cân bằng lại sổ sách.',
   },
   {
-    order: 11,
+    order: 12,
     key: 'attendance',
     path: '/attendance',
     label: 'Chấm công & Bảng lương',
@@ -265,7 +279,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Chấm công ca làm việc và bảng lương theo tháng, duyệt lương hai tầng.',
   },
   {
-    order: 12,
+    order: 13,
     key: 'cashbook',
     path: '/cashbook',
     label: 'Sổ quỹ (Thu/Chi)',
@@ -278,7 +292,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Sổ thu chi toàn hệ thống: doanh thu bán hàng, chi nhập hàng, chi lương, cấp vốn.',
   },
   {
-    order: 13,
+    order: 14,
     key: 'reports',
     path: '/reports',
     label: 'Báo cáo',
