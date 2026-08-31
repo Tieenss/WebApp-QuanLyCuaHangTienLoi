@@ -7,6 +7,7 @@ import {
   DashboardOutlined,
   DeploymentUnitOutlined,
   FileDoneOutlined,
+  FileTextOutlined,
   ImportOutlined,
   ScanOutlined,
   ShopOutlined,
@@ -26,6 +27,7 @@ import type { ModuleIconKey } from '@/config/modules';
 const ICON_MAP: Record<ModuleIconKey, FC> = {
   dashboard: DashboardOutlined,
   pos: ShoppingCartOutlined,
+  'sales-order': FileTextOutlined,
   branch: ShopOutlined,
   employee: TeamOutlined,
   product: AppstoreOutlined,

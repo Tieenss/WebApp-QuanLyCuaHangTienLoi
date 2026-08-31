@@ -8,9 +8,11 @@ import { ProductThumb } from '@/components/ProductThumb';
 import { StatCard } from '@/components/StatCard';
 import { OrderStatusTag } from '@/components/StatusTag';
 import { EmptyState } from '@/components/EmptyState';
+import { OrderDetailDrawer } from '@/features/salesOrders/components/OrderDetailDrawer';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setTimeRange } from '@/store/slices/uiSlice';
+import { setSelectedOrder } from '@/store/slices/salesOrderSlice';
 import {
   PAYMENT_METHOD_LABEL,
   SYSTEM_WIDE_ROLES,
@@ -29,7 +31,6 @@ import {
   buildRevenueTrend,
   buildTopSelling,
   percentChange,
-  recentOrders,
 } from '@/mockData/analytics';
 import { branchNameById } from '@/mockData/branches';
 import { productById } from '@/mockData/products';
@@ -67,6 +68,9 @@ export const DashboardPage: FC = () => {
   const dispatch = useAppDispatch();
   const { activeBranchId, user } = useAppSelector((state) => state.auth);
   const { timeRange } = useAppSelector((state) => state.ui);
+  const selectedOrderId = useAppSelector(
+    (state) => state.salesOrder.selectedOrderId,
+  );
 
   /**
    * Dashboard chỉ mở cho ADMIN và KE_TOAN, nhưng vẫn kiểm tra tường minh để
@@ -200,9 +204,21 @@ export const DashboardPage: FC = () => {
     [activeBranchId, balances],
   );
 
+  /**
+   * Hoá đơn mới nhất đọc trực tiếp từ slice `salesOrder.orders` thay vì từ
+   * `mockData.analytics` — nhờ vậy hoá đơn vừa bán ở POS (qua action
+   * `saleCompleted`) sẽ xuất hiện ngay trên dashboard mà không cần refresh.
+   * Lọc theo chi nhánh đang chọn (nếu có) và lấy 8 dòng đầu.
+   */
+  const allOrders = useAppSelector((state) => state.salesOrder.orders);
   const latestOrders = useMemo(
-    () => recentOrders(activeBranchId, 8),
-    [activeBranchId],
+    () =>
+      allOrders
+        .filter((order) =>
+          activeBranchId === null ? true : order.branchId === activeBranchId,
+        )
+        .slice(0, 8),
+    [allOrders, activeBranchId],
   );
 
   const topSellingColumns: ColumnsType<TopSellingRow> = [
@@ -553,8 +569,20 @@ export const DashboardPage: FC = () => {
           pagination={false}
           scroll={{ x: 860 }}
           className="dense-table"
+          onRow={(record) => ({
+            onClick: () => dispatch(setSelectedOrder(record.id)),
+            style: { cursor: 'pointer' },
+          })}
         />
       </Card>
+
+      <OrderDetailDrawer
+        order={
+          allOrders.find(
+            (order) => order.id === selectedOrderId,
+          ) ?? null
+        }
+      />
     </>
   );
 };

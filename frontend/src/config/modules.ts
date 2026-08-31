@@ -11,6 +11,7 @@ import { USER_ROLE, type UserRole } from '@/types';
 export type ModuleIconKey =
   | 'dashboard'
   | 'pos'
+  | 'sales-order'
   | 'branch'
   | 'employee'
   | 'product'
@@ -139,6 +140,31 @@ export const MODULES: readonly ModuleDefinition[] = [
   },
   {
     order: 3,
+    key: 'sales-orders',
+    path: '/sales-orders',
+    label: 'Lịch sử hoá đơn',
+    shortLabel: 'Hoá đơn',
+    icon: 'sales-order',
+    /**
+     * Phạm vi dữ liệu do trang tự lọc theo vai trò:
+     * - Admin / Kế toán: thấy tất cả.
+     * - Quản lý chi nhánh: chỉ thấy hoá đơn chi nhánh mình.
+     * - Thu ngân: chỉ thấy hoá đơn do mình lập.
+     * - Thủ kho: không có quyền.
+     */
+    allowedRoles: [
+      USER_ROLE.Admin,
+      USER_ROLE.Accountant,
+      USER_ROLE.StoreManager,
+      USER_ROLE.Cashier,
+    ] as const,
+    group: MODULE_GROUP.Operation,
+    implemented: true,
+    description:
+      'Tra cứu toàn bộ hoá đơn bán hàng, xem chi tiết từng mặt hàng và in lại hoá đơn.',
+  },
+  {
+    order: 4,
     key: 'branches',
     path: '/branches',
     label: 'Quản lý Chi nhánh',
@@ -151,7 +177,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Danh sách cửa hàng bán lẻ và Kho Tổng, địa chỉ, giờ mở cửa, trạng thái hoạt động.',
   },
   {
-    order: 4,
+    order: 5,
     key: 'employees',
     path: '/employees',
     label: 'Quản lý Nhân viên',
@@ -164,7 +190,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Danh sách nhân viên, ca làm việc, gán chi nhánh, vai trò và quyền hạn hệ thống.',
   },
   {
-    order: 5,
+    order: 6,
     key: 'products',
     path: '/products',
     label: 'Quản lý Sản phẩm',
@@ -177,7 +203,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Danh sách SKU, mã vạch, giá bán và biên lợi nhuận.',
   },
   {
-    order: 6,
+    order: 7,
     key: 'categories',
     path: '/categories',
     label: 'Quản lý Danh mục',
@@ -190,7 +216,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Phân nhóm hàng hoá, đặt màu và icon cho từng danh mục hiển thị trên POS.',
   },
   {
-    order: 7,
+    order: 8,
     key: 'suppliers',
     path: '/suppliers',
     label: 'Nhà cung cấp',
@@ -203,7 +229,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Danh sách nhà cung cấp, thông tin liên hệ, danh mục hàng cung ứng.',
   },
   {
-    order: 8,
+    order: 9,
     key: 'inventory',
     path: '/inventory',
     label: 'Kho hàng (Tồn kho & Thẻ kho)',
@@ -216,7 +242,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Bảng tồn kho theo từng chi nhánh và Kho Tổng, lịch sử biến động thẻ kho (nhập/xuất/điều chỉnh).',
   },
   {
-    order: 9,
+    order: 10,
     key: 'purchase-orders',
     path: '/purchase-orders',
     label: 'Nhập kho từ NCC',
@@ -233,7 +259,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Tạo phiếu nhập hàng từ nhà cung cấp vào Kho Tổng, xác nhận số lượng thực nhận.',
   },
   {
-    order: 10,
+    order: 11,
     key: 'transfers',
     path: '/transfers',
     label: 'Xuất/Nhập kho nội bộ',
@@ -251,7 +277,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Luân chuyển hàng hoá từ Kho Tổng tới các cửa hàng bán lẻ. Quản lý chi nhánh tạo yêu cầu, Thủ kho duyệt và xuất kho.',
   },
   {
-    order: 11,
+    order: 12,
     key: 'stocktakes',
     path: '/stocktakes',
     label: 'Kiểm kê & Cân bằng kho',
@@ -265,7 +291,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Tạo phiếu kiểm kê thực tế, so sánh lệch tồn kho và cân bằng lại sổ sách.',
   },
   {
-    order: 12,
+    order: 13,
     key: 'attendance',
     path: '/attendance',
     label: 'Chấm công & Bảng lương',
@@ -279,7 +305,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Chấm công ca làm việc và bảng lương theo tháng, duyệt lương hai tầng.',
   },
   {
-    order: 13,
+    order: 14,
     key: 'cashbook',
     path: '/cashbook',
     label: 'Sổ quỹ (Thu/Chi)',
@@ -292,7 +318,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Sổ thu chi toàn hệ thống: doanh thu bán hàng, chi nhập hàng, chi lương, cấp vốn.',
   },
   {
-    order: 14,
+    order: 15,
     key: 'reports',
     path: '/reports',
     label: 'Báo cáo',

@@ -15,6 +15,7 @@ import { seedStockBalances, seedStockLedger } from '@/mockData/inventory';
 import { purchaseReceived } from './purchaseSlice';
 import { saleCompleted } from './posSlice';
 import { transferShipped } from './transferSlice';
+import { orderRefunded, orderCancelled } from './salesOrderSlice';
 
 /**
  * Module 7 — Tồn kho & Thẻ kho (dữ liệu ghi được).
@@ -190,6 +191,40 @@ const applySale = (state: StockState, order: SalesOrder): void => {
       performedBy: `${order.cashierName} (${order.cashierId})`,
       note: 'Xuất bán qua quầy POS',
       occurredAt: order.soldAt,
+      sequence: index,
+    });
+  });
+};
+
+/**
+ * Hoàn tồn cho một hoá đơn bị REFUNDED.
+ *
+ * Phép tính ngược lại của `applySale`: cộng lại số lượng từng dòng và ghi
+ * một dòng thẻ kho `SALE_RETURN` (số dương) tại cùng chi nhánh đã bán. Đây
+ * là nguồn sự thật duy nhất để cập nhật tồn — KHÔNG tự tính từ `grandTotal`
+ * hay trừ `paidAmount` như một số hệ thống cũ vẫn làm.
+ *
+ * `occurredAt` dùng thời điểm hoàn (do payload truyền vào), không dùng
+ * `order.soldAt` — vì hai mốc thời gian có thể cách nhau nhiều ngày.
+ */
+const applyReturn = (
+  state: StockState,
+  order: SalesOrder,
+  performedBy: string,
+  refundedAt: string,
+): void => {
+  order.lines.forEach((line, index) => {
+    applyMovement(state, {
+      branchId: order.branchId,
+      branchName: order.branchName,
+      productId: line.productId,
+      // Hoàn nhập: số lượng dương.
+      quantityChange: line.quantity,
+      type: LEDGER_TYPE.SaleReturn,
+      referenceCode: order.code,
+      performedBy,
+      note: `Hoàn tiền hoá đơn ${order.code} (khách trả hàng)`,
+      occurredAt: refundedAt,
       sequence: index,
     });
   });
@@ -390,6 +425,28 @@ export const stockSlice = createSlice({
     builder.addCase(transferShipped, (state, action) => {
       if (action.payload.transfer.status !== DOCUMENT_STATUS.Completed) return;
       applyTransfer(state, action.payload.transfer, action.payload.performedBy);
+    });
+
+    // Transaction hoàn tiền hoá đơn: cộng lại tồn kho + ghi thẻ kho SALE_RETURN.
+    builder.addCase(orderRefunded, (state, action) => {
+      applyReturn(
+        state,
+        action.payload.order,
+        action.payload.performedBy,
+        action.payload.refundedAt,
+      );
+    });
+
+    // Transaction huỷ đơn: cũng cộng lại tồn kho vì đơn chưa giao nhận
+    // nhưng tồn đã bị trừ lúc bán. KHÔNG tạo phiếu chi sổ quỹ (cashbook
+    // không lắng nghe action này) vì không có dòng tiền thực phát sinh.
+    builder.addCase(orderCancelled, (state, action) => {
+      applyReturn(
+        state,
+        action.payload.order,
+        action.payload.performedBy,
+        action.payload.cancelledAt,
+      );
     });
   },
 });

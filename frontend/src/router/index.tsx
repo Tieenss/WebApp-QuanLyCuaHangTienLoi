@@ -7,6 +7,7 @@ import { ProtectedRoute } from './ProtectedRoute';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { PosPage } from '@/features/pos/PosPage';
+import { SalesOrdersPage } from '@/features/salesOrders/SalesOrdersPage';
 import { BranchesPage } from '@/features/branches/BranchesPage';
 import { EmployeesPage } from '@/features/employees/EmployeesPage';
 import { ProductsPage } from '@/features/products/ProductsPage';
@@ -56,6 +57,7 @@ export const AppRouter: FC = () => (
         <Route index element={<Navigate to="/dashboard" replace />} />
 
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/sales-orders" element={<SalesOrdersPage />} />
         <Route path="/branches" element={<BranchesPage />} />
         <Route path="/employees" element={<EmployeesPage />} />
         <Route path="/products" element={<ProductsPage />} />

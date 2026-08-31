@@ -1,0 +1,24 @@
+/*
+ * SalesOrdersPage.css — style riêng cho trang lịch sử hoá đơn.
+ *
+ * Class chung (numeric-cell, mono-code, tag-no-margin) đã có trong index.css.
+ */
+
+.so-time-date {
+  font-size: 12.5px;
+  font-weight: 500;
+  display: block;
+}
+
+.so-time-hhmm {
+  font-size: 11.5px;
+}
+
+.so-text-12-5 {
+  font-size: 12.5px;
+}
+
+.so-grand-total {
+  color: #e31837;
+  font-size: 13px;
+}

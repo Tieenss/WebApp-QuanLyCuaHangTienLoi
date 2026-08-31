@@ -15,6 +15,7 @@ import { branchNameById } from '@/mockData/branches';
 import { payrollPaid } from './payrollSlice';
 import { saleCompleted } from './posSlice';
 import { purchaseReceived } from './purchaseSlice';
+import { orderRefunded } from './salesOrderSlice';
 
 /**
  * Module 12 — Sổ quỹ (dữ liệu ghi được).
@@ -294,6 +295,31 @@ export const cashbookSlice = createSlice({
         counterparty: order.supplierName,
         referenceCode: order.code,
         description: `Thanh toán nhập hàng ${order.code} · ${order.lines.length} mặt hàng`,
+        createdBy: action.payload.performedBy,
+      });
+    });
+
+    /**
+     * Transaction hoàn tiền hoá đơn: phiếu CHI hạng mục KHAC (hoàn tiền).
+     *
+     * MVP chỉ hỗ trợ hoàn toàn bộ hoá đơn, ghi nhận tiền mặt đơn giản — kể
+     * cả khi khách trả bằng MoMo/VNPay… vẫn ghi chi tiền mặt để đơn giản
+     * hoá sổ sách. Việc chuyển tiền thực tế qua cổng thanh toán nằm ngoài
+     * phạm vi hệ thống này.
+     */
+    builder.addCase(orderRefunded, (state, action) => {
+      const { order } = action.payload;
+
+      insertEntry(state, {
+        direction: CASH_FLOW_DIRECTION.Payment,
+        category: CASH_CATEGORY.Other,
+        branchId: order.branchId,
+        entryDate: action.payload.refundedAt.slice(0, 10),
+        amount: order.grandTotal,
+        paymentMethod: PAYMENT_METHOD.Cash,
+        counterparty: `Khách hoàn đơn ${order.code}`,
+        referenceCode: order.code,
+        description: `Hoàn tiền hoá đơn ${order.code} · ${order.lines.length} mặt hàng`,
         createdBy: action.payload.performedBy,
       });
     });

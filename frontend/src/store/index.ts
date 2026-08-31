@@ -14,6 +14,7 @@ import productReducer from './slices/productSlice';
 import transferReducer from './slices/transferSlice';
 import employeeReducer from './slices/employeeSlice';
 import categoryReducer from './slices/categorySlice';
+import salesOrderReducer from './slices/salesOrderSlice';
 
 export const store = configureStore({
   reducer: {
@@ -33,6 +34,7 @@ export const store = configureStore({
     branch: branchReducer,
     product: productReducer,
     category: categoryReducer,
+    salesOrder: salesOrderReducer,
   },
 });
 
