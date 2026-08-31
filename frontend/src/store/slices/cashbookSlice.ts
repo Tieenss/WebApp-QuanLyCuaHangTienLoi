@@ -10,12 +10,13 @@ import {
   type CashFlowDirection,
   type PayrollRow,
 } from '@/types';
-import { seedCashEntries, OPENING_BALANCE } from '@/mockData/cashbook';
-import { branchNameById } from '@/mockData/branches';
 import { payrollPaid } from './payrollSlice';
 import { saleCompleted } from './posSlice';
 import { purchaseReceived } from './purchaseSlice';
 import { orderRefunded } from './salesOrderSlice';
+
+/** Số dư quỹ đầu kỳ toàn hệ thống. */
+export const OPENING_BALANCE = 50_000_000;
 
 /**
  * Module 12 — Sổ quỹ (dữ liệu ghi được).
@@ -33,9 +34,6 @@ import { orderRefunded } from './salesOrderSlice';
  * số dư luỹ kế phụ thuộc thứ tự thời gian — chèn một phiếu vào giữa sẽ làm sai
  * mọi phiếu sau nó.
  */
-
-/** Số dư quỹ đầu kỳ toàn hệ thống — nguồn duy nhất là `mockData/cashbook`. */
-export { OPENING_BALANCE };
 
 export interface CashbookState {
   /** Sổ quỹ, mới nhất trước. */
@@ -80,7 +78,7 @@ const reindex = (entries: CashEntry[]): CashEntry[] => {
 };
 
 const initialState: CashbookState = {
-  entries: seedCashEntries,
+  entries: [],
 };
 
 /** Dữ liệu tối thiểu để tạo một phiếu mới; phần còn lại slice tự điền. */
@@ -105,7 +103,7 @@ const insertEntry = (state: CashbookState, input: NewEntryInput): void => {
     direction: input.direction,
     category: input.category,
     branchId: input.branchId,
-    branchName: branchNameById(input.branchId),
+    branchName: input.branchId || '',
     entryDate: input.entryDate,
     amount: input.amount,
     paymentMethod: input.paymentMethod,
@@ -114,7 +112,6 @@ const insertEntry = (state: CashbookState, input: NewEntryInput): void => {
     description: input.description,
     status: DOCUMENT_STATUS.Completed,
     createdBy: input.createdBy,
-    // Giá trị tạm; `reindex` ghi lại ngay sau đây.
     runningBalance: 0,
   };
 

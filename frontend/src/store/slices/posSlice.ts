@@ -10,7 +10,6 @@ import {
   type Product,
   type SalesOrder,
 } from '@/types';
-import { branchNameById } from '@/mockData/branches';
 
 /**
  * Module 2 – State quầy bán hàng POS.
@@ -94,7 +93,7 @@ export const buildSalesOrder = (input: {
     id: `so-live-${soldAt}-${sequence}`,
     code: `HD-${isoDate.replace(/-/g, '')}-${String(9000 + sequence).padStart(4, '0')}`,
     branchId: state.branchId,
-    branchName: branchNameById(state.branchId),
+    branchName: '',
     cashierId: input.cashierId,
     cashierName: input.cashierName,
     shiftCode: input.shiftCode,

@@ -1,7 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Employee, EmployeeFormValues } from '@/types';
-import { mockEmployees } from '@/mockData/employees';
 import { today } from '@/utils/dateUtils';
 
 export interface EmployeeState {
@@ -11,7 +10,7 @@ export interface EmployeeState {
 }
 
 const initialState: EmployeeState = {
-  employees: mockEmployees,
+  employees: [],
   selectedEmployee: null,
   isModalOpen: false,
 };

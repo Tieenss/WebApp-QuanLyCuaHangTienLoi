@@ -6,9 +6,6 @@ import {
   type StockTransfer,
   type TransferLine,
 } from '@/types';
-import { seedTransfers } from '@/mockData/warehouseDocuments';
-import { DISTRIBUTION_CENTER_ID, branchNameById } from '@/mockData/branches';
-import { productById } from '@/mockData/products';
 
 /**
  * Module 9 — Xuất kho nội bộ (dữ liệu ghi được).
@@ -36,7 +33,7 @@ export interface TransferState {
 }
 
 const initialState: TransferState = {
-  transfers: seedTransfers,
+  transfers: [],
 };
 
 /** Một dòng hàng người dùng nhập trên form. */
@@ -56,6 +53,9 @@ export const transferShipped = createAction<{
   performedBy: string;
 }>('transfer/shipped');
 
+export const DISTRIBUTION_CENTER_ID = 'br-0001';
+export const DISTRIBUTION_CENTER_NAME = 'Kho Tổng';
+
 /**
  * Dựng `StockTransfer` hoàn chỉnh từ dữ liệu form.
  *
@@ -72,6 +72,7 @@ export const transferShipped = createAction<{
  */
 export const buildTransfer = (input: {
   toBranchId: string;
+  toBranchName: string;
   lines: TransferDraftLine[];
   requestDate: string;
   note: string;
@@ -80,11 +81,13 @@ export const buildTransfer = (input: {
   /** Số phiếu đã có, dùng để sinh mã tiếp theo. */
   existingCount: number;
   initialStatus: DocumentStatus;
+  /** Function to get product by id - provided by caller */
+  getProductById: (productId: string) => { id: string; sku: string; name: string; unit: string; costPrice: number } | undefined;
 }): StockTransfer | null => {
   const lines: TransferLine[] = [];
 
   input.lines.forEach((draft, index) => {
-    const product = productById(draft.productId);
+    const product = input.getProductById(draft.productId);
     if (!product || draft.quantity <= 0) return;
 
     lines.push({
@@ -110,18 +113,17 @@ export const buildTransfer = (input: {
     code: `PX-${input.requestDate.replace(/-/g, '')}-${String(
       input.existingCount + 1,
     ).padStart(3, '0')}`,
-    // BR-06: nguồn xuất luôn là Kho Tổng.
     fromBranchId: DISTRIBUTION_CENTER_ID,
-    fromBranchName: branchNameById(DISTRIBUTION_CENTER_ID),
+    fromBranchName: DISTRIBUTION_CENTER_NAME,
     toBranchId: input.toBranchId,
-    toBranchName: branchNameById(input.toBranchId),
+    toBranchName: input.toBranchName,
     requestDate: input.requestDate,
     shippedDate: isCompleted ? input.requestDate : null,
     receivedDate: isCompleted ? input.requestDate : null,
     status: input.initialStatus,
     lines,
     totalValue: lines.reduce((sum, line) => sum + line.lineTotal, 0),
-    requestedBy: branchNameById(input.toBranchId),
+    requestedBy: input.toBranchName,
     approvedBy: null,
     note: input.note,
   };

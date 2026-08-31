@@ -15,6 +15,7 @@ import {
   TagsOutlined,
   TeamOutlined,
   TruckOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import type { ModuleIconKey } from '@/config/modules';
 
@@ -40,6 +41,7 @@ const ICON_MAP: Record<ModuleIconKey, FC> = {
   attendance: ClockCircleOutlined,
   cashbook: BankOutlined,
   report: BarChartOutlined,
+  'account-manage': UserOutlined,
 };
 
 interface ModuleIconProps {

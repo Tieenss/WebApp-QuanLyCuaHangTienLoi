@@ -37,7 +37,6 @@ import {
   type Employee,
   type ShiftCode,
 } from '@/types';
-import { mockBranches } from '@/mockData/branches';
 import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -56,6 +55,7 @@ export const EmployeesPage: FC = () => {
   const dispatch = useAppDispatch();
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
   const { employees } = useAppSelector((state) => state.employee);
+  const branchesState = useAppSelector((state) => state.branch.branches);
 
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState<string | null>(activeBranchId);
@@ -134,13 +134,14 @@ export const EmployeesPage: FC = () => {
   }, [scoped]);
 
   const branchOptions = useMemo(() => {
+    const branches = branchesState;
     const allowed = user?.allowedBranchIds ?? [];
     const list =
       allowed.length === 0
-        ? mockBranches
-        : mockBranches.filter((branch) => allowed.includes(branch.id));
+        ? branches
+        : branches.filter((branch) => allowed.includes(branch.id));
     return list.map((branch) => ({ value: branch.id, label: branch.name }));
-  }, [user?.allowedBranchIds]);
+  }, [branchesState, user?.allowedBranchIds]);
 
   const filters: ToolbarFilter[] = [
     {

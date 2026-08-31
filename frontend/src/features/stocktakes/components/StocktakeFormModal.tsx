@@ -15,9 +15,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useAppSelector } from '@/store/hooks';
 import { stockOf } from '@/store/slices/stockSlice';
-import { DOCUMENT_STATUS, type StocktakeLine } from '@/types';
-import { activeStores, branchById } from '@/mockData/branches';
-import { sellableProducts } from '@/mockData/products';
+import { DOCUMENT_STATUS, type Stocktake, type StocktakeLine } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
 import type { Dayjs } from 'dayjs';
 import './StocktakeFormModal.css';
@@ -37,7 +35,7 @@ interface DraftRow extends StocktakeLine {
 interface StocktakeFormModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: (stocktake: unknown) => void;
+  onSuccess: (stocktake: Stocktake) => void;
 }
 
 const varianceReasons = [
@@ -70,7 +68,12 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
 }) => {
   const [form] = Form.useForm<StocktakeFormValues>();
   const balances = useAppSelector((state) => state.stock.balances);
+  const branches = useAppSelector((state) => state.branch.branches);
+  const products = useAppSelector((state) => state.product.products);
   const stocktakeCount = 22;
+
+  const sellableProducts = products.filter((p) => p.status === 'Active');
+  const branchById = (id: string) => branches.find((b) => b.id === id);
 
   const [branchId, setBranchId] = useState<string | null>(null);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
@@ -86,7 +89,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
       sellableProducts.filter(
         (product) => branchId && stockOf(balances, branchId, product.id) > 0,
       ),
-    [balances, branchId],
+    [sellableProducts, balances, branchId],
   );
 
   const usedProductIds = useMemo(
@@ -302,7 +305,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
               style={{ width: 280 }}
               value={branchId}
               onChange={(val) => setBranchId(val)}
-              options={activeStores.map((s) => ({ value: s.id, label: s.name }))}
+              options={branches.map((s) => ({ value: s.id, label: s.name }))}
             />
           </Form.Item>
           <Form.Item

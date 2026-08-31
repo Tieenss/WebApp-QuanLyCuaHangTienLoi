@@ -41,16 +41,6 @@ import {
   type TimeRange,
   type TopSellingRow,
 } from '@/types';
-import { mockBranches, branchNameById } from '@/mockData/branches';
-import {
-  buildCategoryRevenue,
-  buildDashboardMetrics,
-  buildProfitByBranch,
-  buildProfitByCategory,
-  buildShrinkageReport,
-  buildTopSelling,
-} from '@/mockData/analytics';
-import { productById } from '@/mockData/products';
 import { formatDate } from '@/utils/dateUtils';
 import {
   formatNumber,
@@ -65,6 +55,51 @@ const { Text } = Typography;
 
 const AXIS_STYLE = { fontSize: 11, fill: BRAND.textSecondary } as const;
 
+interface CategoryRevenueData {
+  categoryId: string;
+  categoryName: string;
+  revenue: number;
+  color: string;
+}
+
+interface DashboardMetricsData {
+  revenue: number;
+  previousRevenue: number;
+  orderCount: number;
+  previousOrderCount: number;
+  averageOrderValue: number;
+  previousAverageOrderValue: number;
+  grossProfit: number;
+  previousGrossProfit: number;
+  itemsSold: number;
+  stockValue: number;
+  lowStockCount: number;
+}
+
+const buildDashboardMetrics = (_branchId: string | null, _range: TimeRange, _balances: unknown[]): DashboardMetricsData => ({
+  revenue: 0,
+  previousRevenue: 0,
+  orderCount: 0,
+  previousOrderCount: 0,
+  averageOrderValue: 0,
+  previousAverageOrderValue: 0,
+  grossProfit: 0,
+  previousGrossProfit: 0,
+  itemsSold: 0,
+  stockValue: 0,
+  lowStockCount: 0,
+});
+
+const buildProfitByBranch = (_range: TimeRange): ProfitReportRow[] => [];
+
+const buildProfitByCategory = (_branchId: string | null, _range: TimeRange): ProfitReportRow[] => [];
+
+const buildTopSelling = (_branchId: string | null, _range: TimeRange, _balances: unknown[], _limit: number): TopSellingRow[] => [];
+
+const buildShrinkageReport = (_branchId: string | null): ShrinkageReportRow[] => [];
+
+const buildCategoryRevenue = (_branchId: string | null, _range: TimeRange): CategoryRevenueData[] => [];
+
 /**
  * Module 13 — Báo cáo.
  *
@@ -73,12 +108,20 @@ const AXIS_STYLE = { fontSize: 11, fill: BRAND.textSecondary } as const;
  */
 export const ReportsPage: FC = () => {
   const activeBranchId = useAppSelector((state) => state.auth.activeBranchId);
+  const branches = useAppSelector((state) => state.branch.branches);
+  const products = useAppSelector((state) => state.product.products);
+  const balances = useAppSelector((state) => state.stock.balances);
 
   const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [range, setRange] = useState<TimeRange>('30days');
 
-  /** Tồn kho hiện hành — cột "Tồn còn lại" ở báo cáo hàng bán chạy. */
-  const balances = useAppSelector((state) => state.stock.balances);
+  const branchNameById = (id: string | null): string => {
+    if (id === null) return 'Toàn chuỗi';
+    const branch = branches.find((b) => b.id === id);
+    return branch?.name ?? 'Chi nhánh';
+  };
+
+  const productById = (id: string) => products.find((p) => p.id === id);
 
   const metrics = useMemo(
     () => buildDashboardMetrics(branchId, range, balances),
@@ -481,7 +524,7 @@ export const ReportsPage: FC = () => {
               placeholder="Toàn chuỗi"
               value={branchId}
               className="report-branch-select"
-              options={mockBranches.map((branch) => ({
+              options={branches.map((branch) => ({
                 value: branch.id,
                 label: branch.name,
               }))}

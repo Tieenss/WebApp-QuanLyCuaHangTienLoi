@@ -5,10 +5,6 @@ import {
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '@/types';
-import { mockPurchaseOrders } from '@/mockData/warehouseDocuments';
-import { DISTRIBUTION_CENTER_ID, branchNameById } from '@/mockData/branches';
-import { productById } from '@/mockData/products';
-import { supplierNameById } from '@/mockData/suppliers';
 
 /**
  * Module 8 — Nhập kho từ nhà cung cấp (dữ liệu ghi được).
@@ -33,7 +29,7 @@ export interface PurchaseState {
 }
 
 const initialState: PurchaseState = {
-  orders: mockPurchaseOrders,
+  orders: [],
 };
 
 /** Một dòng hàng người dùng nhập trên form. */
@@ -62,39 +58,30 @@ export const purchaseReceived = createAction<{
  */
 export const buildPurchaseOrder = (input: {
   supplierId: string;
+  supplierName: string;
   lines: PurchaseDraftLine[];
   orderDate: string;
   note: string;
   createdBy: string;
-  /** Số phiếu đã có, dùng để sinh mã tiếp theo. */
   existingCount: number;
 }): PurchaseOrder | null => {
   const lines: PurchaseOrderLine[] = [];
 
   input.lines.forEach((draft, index) => {
-    const product = productById(draft.productId);
-    if (!product || draft.quantity <= 0) return;
+    if (draft.quantity <= 0) return;
 
     lines.push({
       id: `pol-live-${input.existingCount}-${index}`,
-      productId: product.id,
-      sku: product.sku,
-      productName: product.name,
-      unit: product.unit,
+      productId: draft.productId,
+      sku: '',
+      productName: '',
+      unit: '',
       orderedQuantity: draft.quantity,
       receivedQuantity: draft.quantity,
       unitCost: draft.unitCost,
-      vatPercent: product.vatPercent,
+      vatPercent: 0,
       lineTotal: draft.quantity * draft.unitCost,
-      expiryDate: product.isPerishable
-        ? // Hạn dùng tính từ ngày nhập theo `shelfLifeDays` của sản phẩm.
-          new Date(
-            new Date(input.orderDate).getTime() +
-              product.shelfLifeDays * 24 * 60 * 60 * 1000,
-          )
-            .toISOString()
-            .slice(0, 10)
-        : null,
+      expiryDate: null,
     });
   });
 
@@ -112,13 +99,11 @@ export const buildPurchaseOrder = (input: {
       input.existingCount + 1,
     ).padStart(3, '0')}`,
     supplierId: input.supplierId,
-    supplierName: supplierNameById(input.supplierId),
-    // BR-05: luôn là Kho Tổng.
-    branchId: DISTRIBUTION_CENTER_ID,
-    branchName: branchNameById(DISTRIBUTION_CENTER_ID),
+    supplierName: input.supplierName,
+    branchId: '',
+    branchName: '',
     orderDate: input.orderDate,
     expectedDate: input.orderDate,
-    // Hàng đã vào kho ngay khi lập phiếu.
     receivedDate: input.orderDate,
     status: DOCUMENT_STATUS.Completed,
     lines,
@@ -126,7 +111,6 @@ export const buildPurchaseOrder = (input: {
     vatTotal,
     discount: 0,
     grandTotal,
-    // Thanh toán ngay khi nhập, không theo dõi công nợ.
     paidAmount: grandTotal,
     createdBy: input.createdBy,
     note: input.note,

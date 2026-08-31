@@ -21,6 +21,7 @@ import { AttendancePage } from '@/features/attendance/AttendancePage';
 import { CashbookPage } from '@/features/cashbook/CashbookPage';
 import { ReportsPage } from '@/features/reports/ReportsPage';
 import { AccountPage } from '@/features/account/AccountPage';
+import { AccountManagementPage } from '@/features/accounts/AccountManagementPage';
 import { NotFoundPage } from '@/features/shared/NotFoundPage';
 
 
@@ -74,6 +75,9 @@ export const AppRouter: FC = () => (
         {/* Trang tài khoản không thuộc registry module nên mọi vai trò đều
             vào được — kể cả thu ngân, để tự đổi được mật khẩu. */}
         <Route path="/account" element={<AccountPage />} />
+
+        {/* Chỉ ADMIN mới được vào trang quản lý tài khoản */}
+        <Route path="/admin/accounts" element={<AccountManagementPage />} />
 
         <Route path="*" element={<NotFoundPage />} />
       </Route>

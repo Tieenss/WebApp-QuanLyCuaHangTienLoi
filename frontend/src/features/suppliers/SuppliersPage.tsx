@@ -31,7 +31,6 @@ import {
   setStatusFilter,
 } from '@/store/slices/supplierSlice';
 import type { Supplier } from '@/types';
-import { mockProducts } from '@/mockData/products';
 import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -57,6 +56,7 @@ export const SuppliersPage: FC = () => {
   const { suppliers, searchQuery, categoryFilter, statusFilter } = useAppSelector(
     (state) => state.supplier,
   );
+  const products = useAppSelector((state) => state.product.products);
 
   const filtered = useMemo(
     () =>
@@ -79,11 +79,11 @@ export const SuppliersPage: FC = () => {
   /** Số SKU mỗi nhà cung cấp đang cung ứng. */
   const skuCountMap = useMemo(() => {
     const map = new Map<string, number>();
-    for (const product of mockProducts) {
+    for (const product of products) {
       map.set(product.supplierId, (map.get(product.supplierId) ?? 0) + 1);
     }
     return map;
-  }, []);
+  }, [products]);
 
   const summary = useMemo<SummaryItem[]>(() => {
     const active = suppliers.filter((supplier) => supplier.status === 'Active');

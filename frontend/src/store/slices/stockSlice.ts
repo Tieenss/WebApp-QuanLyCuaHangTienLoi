@@ -11,7 +11,7 @@ import {
   type StockLevel,
   type StockTransfer,
 } from '@/types';
-import { seedStockBalances, seedStockLedger } from '@/mockData/inventory';
+
 import { purchaseReceived } from './purchaseSlice';
 import { saleCompleted } from './posSlice';
 import { transferShipped } from './transferSlice';
@@ -43,8 +43,8 @@ export interface StockState {
 }
 
 const initialState: StockState = {
-  balances: seedStockBalances,
-  ledger: seedStockLedger,
+  balances: [],
+  ledger: [],
 };
 
 /** Xác định mức cảnh báo tồn kho từ số lượng thực tế. */

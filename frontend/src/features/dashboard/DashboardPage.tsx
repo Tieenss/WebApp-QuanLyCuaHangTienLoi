@@ -24,17 +24,6 @@ import {
   type TopSellingRow,
 } from '@/types';
 import {
-  buildBranchRevenue,
-  buildCategoryRevenue,
-  buildDashboardMetrics,
-  buildInventoryAlerts,
-  buildRevenueTrend,
-  buildTopSelling,
-  percentChange,
-} from '@/mockData/analytics';
-import { branchNameById } from '@/mockData/branches';
-import { productById } from '@/mockData/products';
-import {
   formatNumber,
   formatRatio,
   formatVND,
@@ -49,6 +38,74 @@ import {
 import './DashboardPage.css';
 
 const { Text } = Typography;
+
+const percentChange = (current: number, previous: number): number => {
+  if (previous === 0) return 0;
+  return ((current - previous) / previous) * 100;
+};
+
+interface DashboardMetricsData {
+  revenue: number;
+  previousRevenue: number;
+  orderCount: number;
+  previousOrderCount: number;
+  averageOrderValue: number;
+  previousAverageOrderValue: number;
+  grossProfit: number;
+  previousGrossProfit: number;
+  itemsSold: number;
+  stockValue: number;
+  lowStockCount: number;
+}
+
+interface RevenueTrendData {
+  label: string;
+  revenue: number;
+  previousRevenue: number;
+  orderCount: number;
+}
+
+interface BranchRevenueData {
+  branchId: string;
+  branchName: string;
+  shortName: string;
+  revenue: number;
+  profit: number;
+  orderCount: number;
+  targetAchievedPercent: number;
+}
+
+interface CategoryRevenueData {
+  categoryId: string;
+  categoryName: string;
+  revenue: number;
+  percentage: number;
+  color: string;
+}
+
+const buildDashboardMetrics = (_branchId: string | null, _range: TimeRange, _balances: unknown[]): DashboardMetricsData => ({
+  revenue: 0,
+  previousRevenue: 0,
+  orderCount: 0,
+  previousOrderCount: 0,
+  averageOrderValue: 0,
+  previousAverageOrderValue: 0,
+  grossProfit: 0,
+  previousGrossProfit: 0,
+  itemsSold: 0,
+  stockValue: 0,
+  lowStockCount: 0,
+});
+
+const buildRevenueTrend = (_branchId: string | null, _range: TimeRange): RevenueTrendData[] => [];
+
+const buildBranchRevenue = (_range: TimeRange): BranchRevenueData[] => [];
+
+const buildCategoryRevenue = (_branchId: string | null, _range: TimeRange): CategoryRevenueData[] => [];
+
+const buildTopSelling = (_branchId: string | null, _range: TimeRange, _balances: unknown[], _limit: number): TopSellingRow[] => [];
+
+const buildInventoryAlerts = (_branchId: string | null, _balances: unknown[], _limit: number): InventoryAlertItem[] => [];
 
 /** Nhãn mốc so sánh tương ứng từng khoảng thời gian. */
 const COMPARE_LABEL: Record<TimeRange, string> = {
@@ -81,6 +138,16 @@ export const DashboardPage: FC = () => {
 
   /** Tồn kho hiện hành — KPI tồn kho và cảnh báo đọc từ đây. */
   const balances = useAppSelector((state) => state.stock.balances);
+  const branches = useAppSelector((state) => state.branch.branches);
+  const products = useAppSelector((state) => state.product.products);
+
+  const branchNameById = (id: string | null): string => {
+    if (id === null) return 'Toàn chuỗi';
+    const branch = branches.find((b) => b.id === id);
+    return branch?.name ?? 'Chi nhánh';
+  };
+
+  const productById = (id: string) => products.find((p) => p.id === id);
 
   const metrics = useMemo(
     () => buildDashboardMetrics(activeBranchId, timeRange, balances),

@@ -24,12 +24,12 @@ import {
 } from '@/store/slices/purchaseSlice';
 import { stockOf } from '@/store/slices/stockSlice';
 import { PRODUCT_UNIT_LABEL } from '@/types';
-import { DISTRIBUTION_CENTER_ID, branchNameById } from '@/mockData/branches';
-import { sellableProducts } from '@/mockData/products';
 import { dayjs, today } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 import type { Dayjs } from 'dayjs';
 import './PurchaseFormModal.css';
+
+const DISTRIBUTION_CENTER_ID = 'br-dc-001';
 
 const { Text, Paragraph } = Typography;
 
@@ -75,6 +75,14 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
   const orderCount = useAppSelector((state) => state.purchase.orders.length);
   const balances = useAppSelector((state) => state.stock.balances);
+  const products = useAppSelector((state) => state.product.products);
+  const branches = useAppSelector((state) => state.branch.branches);
+
+  const sellableProducts = products.filter((p) => p.status === 'Active');
+  const branchNameById = (id: string): string => {
+    const branch = branches.find((b) => b.id === id);
+    return branch?.name ?? 'Kho Tổng';
+  };
 
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
@@ -152,8 +160,10 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         return;
       }
 
+      const supplierName = suppliers.find((s) => s.id === values.supplierId)?.name ?? '';
       const order = buildPurchaseOrder({
         supplierId: values.supplierId,
+        supplierName,
         lines: validRows.map(({ productId, quantity, unitCost }) => ({
           productId,
           quantity,

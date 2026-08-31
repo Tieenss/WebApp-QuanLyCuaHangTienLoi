@@ -87,7 +87,7 @@ export const OrderDetailDrawer: FC<OrderDetailDrawerProps> = ({
   const handlePrint = (): void => {
     if (order === null) return;
     try {
-      printHtml(buildReceiptHtml(order), `Hoá đơn ${order.code}`);
+      printHtml(buildReceiptHtml(order, '', '', ''), `Hoá đơn ${order.code}`);
     } catch {
       message.error(
         'Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép popup cho trang này rồi thử lại.',

@@ -23,7 +23,6 @@ import {
   type ShiftCode,
   type UserRole,
 } from '@/types';
-import { activeStores } from '@/mockData/branches';
 import logo from '@/assets/logo.png';
 import './PosLayout.css';
 
@@ -57,6 +56,7 @@ export const PosLayout: FC = () => {
   const user = useAppSelector((state) => state.auth.user);
   const branchId = useAppSelector((state) => state.pos.branchId);
   const sessionOrderCount = useAppSelector((state) => state.pos.sessionOrderCount);
+  const branches = useAppSelector((state) => state.branch.branches);
 
   const role: UserRole = user?.role ?? USER_ROLE.Cashier;
   /** Thu ngân không có quyền vào bất kỳ trang quản trị nào. */
@@ -68,16 +68,17 @@ export const PosLayout: FC = () => {
    */
   const branchOptions = useMemo(() => {
     const allowed = user?.allowedBranchIds ?? [];
+    const activeStores = branches.filter((b: { status: string }) => b.status === 'Active');
     const selectable =
       allowed.length === 0
         ? activeStores
-        : activeStores.filter((branch) => allowed.includes(branch.id));
+        : activeStores.filter((branch: { id: string }) => allowed.includes(branch.id));
 
-    return selectable.map((branch) => ({
+    return selectable.map((branch: { id: string; code: string; name: string }) => ({
       value: branch.id,
       label: `${branch.code} — ${branch.name}`,
     }));
-  }, [user?.allowedBranchIds]);
+  }, [user?.allowedBranchIds, branches]);
 
   /** Đổi quầy bán: đồng bộ luôn chi nhánh đang xem của khu quản trị. */
   const handleBranchChange = (value: string): void => {
@@ -97,7 +98,7 @@ export const PosLayout: FC = () => {
       key: 'role-group',
       type: 'group',
       label: 'Chuyển đổi vai trò (demo)',
-      children: USER_ROLES.map((item) => ({
+      children: USER_ROLES.map((item: UserRole) => ({
         key: `role-${item}`,
         icon: <UserSwitchOutlined />,
         label: USER_ROLE_LABEL[item],

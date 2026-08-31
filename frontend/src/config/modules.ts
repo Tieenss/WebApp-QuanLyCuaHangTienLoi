@@ -23,7 +23,8 @@ export type ModuleIconKey =
   | 'stocktake'
   | 'attendance'
   | 'cashbook'
-  | 'report';
+  | 'report'
+  | 'account-manage';
 
 export interface ModuleDefinition {
   /** Số thứ tự module theo đặc tả (1..13, module 0 là Login nằm ngoài layout). */
@@ -329,6 +330,19 @@ export const MODULES: readonly ModuleDefinition[] = [
     implemented: true,
     description:
       'Báo cáo doanh thu, lợi nhuận, hàng bán chạy và hao hụt theo kỳ.',
+  },
+  {
+    order: 16,
+    key: 'admin-accounts',
+    path: '/admin/accounts',
+    label: 'Quản lý Tài khoản',
+    shortLabel: 'QL Tài khoản',
+    icon: 'account-manage',
+    allowedRoles: ADMIN_ONLY,
+    group: MODULE_GROUP.MasterData,
+    implemented: true,
+    description:
+      'Tạo, sửa, xóa tài khoản người dùng và phân quyền hệ thống.',
   },
 ];
 

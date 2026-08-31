@@ -7,7 +7,6 @@ import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { closeLedgerDrawer } from '@/store/slices/inventorySlice';
 import { LEDGER_TYPE_LABEL, type StockLedgerEntry } from '@/types';
-import { productById } from '@/mockData/products';
 import { formatDateTime } from '@/utils/dateUtils';
 import { formatNumber, formatVND } from '@/utils/formatters';
 
@@ -25,7 +24,9 @@ export const LedgerDrawer: FC = () => {
     (state) => state.inventory,
   );
   const allLedger = useAppSelector((state) => state.stock.ledger);
+  const products = useAppSelector((state) => state.product.products);
 
+  const productById = (id: string) => products.find((p) => p.id === id);
   const product = selectedProductId === null ? undefined : productById(selectedProductId);
 
   /** Thẻ kho của đúng sản phẩm (và chi nhánh nếu đang lọc). */

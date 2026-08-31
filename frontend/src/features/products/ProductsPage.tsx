@@ -36,10 +36,6 @@ import {
   type Product,
 } from '@/types';
 import {
-  grossProfitPerUnit,
-  marginPercent,
-} from '@/mockData/products';
-import {
   formatNumber,
   formatRatio,
   formatVND,
@@ -50,6 +46,12 @@ import { ProductFormModal } from './components/ProductFormModal';
 import './ProductsPage.css';
 
 const { Text } = Typography;
+
+const grossProfitPerUnit = (product: Product): number =>
+  product.salePrice - product.costPrice;
+
+const marginPercent = (product: Product): number =>
+  product.costPrice > 0 ? ((product.salePrice - product.costPrice) / product.costPrice) * 100 : 0;
 
 /**
  * Module 5 — Sản phẩm.

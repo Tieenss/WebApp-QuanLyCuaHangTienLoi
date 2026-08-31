@@ -1,5 +1,4 @@
 import type { CSSProperties, FC } from 'react';
-import { categoryById } from '@/mockData/categories';
 import { BRAND } from '@/config/brand';
 import './ProductThumb.css';
 
@@ -12,21 +11,22 @@ interface ProductThumbProps {
   productName?: string;
 }
 
-/**
- * Ảnh đại diện sản phẩm.
- *
- * MVP không host ảnh sản phẩm nên mặc định render emoji + màu của danh mục.
- * Cách này giữ lưới POS hiển thị tức thì và không phụ thuộc mạng ngoài; khi có
- * ảnh thật chỉ cần truyền `imageUrl` là component tự đổi.
- */
+const FALLBACK_CATEGORY: Record<string, { name: string; icon: string; color: string }> = {
+  'cat-01': { name: 'Thức uống', icon: '☕', color: '#8B5CF6' },
+  'cat-02': { name: 'Thực phẩm', icon: '🍱', color: '#F97316' },
+  'cat-03': { name: 'Pha chế', icon: '🧋', color: '#EC4899' },
+  'cat-04': { name: 'Bánh', icon: '🍩', color: '#EAB308' },
+  'cat-05': { name: 'Snack', icon: '🍿', color: '#22C55E' },
+};
+
 export const ProductThumb: FC<ProductThumbProps> = ({
   categoryId,
   size = 44,
   imageUrl,
   productName,
 }) => {
-  const category = categoryById(categoryId);
-  const color = category?.color ?? BRAND.textSecondary;
+  const category = FALLBACK_CATEGORY[categoryId] ?? { name: 'Sản phẩm', icon: '📦', color: BRAND.textSecondary };
+  const color = category.color ?? BRAND.textSecondary;
 
   if (imageUrl !== undefined && imageUrl !== '') {
     return (

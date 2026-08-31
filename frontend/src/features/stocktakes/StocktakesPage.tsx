@@ -8,6 +8,7 @@ import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { DocumentStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
+import { useAppSelector } from '@/store/hooks';
 import {
   DOCUMENT_STATUS,
   DOCUMENT_STATUS_LABEL,
@@ -15,8 +16,6 @@ import {
   type Stocktake,
   type StocktakeLine,
 } from '@/types';
-import { activeStores } from '@/mockData/branches';
-import { mockStocktakes } from '@/mockData/warehouseDocuments';
 import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -32,15 +31,17 @@ const { Text } = Typography;
  * chính là nguồn dữ liệu cho báo cáo hao hụt ở module 13.
  */
 export const StocktakesPage: FC = () => {
+  const branches = useAppSelector((state) => state.branch.branches);
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [balanceModal, setBalanceModal] = useState<Stocktake | null>(null);
   const [createModal, setCreateModal] = useState(false);
+  const [stocktakes, setStocktakes] = useState<Stocktake[]>([]);
 
   const filtered = useMemo(
     () =>
-      mockStocktakes.filter((stocktake) => {
+      stocktakes.filter((stocktake) => {
         const matchSearch = matchKeyword(search, [
           stocktake.code,
           stocktake.branchName,
@@ -51,23 +52,23 @@ export const StocktakesPage: FC = () => {
         const matchStatus = statusFilter === null || stocktake.status === statusFilter;
         return matchSearch && matchBranch && matchStatus;
       }),
-    [search, branchFilter, statusFilter],
+    [stocktakes, search, branchFilter, statusFilter],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
-    const totalVarianceValue = mockStocktakes.reduce(
+    const totalVarianceValue = stocktakes.reduce(
       (sum, stocktake) => sum + stocktake.totalVarianceValue,
       0,
     );
-    const totalVarianceItems = mockStocktakes.reduce(
+    const totalVarianceItems = stocktakes.reduce(
       (sum, stocktake) => sum + stocktake.totalVarianceItems,
       0,
     );
-    const totalCounted = mockStocktakes.reduce(
+    const totalCounted = stocktakes.reduce(
       (sum, stocktake) => sum + stocktake.totalItemsCounted,
       0,
     );
-    const pending = mockStocktakes.filter(
+    const pending = stocktakes.filter(
       (stocktake) =>
         stocktake.status === DOCUMENT_STATUS.Pending ||
         stocktake.status === DOCUMENT_STATUS.Draft,
@@ -77,7 +78,7 @@ export const StocktakesPage: FC = () => {
       {
         key: 'sheets',
         title: 'Tổng phiếu kiểm kê',
-        value: formatNumber(mockStocktakes.length),
+        value: formatNumber(stocktakes.length),
         suffix: 'phiếu',
         color: BRAND.primaryRed,
       },
@@ -101,7 +102,7 @@ export const StocktakesPage: FC = () => {
         suffix: 'phiếu',
       },
     ];
-  }, []);
+  }, [stocktakes]);
 
   const filters: ToolbarFilter[] = [
     {
@@ -109,7 +110,7 @@ export const StocktakesPage: FC = () => {
       placeholder: 'Chi nhánh',
       value: branchFilter,
       onChange: setBranchFilter,
-      options: activeStores.map((branch) => ({
+      options: branches.map((branch) => ({
         value: branch.id,
         label: branch.name,
       })),
@@ -392,15 +393,14 @@ export const StocktakesPage: FC = () => {
   };
 
   const handleApprove = (stocktake: Stocktake): void => {
-    const index = mockStocktakes.findIndex((s) => s.id === stocktake.id);
-    if (index !== -1) {
-      mockStocktakes[index] = {
-        ...mockStocktakes[index],
-        status: DOCUMENT_STATUS.Approved,
-        approvedBy: 'Quản lý cửa hàng',
-      };
-      message.success(`Đã duyệt phiếu ${stocktake.code}`);
-    }
+    setStocktakes((prev) =>
+      prev.map((s) =>
+        s.id === stocktake.id
+          ? { ...s, status: DOCUMENT_STATUS.Approved, approvedBy: 'Quản lý cửa hàng' }
+          : s,
+      ),
+    );
+    message.success(`Đã duyệt phiếu ${stocktake.code}`);
   };
 
   const handleBalance = (stocktake: Stocktake): void => {
@@ -409,19 +409,19 @@ export const StocktakesPage: FC = () => {
 
   const confirmBalance = (): void => {
     if (!balanceModal) return;
-    const index = mockStocktakes.findIndex((s) => s.id === balanceModal.id);
-    if (index !== -1) {
-      mockStocktakes[index] = {
-        ...mockStocktakes[index],
-        status: DOCUMENT_STATUS.Balanced,
-      };
-      message.success(`Đã cân bằng kho cho phiếu ${balanceModal.code}`);
-    }
+    setStocktakes((prev) =>
+      prev.map((s) =>
+        s.id === balanceModal.id
+          ? { ...s, status: DOCUMENT_STATUS.Balanced }
+          : s,
+      ),
+    );
+    message.success(`Đã cân bằng kho cho phiếu ${balanceModal.code}`);
     setBalanceModal(null);
   };
 
-  const handleCreateSuccess = (stocktake: unknown): void => {
-    mockStocktakes.unshift(stocktake as (typeof mockStocktakes)[number]);
+  const handleCreateSuccess = (stocktake: Stocktake): void => {
+    setStocktakes((prev) => [stocktake, ...prev]);
     message.success('Đã tạo phiếu kiểm kê');
   };
 
@@ -441,7 +441,7 @@ export const StocktakesPage: FC = () => {
               Tạo phiếu kiểm kê
             </Button>
             <Tag color="red" className="tag-no-margin">
-              {filtered.length} / {mockStocktakes.length} phiếu
+              {filtered.length} / {stocktakes.length} phiếu
             </Tag>
           </Space>
         }

@@ -13,8 +13,8 @@ export type VND = number;
 
 /** Trạng thái hoạt động chung của các bản ghi danh mục. */
 export const RECORD_STATUS = {
-  Active: 'ACTIVE',
-  Inactive: 'INACTIVE',
+  Active: 'Active',
+  Inactive: 'Inactive',
 } as const;
 
 export type RecordStatus = (typeof RECORD_STATUS)[keyof typeof RECORD_STATUS];

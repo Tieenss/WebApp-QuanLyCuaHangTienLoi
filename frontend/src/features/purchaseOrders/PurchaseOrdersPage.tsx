@@ -16,7 +16,6 @@ import {
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '@/types';
-import { mockSuppliers } from '@/mockData/suppliers';
 import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -36,6 +35,7 @@ const { Text } = Typography;
 export const PurchaseOrdersPage: FC = () => {
   const user = useAppSelector((state) => state.auth.user);
   const orders = useAppSelector((state) => state.purchase.orders);
+  const suppliers = useAppSelector((state) => state.supplier.suppliers);
 
   /** Admin và Thủ kho được lập phiếu nhập (ma trận phân quyền). */
   const canCreate =
@@ -113,7 +113,7 @@ export const PurchaseOrdersPage: FC = () => {
       placeholder: 'Nhà cung cấp',
       value: supplierFilter,
       onChange: setSupplierFilter,
-      options: mockSuppliers.map((supplier) => ({
+      options: suppliers.map((supplier) => ({
         value: supplier.id,
         label: supplier.name,
       })),

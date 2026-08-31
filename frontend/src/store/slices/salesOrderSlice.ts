@@ -2,7 +2,6 @@ import { createAction, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { ORDER_STATUS, type SalesOrder } from '@/types';
 import { saleCompleted } from './posSlice';
-import { mockSalesOrders } from '@/mockData/salesOrders';
 
 /**
  * Module — Lịch sử hoá đơn bán hàng.
@@ -34,9 +33,7 @@ export interface SalesOrderState {
 }
 
 const initialState: SalesOrderState = {
-  orders: [...mockSalesOrders].sort((a, b) =>
-    b.soldAt.localeCompare(a.soldAt),
-  ),
+  orders: [],
   selectedOrderId: null,
 };
 

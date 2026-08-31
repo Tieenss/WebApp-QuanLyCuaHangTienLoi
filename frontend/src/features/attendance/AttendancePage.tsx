@@ -52,14 +52,14 @@ import {
   type PayrollStatus,
   type ShiftCode,
 } from '@/types';
-import { mockBranches } from '@/mockData/branches';
-import { CURRENT_PAYROLL_PERIOD } from '@/mockData/employees';
 import { today } from '@/utils/dateUtils';
 import { formatDate, formatDateTime, formatPeriod, formatTime, nowIso } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { HourAdjustModal } from './components/HourAdjustModal';
 import './AttendancePage.css';
+
+const CURRENT_PAYROLL_PERIOD = '2026-08';
 
 const { Text } = Typography;
 
@@ -212,9 +212,10 @@ export const AttendancePage: FC = () => {
     ];
   }, [attendanceRecords, branchFilter, payrollRows]);
 
+  const branches = useAppSelector((state) => state.branch.branches);
   const branchOptions = useMemo(
-    () => mockBranches.map((branch) => ({ value: branch.id, label: branch.name })),
-    [],
+    () => branches.map((branch) => ({ value: branch.id, label: branch.name })),
+    [branches],
   );
 
   const attendanceFilters: ToolbarFilter[] = [

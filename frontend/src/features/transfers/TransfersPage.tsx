@@ -20,7 +20,6 @@ import {
   type StockTransfer,
   type TransferLine,
 } from '@/types';
-import { activeStores } from '@/mockData/branches';
 import { formatDate, today } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -50,6 +49,9 @@ export const TransfersPage: FC = () => {
   const { message } = AntdApp.useApp();
   const user = useAppSelector((state) => state.auth.user);
   const transfers = useAppSelector((state) => state.transfer.transfers);
+  const branches = useAppSelector((state) => state.branch.branches);
+
+  const activeStores = branches.filter((b) => b.status === 'Active');
 
   const isStoreManager = user?.role === USER_ROLE.StoreManager;
   const isApprover =

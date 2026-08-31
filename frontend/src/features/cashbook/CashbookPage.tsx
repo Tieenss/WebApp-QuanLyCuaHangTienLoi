@@ -22,9 +22,8 @@ import {
   USER_ROLE,
   type CashEntry,
   type CashFlowDirection,
+  type CashBookSummary,
 } from '@/types';
-import { mockBranches } from '@/mockData/branches';
-import { summarizeCashBook } from '@/mockData/cashbook';
 import { dayjs, formatDate, lastNDays } from '@/utils/dateUtils';
 import { formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -82,7 +81,28 @@ export const CashbookPage: FC = () => {
     [allEntries, search, directionFilter, categoryFilter, branchFilter, range],
   );
 
-  /** Tổng hợp trên tập phiếu đang lọc, không phải toàn bộ sổ. */
+  const summarizeCashBook = (entries: CashEntry[]): CashBookSummary => {
+    const totalReceipt = entries
+      .filter((e) => e.direction === CASH_FLOW_DIRECTION.Receipt)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const totalPayment = entries
+      .filter((e) => e.direction === CASH_FLOW_DIRECTION.Payment)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const lastEntry = entries[0];
+    return {
+      openingBalance: 50_000_000,
+      totalReceipt,
+      totalPayment,
+      closingBalance: lastEntry?.runningBalance ?? 50_000_000,
+      cashOnHand: entries
+        .filter((e) => e.paymentMethod === PAYMENT_METHOD.Cash)
+        .reduce((sum, e) => sum + (e.direction === CASH_FLOW_DIRECTION.Receipt ? e.amount : -e.amount), 0),
+      bankBalance: entries
+        .filter((e) => e.paymentMethod !== PAYMENT_METHOD.Cash)
+        .reduce((sum, e) => sum + (e.direction === CASH_FLOW_DIRECTION.Receipt ? e.amount : -e.amount), 0),
+    };
+  };
+
   const bookSummary = useMemo(() => summarizeCashBook(filtered), [filtered]);
 
   const summary = useMemo<SummaryItem[]>(
@@ -124,6 +144,7 @@ export const CashbookPage: FC = () => {
     [bookSummary],
   );
 
+  const branches = useAppSelector((state) => state.branch.branches);
   const filters: ToolbarFilter[] = [
     {
       key: 'direction',
@@ -151,7 +172,7 @@ export const CashbookPage: FC = () => {
       placeholder: 'Chi nhánh',
       value: branchFilter,
       onChange: setBranchFilter,
-      options: mockBranches.map((branch) => ({
+      options: branches.map((branch) => ({
         value: branch.id,
         label: branch.name,
       })),

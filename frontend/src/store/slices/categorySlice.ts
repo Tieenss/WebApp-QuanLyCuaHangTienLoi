@@ -1,7 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Category, CategoryFormValues } from '@/types';
-import { mockCategories } from '@/mockData/categories';
 
 /**
  * Module 5 — Danh mục hàng hoá (dữ liệu ghi được).
@@ -21,7 +20,7 @@ export interface CategoryState {
 }
 
 const initialState: CategoryState = {
-  categories: [...mockCategories],
+  categories: [],
 };
 
 /**

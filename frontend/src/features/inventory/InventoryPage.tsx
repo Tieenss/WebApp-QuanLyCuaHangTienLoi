@@ -30,9 +30,6 @@ import {
   type StockLedgerEntry,
   type StockLevel,
 } from '@/types';
-import { mockBranches } from '@/mockData/branches';
-import { mockCategories } from '@/mockData/categories';
-import { productById } from '@/mockData/products';
 import {
   distinctSkuCount,
   lowStockBalances,
@@ -75,6 +72,11 @@ export const InventoryPage: FC = () => {
   /** Dữ liệu kho hiện hành. */
   const allBalances = useAppSelector((state) => state.stock.balances);
   const allLedger = useAppSelector((state) => state.stock.ledger);
+  const allProducts = useAppSelector((state) => state.product.products);
+  const allBranches = useAppSelector((state) => state.branch.branches);
+  const allCategories = useAppSelector((state) => state.category.categories);
+
+  const productById = (id: string) => allProducts.find((p) => p.id === id);
 
   /** Tồn kho sau khi áp toàn bộ bộ lọc. */
   const balances = useMemo(
@@ -111,6 +113,7 @@ export const InventoryPage: FC = () => {
       categoryFilter,
       stockLevelFilter,
       onlyNearExpiry,
+      allProducts,
     ],
   );
 
@@ -133,7 +136,7 @@ export const InventoryPage: FC = () => {
 
         return matchSearch && matchBranch && matchType && matchCategory;
       }),
-    [allLedger, searchKeyword, branchFilter, ledgerTypeFilter, categoryFilter],
+    [allLedger, searchKeyword, branchFilter, ledgerTypeFilter, categoryFilter, allProducts],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
@@ -175,17 +178,17 @@ export const InventoryPage: FC = () => {
   }, [allBalances, branchFilter]);
 
   const branchOptions = useMemo(
-    () => mockBranches.map((branch) => ({ value: branch.id, label: branch.name })),
-    [],
+    () => allBranches.map((branch) => ({ value: branch.id, label: branch.name })),
+    [allBranches],
   );
 
   const categoryOptions = useMemo(
     () =>
-      mockCategories.map((category) => ({
+      allCategories.map((category) => ({
         value: category.id,
         label: `${category.icon} ${category.name}`,
       })),
-    [],
+    [allCategories],
   );
 
   /** Bộ lọc dùng chung, thêm bộ lọc riêng theo tab đang mở. */

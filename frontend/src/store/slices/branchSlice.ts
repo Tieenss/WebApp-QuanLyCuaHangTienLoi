@@ -1,7 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Branch, BranchFormValues } from '@/types';
-import { mockBranches } from '@/mockData/branches';
 import { today } from '@/utils/dateUtils';
 
 export interface BranchState {
@@ -11,7 +10,7 @@ export interface BranchState {
 }
 
 const initialState: BranchState = {
-  branches: mockBranches,
+  branches: [],
   selectedBranch: null,
   isModalOpen: false,
 };

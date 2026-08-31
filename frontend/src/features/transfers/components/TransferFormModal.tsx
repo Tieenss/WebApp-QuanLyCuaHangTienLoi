@@ -22,10 +22,9 @@ import {
   buildTransfer,
   transferShipped,
   type TransferDraftLine,
+  DISTRIBUTION_CENTER_ID,
 } from '@/store/slices/transferSlice';
 import { DOCUMENT_STATUS, STOCK_LEVEL, USER_ROLE, type DocumentStatus, type StockLevel } from '@/types';
-import { DISTRIBUTION_CENTER_ID, activeStores, branchNameById } from '@/mockData/branches';
-import { sellableProducts } from '@/mockData/products';
 import { dayjs, today } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 import type { Dayjs } from 'dayjs';
@@ -84,7 +83,14 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
 
   const user = useAppSelector((state) => state.auth.user);
   const balances = useAppSelector((state) => state.stock.balances);
+  const branches = useAppSelector((state) => state.branch.branches);
+  const products = useAppSelector((state) => state.product.products);
   const transferCount = useAppSelector((state) => state.transfer.transfers.length);
+
+  const activeStores = branches.filter((b) => b.status === 'Active');
+  const sellableProducts = products.filter((p) => p.status === 'Active');
+  const branchNameById = (id: string) => branches.find((b) => b.id === id)?.name ?? '';
+  const productById = (id: string) => products.find((p) => p.id === id);
 
   const isRequest = initialStatus === DOCUMENT_STATUS.Pending;
 
@@ -183,12 +189,14 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
 
       const transfer = buildTransfer({
         toBranchId: values.toBranchId,
+        toBranchName: branchNameById(values.toBranchId),
         lines: validRows.map(({ productId, quantity }) => ({ productId, quantity })),
         requestDate: values.requestDate.format('YYYY-MM-DD'),
         note: values.note?.trim() ?? '',
         createdBy: performedBy,
         existingCount: transferCount,
         initialStatus,
+        getProductById: productById,
       });
       if (transfer === null) return;
 

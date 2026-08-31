@@ -313,13 +313,13 @@ VALUES
     ('f6a7b8c9-0001-0000-0000-000000000070',
      'a1b2c3d4-0001-0000-0000-000000000101',
      12, 8500, 20, 60, CURRENT_DATE + 300, NOW())  -- sắp hết (dưới min=20)
-ON CONFLICT (id_san_pham, id_chi_nhanh) DO NOTHING;
-
--- Sau khi INSERT, cập nhật lại gia_tri_ton (vì INSERT trigger đã làm, nhưng
--- ON CONFLICT DO NOTHING không chạy lại trigger, đảm bảo chạy lại để đúng)
-UPDATE ton_kho
-SET so_luong_ton = so_luong_ton  -- dummy update để trigger BEFORE UPDATE chạy
-WHERE gia_tri_ton = 0 AND so_luong_ton > 0;
+-- ON CONFLICT DO UPDATE: nếu row đã tồn tại, update gia_tri_ton = SL × giá vốn
+-- (đảm bảo gia_tri_ton luôn đúng kể cả khi INSERT trùng). EXCLUDED tham chiếu
+-- giá trị MỚI trong câu INSERT. Khác ON CONFLICT DO NOTHING ở chỗ trigger
+-- BEFORE UPDATE vẫn chạy, nên lan_bien_dong_cuoi cũng được cập nhật.
+ON CONFLICT (id_san_pham, id_chi_nhanh) DO UPDATE
+SET gia_tri_ton = EXCLUDED.so_luong_ton * EXCLUDED.gia_von_trung_binh,
+    lan_bien_dong_cuoi = NOW();
 
 COMMENT ON TABLE ton_kho IS
     'Số lượng tồn hiện tại của từng sản phẩm tại từng chi nhánh. Dùng chung cho '

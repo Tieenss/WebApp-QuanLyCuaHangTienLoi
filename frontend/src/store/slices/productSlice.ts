@@ -1,7 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Product, ProductFormValues } from '@/types';
-import { mockProducts } from '@/mockData/products';
 import { today } from '@/utils/dateUtils';
 
 export interface ProductState {
@@ -11,7 +10,7 @@ export interface ProductState {
 }
 
 const initialState: ProductState = {
-  products: mockProducts,
+  products: [],
   selectedProduct: null,
   isModalOpen: false,
 };

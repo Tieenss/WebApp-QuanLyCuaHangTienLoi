@@ -1,6 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { AttendanceRecord } from '@/types';
-import { seedAttendance } from '@/mockData/employees';
 import { today } from '@/utils/dateUtils';
 import dayjs from 'dayjs';
 
@@ -9,7 +8,7 @@ export interface AttendanceState {
 }
 
 const initialState: AttendanceState = {
-  records: seedAttendance,
+  records: [],
 };
 
 /**

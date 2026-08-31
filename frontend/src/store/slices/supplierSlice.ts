@@ -1,7 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Supplier, SupplierFormValues } from '@/types';
-import { mockSuppliers } from '@/mockData/suppliers';
 import { today } from '@/utils/dateUtils';
 
 /**
@@ -21,7 +20,7 @@ export interface SupplierState {
 }
 
 const initialState: SupplierState = {
-  suppliers: mockSuppliers,
+  suppliers: [],
   selectedSupplier: null,
   isModalOpen: false,
   searchQuery: '',

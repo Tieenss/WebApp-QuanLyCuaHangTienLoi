@@ -42,9 +42,7 @@ import {
   type PaymentMethod,
   type ShiftCode,
 } from '@/types';
-import { productById } from '@/mockData/products';
 import { stockOf } from '@/store/slices/stockSlice';
-import { cashiersOfBranch } from '@/mockData/employees';
 import { nowIso } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 
@@ -85,6 +83,8 @@ export const CartPanel: FC = () => {
   const { user } = useAppSelector((state) => state.auth);
   const posState = useAppSelector((state) => state.pos);
   const balances = useAppSelector((state) => state.stock.balances);
+  const products = useAppSelector((state) => state.product.products);
+  const employees = useAppSelector((state) => state.employee.employees);
   const {
     branchId,
     lines,
@@ -93,6 +93,10 @@ export const CartPanel: FC = () => {
     tenderedAmount,
     memberPhone,
   } = posState;
+
+  const productById = (id: string) => products.find((p) => p.id === id);
+  const cashiersOfBranch = (branch: string | null) =>
+    employees.filter((e) => e.branchId === branch && e.status === 'Active');
 
   const totals = useMemo(
     () => calculateTotals(lines, orderDiscount),

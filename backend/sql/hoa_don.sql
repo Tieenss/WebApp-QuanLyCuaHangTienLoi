@@ -412,15 +412,21 @@ DECLARE
     v_ma_chung_tu VARCHAR(50);
     v_don_gia_von DECIMAL(12,0);
 BEGIN
-    -- BR-01: validate tồn kho trước khi INSERT (nhanh hơn để fail sớm)
+    -- BR-01: validate tồn kho trước khi INSERT (nhanh hơn để fail sớm).
+    -- Dùng FOR UPDATE để khoá row — tránh race condition khi 2 thu ngân
+    -- cùng thanh toán cùng SP. Nếu 1 transaction đang chạy, transaction
+    -- còn lại sẽ CHỜ (không fail) → fail message rõ ràng từ
+    -- fn_ghi_the_kho_va_dieu_chinh_ton thay vì CHECK constraint.
     FOR v_line IN SELECT * FROM jsonb_array_elements(p_lines)
     LOOP
-        IF NOT EXISTS (
-            SELECT 1 FROM ton_kho
-            WHERE id_san_pham = (v_line->>'id_san_pham')::UUID
-              AND id_chi_nhanh = p_id_chi_nhanh
-              AND so_luong_ton >= (v_line->>'so_luong')::INTEGER
-        ) THEN
+        PERFORM 1
+        FROM ton_kho
+        WHERE id_san_pham = (v_line->>'id_san_pham')::UUID
+          AND id_chi_nhanh = p_id_chi_nhanh
+          AND so_luong_ton >= (v_line->>'so_luong')::INTEGER
+        FOR UPDATE;
+
+        IF NOT FOUND THEN
             RAISE EXCEPTION 'BR-01: Không đủ tồn kho cho sản phẩm (%) tại chi nhánh (%)',
                 (v_line->>'id_san_pham')::UUID, p_id_chi_nhanh;
         END IF;
