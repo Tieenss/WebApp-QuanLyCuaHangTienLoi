@@ -10,9 +10,9 @@ import {
 } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  addSupplier,
+  createSupplier,
   setModalOpen,
-  updateSupplier,
+  updateSupplierThunk,
 } from '@/store/slices/supplierSlice';
 import type { SupplierFormValues } from '@/types';
 import './SupplierFormModal.css';
@@ -76,17 +76,17 @@ export const SupplierFormModal: FC = () => {
     try {
       const values = await form.validateFields();
 
-      if (isEditing) {
-        dispatch(updateSupplier({ id: selectedSupplier.id, values }));
+      if (isEditing && selectedSupplier) {
+        await dispatch(updateSupplierThunk({ id: selectedSupplier.id, values })).unwrap();
         message.success('Đã cập nhật thông tin nhà cung cấp.');
       } else {
-        dispatch(addSupplier(values));
+        await dispatch(createSupplier(values)).unwrap();
         message.success('Đã thêm nhà cung cấp mới.');
       }
 
       dispatch(setModalOpen(false));
-    } catch {
-      // Lỗi validate đã được antd Form hiển thị tại từng field.
+    } catch (error: any) {
+      message.error(error?.message || 'Có lỗi xảy ra');
     }
   };
 

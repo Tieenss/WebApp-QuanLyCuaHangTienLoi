@@ -20,8 +20,6 @@ import {
   setActiveCategory,
   setSearchKeyword,
 } from '@/store/slices/posSlice';
-import { mockCategories } from '@/mockData/categories';
-import { productByBarcode, sellableProducts } from '@/mockData/products';
 import { stockOf } from '@/store/slices/stockSlice';
 import { formatVND } from '@/utils/formatters';
 import { matchKeyword } from '@/utils/formatters';
@@ -45,6 +43,11 @@ export const ProductPicker: FC = () => {
   const cartLines = useAppSelector((state) => state.pos.lines);
   /** Tồn kho hiện hành — cập nhật ngay sau mỗi lần bán. */
   const balances = useAppSelector((state) => state.stock.balances);
+  const products = useAppSelector((state) => state.product.products);
+  const categories = useAppSelector((state) => state.category.categories);
+
+  const sellableProducts = products.filter((p) => p.status === 'Active');
+  const productByBarcode = (barcode: string) => products.find((p) => p.barcode === barcode);
 
   /** Số lượng đang có trong giỏ theo từng sản phẩm, để hiện badge trên thẻ. */
   const cartQuantityMap = useMemo(() => {
@@ -68,19 +71,19 @@ export const ProductPicker: FC = () => {
         ]);
         return matchCategory && matchSearch;
       }),
-    [activeCategoryId, searchKeyword],
+    [sellableProducts, activeCategoryId, searchKeyword],
   );
 
   /** Tuỳ chọn danh mục, kèm mục "Tất cả" ở đầu. */
   const categoryOptions = useMemo(
     () => [
       { label: 'Tất cả', value: '__ALL__' },
-      ...mockCategories.map((category) => ({
+      ...categories.map((category) => ({
         label: `${category.icon} ${category.name}`,
         value: category.id,
       })),
     ],
-    [],
+    [categories],
   );
 
   /** Xử lý khi máy quét gửi Enter: tra mã vạch rồi thêm vào giỏ. */

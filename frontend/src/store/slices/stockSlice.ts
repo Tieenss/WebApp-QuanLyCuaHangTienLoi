@@ -1,6 +1,7 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
+  DOCUMENT_STATUS,
   LEDGER_TYPE,
   STOCK_LEVEL,
   type PurchaseOrder,
@@ -8,10 +9,14 @@ import {
   type StockBalance,
   type StockLedgerEntry,
   type StockLevel,
+  type StockTransfer,
 } from '@/types';
-import { seedStockBalances, seedStockLedger } from '@/mockData/inventory';
+import { tonKhoApi, theKhoApi, type TonKhoDTO, type TheKhoDTO } from '@/api/tonKho';
+
 import { purchaseReceived } from './purchaseSlice';
 import { saleCompleted } from './posSlice';
+import { transferShipped } from './transferSlice';
+import { orderRefunded, orderCancelled } from './salesOrderSlice';
 
 /**
  * Module 7 — Tồn kho & Thẻ kho (dữ liệu ghi được).
@@ -36,12 +41,59 @@ export interface StockState {
   balances: StockBalance[];
   /** Sổ cái kho, mới nhất trước. */
   ledger: StockLedgerEntry[];
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: StockState = {
-  balances: seedStockBalances,
-  ledger: seedStockLedger,
+  balances: [],
+  ledger: [],
+  loading: false,
+  error: null,
 };
+
+const mapTonKhoToBalance = (dto: TonKhoDTO): StockBalance => ({
+  productId: dto.idSanPham,
+  branchId: dto.idChiNhanh,
+  productName: '',
+  branchName: '',
+  quantity: dto.soLuongTon || 0,
+  averageCost: dto.giaVonTrungBinh || 0,
+  totalValue: dto.giaTriTon || 0,
+  minStock: dto.tonToiThieu || 0,
+  maxStock: dto.tonToiDa || 0,
+  lastUpdated: dto.lanBienDongCuoi || new Date().toISOString(),
+});
+
+const mapTheKhoToEntry = (dto: TheKhoDTO): StockLedgerEntry => ({
+  id: dto.id,
+  timestamp: dto.ngayPhatSinh,
+  productId: dto.idSanPham,
+  productName: '',
+  branchId: dto.idChiNhanh,
+  branchName: '',
+  type: (dto.loaiGiaoDich as any) || 'ADJUSTMENT',
+  quantity: dto.soLuong,
+  unitPrice: dto.donGia || 0,
+  totalValue: dto.thanhTien || 0,
+  balanceBefore: dto.tonTruoc || 0,
+  balanceAfter: dto.tonSau || 0,
+  referenceCode: dto.maChungTu,
+  performedBy: dto.nguoiThucHien,
+  expiryDate: dto.hanSuDung,
+  note: dto.ghiChu,
+});
+
+export const fetchStock = createAsyncThunk('stock/fetchAll', async () => {
+  const [tonKho, theKho] = await Promise.all([
+    tonKhoApi.getAll(),
+    theKhoApi.getAll(),
+  ]);
+  return {
+    balances: tonKho.map(mapTonKhoToBalance),
+    ledger: theKho.map(mapTheKhoToEntry),
+  };
+});
 
 /** Xác định mức cảnh báo tồn kho từ số lượng thực tế. */
 export const resolveStockLevel = (
@@ -193,6 +245,40 @@ const applySale = (state: StockState, order: SalesOrder): void => {
 };
 
 /**
+ * Hoàn tồn cho một hoá đơn bị REFUNDED.
+ *
+ * Phép tính ngược lại của `applySale`: cộng lại số lượng từng dòng và ghi
+ * một dòng thẻ kho `SALE_RETURN` (số dương) tại cùng chi nhánh đã bán. Đây
+ * là nguồn sự thật duy nhất để cập nhật tồn — KHÔNG tự tính từ `grandTotal`
+ * hay trừ `paidAmount` như một số hệ thống cũ vẫn làm.
+ *
+ * `occurredAt` dùng thời điểm hoàn (do payload truyền vào), không dùng
+ * `order.soldAt` — vì hai mốc thời gian có thể cách nhau nhiều ngày.
+ */
+const applyReturn = (
+  state: StockState,
+  order: SalesOrder,
+  performedBy: string,
+  refundedAt: string,
+): void => {
+  order.lines.forEach((line, index) => {
+    applyMovement(state, {
+      branchId: order.branchId,
+      branchName: order.branchName,
+      productId: line.productId,
+      // Hoàn nhập: số lượng dương.
+      quantityChange: line.quantity,
+      type: LEDGER_TYPE.SaleReturn,
+      referenceCode: order.code,
+      performedBy,
+      note: `Hoàn tiền hoá đơn ${order.code} (khách trả hàng)`,
+      occurredAt: refundedAt,
+      sequence: index,
+    });
+  });
+};
+
+/**
  * Cộng tồn kho + ghi thẻ kho cho một phiếu nhập từ NCC.
  *
  * Giá vốn bình quân gia quyền được tính lại theo công thức
@@ -248,6 +334,77 @@ const applyPurchase = (
   });
 };
 
+/**
+ * Luân chuyển nội bộ: trừ tồn kho nguồn, cộng tồn kho đích, ghi 2 dòng thẻ kho.
+ *
+ * Mỗi mặt hàng sinh đúng 2 dòng sổ cái (`luong_nghiep_vu.md` mục 3.2):
+ *   - `XUAT_CHI_NHANH` số âm tại kho xuất
+ *   - `NHAN_TU_KHO`   số dương tại kho nhận
+ *
+ * Nếu cửa hàng nhận chưa từng có mặt hàng này thì chưa có dòng tồn kho để cộng
+ * vào; khi đó `applyMovement` trả `false` và ta tạo dòng mới, kế thừa ngưỡng
+ * min/max cùng giá vốn từ kho xuất.
+ */
+const applyTransfer = (
+  state: StockState,
+  transfer: StockTransfer,
+  performedBy: string,
+): void => {
+  transfer.lines.forEach((line, index) => {
+    const source = state.balances.find(
+      (item) =>
+        item.branchId === transfer.fromBranchId && item.productId === line.productId,
+    );
+
+    // Bảo đảm kho nhận có dòng tồn kho trước khi cộng vào.
+    const hasTarget = state.balances.some(
+      (item) =>
+        item.branchId === transfer.toBranchId && item.productId === line.productId,
+    );
+    if (!hasTarget && source) {
+      state.balances.push({
+        ...source,
+        id: `stk-${transfer.toBranchId}-${line.productId}`,
+        branchId: transfer.toBranchId,
+        branchName: transfer.toBranchName,
+        quantity: 0,
+        stockValue: 0,
+        // Cửa hàng giữ tồn nhỏ hơn Kho Tổng (hệ số 8x khi sinh dữ liệu seed).
+        minStock: Math.max(1, Math.round(source.minStock / 8)),
+        maxStock: Math.max(2, Math.round(source.maxStock / 8)),
+      });
+    }
+
+    // Xuất khỏi kho nguồn.
+    applyMovement(state, {
+      branchId: transfer.fromBranchId,
+      branchName: transfer.fromBranchName,
+      productId: line.productId,
+      quantityChange: -line.shippedQuantity,
+      type: LEDGER_TYPE.TransferOut,
+      referenceCode: transfer.code,
+      performedBy,
+      note: `Xuất luân chuyển sang ${transfer.toBranchName}`,
+      occurredAt: `${transfer.requestDate}T10:00:00.000Z`,
+      sequence: index * 2,
+    });
+
+    // Nhập vào kho đích.
+    applyMovement(state, {
+      branchId: transfer.toBranchId,
+      branchName: transfer.toBranchName,
+      productId: line.productId,
+      quantityChange: line.receivedQuantity,
+      type: LEDGER_TYPE.TransferIn,
+      referenceCode: transfer.code,
+      performedBy,
+      note: `Nhận hàng luân chuyển từ ${transfer.fromBranchName}`,
+      occurredAt: `${transfer.requestDate}T10:00:00.000Z`,
+      sequence: index * 2 + 1,
+    });
+  });
+};
+
 export const stockSlice = createSlice({
   name: 'stock',
   initialState,
@@ -296,6 +453,21 @@ export const stockSlice = createSlice({
   },
 
   extraReducers: (builder) => {
+    builder
+      .addCase(fetchStock.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchStock.fulfilled, (state, action) => {
+        state.loading = false;
+        state.balances = action.payload.balances;
+        state.ledger = action.payload.ledger;
+      })
+      .addCase(fetchStock.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Lỗi tải tồn kho';
+      });
+
     // Bước 2 và 3 của transaction bán hàng: trừ tồn kho + ghi thẻ kho.
     builder.addCase(saleCompleted, (state, action) => {
       applySale(state, action.payload.order);
@@ -305,6 +477,39 @@ export const stockSlice = createSlice({
     // kèm tính lại giá vốn bình quân gia quyền.
     builder.addCase(purchaseReceived, (state, action) => {
       applyPurchase(state, action.payload.order, action.payload.performedBy);
+    });
+
+    // Luân chuyển nội bộ: trừ tồn kho nguồn, cộng tồn kho đích, ghi 2 dòng
+    // thẻ kho. Không sinh phiếu sổ quỹ vì không phát sinh dòng tiền.
+    //
+    // Chỉ áp dụng khi phiếu đã được duyệt (COMPLETED) — phiếu PENDING chỉ mới
+    // là yêu cầu, tồn kho chưa bị đụng tới. Cùng action `transferShipped`
+    // nhưng hai bên sẽ lọc theo trạng thái phiếu.
+    builder.addCase(transferShipped, (state, action) => {
+      if (action.payload.transfer.status !== DOCUMENT_STATUS.Completed) return;
+      applyTransfer(state, action.payload.transfer, action.payload.performedBy);
+    });
+
+    // Transaction hoàn tiền hoá đơn: cộng lại tồn kho + ghi thẻ kho SALE_RETURN.
+    builder.addCase(orderRefunded, (state, action) => {
+      applyReturn(
+        state,
+        action.payload.order,
+        action.payload.performedBy,
+        action.payload.refundedAt,
+      );
+    });
+
+    // Transaction huỷ đơn: cũng cộng lại tồn kho vì đơn chưa giao nhận
+    // nhưng tồn đã bị trừ lúc bán. KHÔNG tạo phiếu chi sổ quỹ (cashbook
+    // không lắng nghe action này) vì không có dòng tiền thực phát sinh.
+    builder.addCase(orderCancelled, (state, action) => {
+      applyReturn(
+        state,
+        action.payload.order,
+        action.payload.performedBy,
+        action.payload.cancelledAt,
+      );
     });
   },
 });

@@ -70,7 +70,7 @@ export interface Employee {
   avatarText: string;
 }
 
-export type EmployeeFormValues = Omit<Employee, 'id' | 'code' | 'avatarText' | 'branchName'>;
+export type EmployeeFormValues = Omit<Employee, 'id' | 'avatarText' | 'branchName'>;
 
 /**
  * Module 11 — Bản ghi chấm công của 1 nhân viên trong 1 ca.
@@ -110,9 +110,19 @@ export interface AttendanceRecord {
   shift: ShiftCode;
   checkInAt: string | null;
   checkOutAt: string | null;
-  /** Số giờ làm thực tế, đã trừ giờ nghỉ. */
+  /** Giờ vào thực tế từ máy chấm công. */
+  clockInAt: string | null;
+  /** Giờ ra thực tế từ máy chấm công. */
+  clockOutAt: string | null;
+  /** Thời gian nghỉ (giờ). */
+  breakDuration: number;
+  /** Số giờ làm thực tế đã trừ giờ nghỉ. */
+  actualHours: number;
+  /** Số giờ làm thực tế, đã trừ giờ nghỉ (legacy, dùng cho lương). */
   workedHours: number;
   overtimeHours: number;
+  /** Đã thanh toán lương cho ca này chưa. */
+  isPaid: boolean;
   status: AttendanceStatus;
   note: string;
 }

@@ -11,9 +11,11 @@ import { USER_ROLE, type UserRole } from '@/types';
 export type ModuleIconKey =
   | 'dashboard'
   | 'pos'
+  | 'sales-order'
   | 'branch'
   | 'employee'
   | 'product'
+  | 'category'
   | 'supplier'
   | 'warehouse'
   | 'purchase'
@@ -21,7 +23,8 @@ export type ModuleIconKey =
   | 'stocktake'
   | 'attendance'
   | 'cashbook'
-  | 'report';
+  | 'report'
+  | 'account-manage';
 
 export interface ModuleDefinition {
   /** Số thứ tự module theo đặc tả (1..13, module 0 là Login nằm ngoài layout). */
@@ -99,7 +102,7 @@ const STOCK_VIEW = [
 ] as const;
 
 /** Bán hàng tại quầy — Admin KHÔNG có quyền này theo ma trận phân quyền. */
-const POS_OPS = [USER_ROLE.StoreManager, USER_ROLE.Cashier] as const;
+const POS_OPS = [USER_ROLE.Cashier] as const;
 
 /** Sổ quỹ: Admin và Kế toán xem toàn hệ thống, Quản lý chỉ chi nhánh mình. */
 const CASHBOOK_VIEW = [
@@ -117,7 +120,7 @@ export const MODULES: readonly ModuleDefinition[] = [
     label: 'Tổng quan',
     shortLabel: 'Tổng quan',
     icon: 'dashboard',
-    allowedRoles: FINANCE_VIEW,
+    allowedRoles: [...FINANCE_VIEW, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.Operation,
     implemented: true,
     description:
@@ -138,6 +141,31 @@ export const MODULES: readonly ModuleDefinition[] = [
   },
   {
     order: 3,
+    key: 'sales-orders',
+    path: '/sales-orders',
+    label: 'Lịch sử hoá đơn',
+    shortLabel: 'Hoá đơn',
+    icon: 'sales-order',
+    /**
+     * Phạm vi dữ liệu do trang tự lọc theo vai trò:
+     * - Admin / Kế toán: thấy tất cả.
+     * - Quản lý chi nhánh: chỉ thấy hoá đơn chi nhánh mình.
+     * - Thu ngân: chỉ thấy hoá đơn do mình lập.
+     * - Thủ kho: không có quyền.
+     */
+    allowedRoles: [
+      USER_ROLE.Admin,
+      USER_ROLE.Accountant,
+      USER_ROLE.StoreManager,
+      USER_ROLE.Cashier,
+    ] as const,
+    group: MODULE_GROUP.Operation,
+    implemented: true,
+    description:
+      'Tra cứu toàn bộ hoá đơn bán hàng, xem chi tiết từng mặt hàng và in lại hoá đơn.',
+  },
+  {
+    order: 4,
     key: 'branches',
     path: '/branches',
     label: 'Quản lý Chi nhánh',
@@ -150,33 +178,46 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Danh sách cửa hàng bán lẻ và Kho Tổng, địa chỉ, giờ mở cửa, trạng thái hoạt động.',
   },
   {
-    order: 4,
+    order: 5,
     key: 'employees',
     path: '/employees',
     label: 'Quản lý Nhân viên',
     shortLabel: 'Nhân viên',
     icon: 'employee',
-    allowedRoles: ADMIN_ONLY,
+    allowedRoles: [USER_ROLE.Admin, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.MasterData,
     implemented: true,
     description:
       'Danh sách nhân viên, ca làm việc, gán chi nhánh, vai trò và quyền hạn hệ thống.',
   },
   {
-    order: 5,
+    order: 6,
     key: 'products',
     path: '/products',
-    label: 'Danh mục & Sản phẩm',
+    label: 'Quản lý Sản phẩm',
     shortLabel: 'Sản phẩm',
     icon: 'product',
-    allowedRoles: ADMIN_ONLY,
+    allowedRoles: [USER_ROLE.Admin, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.MasterData,
     implemented: true,
     description:
-      'Phân loại danh mục hàng hoá, danh sách sản phẩm, giá bán, mã vạch và SKU.',
+      'Danh sách SKU, mã vạch, giá bán và biên lợi nhuận.',
   },
   {
-    order: 6,
+    order: 7,
+    key: 'categories',
+    path: '/categories',
+    label: 'Quản lý Danh mục',
+    shortLabel: 'Danh mục',
+    icon: 'category',
+    allowedRoles: [USER_ROLE.Admin, USER_ROLE.StoreManager] as const,
+    group: MODULE_GROUP.MasterData,
+    implemented: true,
+    description:
+      'Phân nhóm hàng hoá, đặt màu và icon cho từng danh mục hiển thị trên POS.',
+  },
+  {
+    order: 8,
     key: 'suppliers',
     path: '/suppliers',
     label: 'Nhà cung cấp',
@@ -189,7 +230,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Danh sách nhà cung cấp, thông tin liên hệ, danh mục hàng cung ứng.',
   },
   {
-    order: 7,
+    order: 9,
     key: 'inventory',
     path: '/inventory',
     label: 'Kho hàng (Tồn kho & Thẻ kho)',
@@ -202,12 +243,16 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Bảng tồn kho theo từng chi nhánh và Kho Tổng, lịch sử biến động thẻ kho (nhập/xuất/điều chỉnh).',
   },
   {
-    order: 8,
+    order: 10,
     key: 'purchase-orders',
     path: '/purchase-orders',
     label: 'Nhập kho từ NCC',
     shortLabel: 'Nhập kho',
     icon: 'purchase',
+    /**
+     * BR-05: chỉ nhập vào Kho Tổng. Quản lý chi nhánh nhận hàng qua phiếu
+     * xuất kho nội bộ (module 9), không tự nhập trực tiếp từ NCC.
+     */
     allowedRoles: WAREHOUSE_OPS,
     group: MODULE_GROUP.Warehouse,
     implemented: true,
@@ -215,20 +260,25 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Tạo phiếu nhập hàng từ nhà cung cấp vào Kho Tổng, xác nhận số lượng thực nhận.',
   },
   {
-    order: 9,
+    order: 11,
     key: 'transfers',
     path: '/transfers',
-    label: 'Xuất kho nội bộ',
-    shortLabel: 'Xuất kho',
+    label: 'Xuất/Nhập kho nội bộ',
+    shortLabel: 'Xuất/Nhập',
     icon: 'transfer',
-    allowedRoles: WAREHOUSE_OPS,
+    /**
+     * Quản lý chi nhánh được xem và lập yêu cầu xuất cho chi nhánh mình;
+     * Thủ kho/Admin duyệt yêu cầu và xuất kho. Phạm vi dữ liệu của từng vai
+     * trò do trang TransfersPage tự lọc theo `user.branchId`.
+     */
+    allowedRoles: [...WAREHOUSE_OPS, USER_ROLE.StoreManager] as const,
     group: MODULE_GROUP.Warehouse,
     implemented: true,
     description:
-      'Luân chuyển hàng hoá từ Kho Tổng tới các cửa hàng bán lẻ.',
+      'Luân chuyển hàng hoá từ Kho Tổng tới các cửa hàng bán lẻ. Quản lý chi nhánh tạo yêu cầu, Thủ kho duyệt và xuất kho.',
   },
   {
-    order: 10,
+    order: 12,
     key: 'stocktakes',
     path: '/stocktakes',
     label: 'Kiểm kê & Cân bằng kho',
@@ -242,7 +292,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Tạo phiếu kiểm kê thực tế, so sánh lệch tồn kho và cân bằng lại sổ sách.',
   },
   {
-    order: 11,
+    order: 13,
     key: 'attendance',
     path: '/attendance',
     label: 'Chấm công & Bảng lương',
@@ -256,7 +306,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Chấm công ca làm việc và bảng lương theo tháng, duyệt lương hai tầng.',
   },
   {
-    order: 12,
+    order: 14,
     key: 'cashbook',
     path: '/cashbook',
     label: 'Sổ quỹ (Thu/Chi)',
@@ -269,7 +319,7 @@ export const MODULES: readonly ModuleDefinition[] = [
       'Sổ thu chi toàn hệ thống: doanh thu bán hàng, chi nhập hàng, chi lương, cấp vốn.',
   },
   {
-    order: 13,
+    order: 15,
     key: 'reports',
     path: '/reports',
     label: 'Báo cáo',
@@ -280,6 +330,19 @@ export const MODULES: readonly ModuleDefinition[] = [
     implemented: true,
     description:
       'Báo cáo doanh thu, lợi nhuận, hàng bán chạy và hao hụt theo kỳ.',
+  },
+  {
+    order: 16,
+    key: 'admin-accounts',
+    path: '/admin/accounts',
+    label: 'Quản lý Tài khoản',
+    shortLabel: 'QL Tài khoản',
+    icon: 'account-manage',
+    allowedRoles: ADMIN_ONLY,
+    group: MODULE_GROUP.MasterData,
+    implemented: true,
+    description:
+      'Tạo, sửa, xóa tài khoản người dùng và phân quyền hệ thống.',
   },
 ];
 
@@ -300,16 +363,18 @@ export const getModulesForRole = (role: UserRole): ModuleDefinition[] =>
  * Trang mặc định sau khi đăng nhập, tuỳ theo vai trò.
  *
  * Không dùng chung một trang được vì mỗi vai trò có mối quan tâm khác nhau và
- * Dashboard chỉ mở cho Admin / Kế toán:
- * - THU_NGAN, QUAN_LY → quầy bán hàng.
+ * Dashboard chỉ mở cho Admin / Kế toán / Quản lý:
+ * - THU_NGAN → quầy bán hàng.
+ * - QUAN_LY → Dashboard.
  * - THU_KHO → tồn kho Kho Tổng.
  * - ADMIN, KE_TOAN → Dashboard.
  */
 export const getLandingPath = (role: UserRole): string => {
   switch (role) {
     case USER_ROLE.Cashier:
-    case USER_ROLE.StoreManager:
       return '/pos';
+    case USER_ROLE.StoreManager:
+      return '/dashboard';
     case USER_ROLE.WarehouseKeeper:
       return '/inventory';
     default:

@@ -2,7 +2,6 @@ import type { SalesOrder } from '@/types';
 import { PAYMENT_METHOD_LABEL } from '@/types';
 import { formatDateTime } from '@/utils/dateUtils';
 import { formatAmount, formatVND } from '@/utils/formatters';
-import { branchById } from '@/mockData/branches';
 
 /**
  * Dựng HTML hoá đơn khổ 80mm cho máy in nhiệt.
@@ -10,9 +9,7 @@ import { branchById } from '@/mockData/branches';
  * Trả về chuỗi HTML thuần (không phải JSX) vì nội dung được ghi sang cửa sổ in
  * riêng bằng `printHtml`, nơi React không kiểm soát DOM.
  */
-export const buildReceiptHtml = (order: SalesOrder): string => {
-  const branch = branchById(order.branchId);
-
+export const buildReceiptHtml = (order: SalesOrder, branchName: string, branchAddress: string, branchPhone: string): string => {
   const lineRows = order.lines
     .map((line) => {
       const discountRow =
@@ -47,9 +44,9 @@ export const buildReceiptHtml = (order: SalesOrder): string => {
 
   return `
 <h1>CIRCLE K</h1>
-<div class="center muted">${escapeHtml(branch?.name ?? order.branchName)}</div>
-<div class="center muted">${escapeHtml(branch?.addressLine ?? '')}</div>
-<div class="center muted">ĐT: ${escapeHtml(branch?.phone ?? '')}</div>
+<div class="center muted">${escapeHtml(branchName || order.branchName)}</div>
+<div class="center muted">${escapeHtml(branchAddress || '')}</div>
+<div class="center muted">ĐT: ${escapeHtml(branchPhone || '')}</div>
 <hr />
 <table>
   <tr><td>Số HĐ</td><td class="right bold">${escapeHtml(order.code)}</td></tr>

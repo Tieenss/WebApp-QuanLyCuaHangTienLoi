@@ -42,8 +42,7 @@ import {
   type PaymentMethod,
   type ShiftCode,
 } from '@/types';
-import { productById } from '@/mockData/products';
-import { cashiersOfBranch } from '@/mockData/employees';
+import { stockOf } from '@/store/slices/stockSlice';
 import { nowIso } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 
@@ -83,6 +82,9 @@ export const CartPanel: FC = () => {
 
   const { user } = useAppSelector((state) => state.auth);
   const posState = useAppSelector((state) => state.pos);
+  const balances = useAppSelector((state) => state.stock.balances);
+  const products = useAppSelector((state) => state.product.products);
+  const employees = useAppSelector((state) => state.employee.employees);
   const {
     branchId,
     lines,
@@ -91,6 +93,10 @@ export const CartPanel: FC = () => {
     tenderedAmount,
     memberPhone,
   } = posState;
+
+  const productById = (id: string) => products.find((p) => p.id === id);
+  const cashiersOfBranch = (branch: string | null) =>
+    employees.filter((e) => e.branchId === branch && e.status === 'Active');
 
   const totals = useMemo(
     () => calculateTotals(lines, orderDiscount),
@@ -101,6 +107,16 @@ export const CartPanel: FC = () => {
   /** Tiền thừa; chỉ có ý nghĩa khi khách đưa đủ tiền mặt. */
   const changeAmount = Math.max(0, tenderedAmount - totals.grandTotal);
   const isTenderInsufficient = isCash && tenderedAmount < totals.grandTotal;
+
+  /** Kiểm tra tồn kho tại thời điểm thanh toán (BR-01). */
+  const hasOutOfStockLines = useMemo(() => {
+    return lines.some((line) => {
+      const currentStock = stockOf(balances, branchId, line.productId);
+      if (currentStock > 0) return false;
+      const product = productById(line.productId);
+      return product?.categoryId !== 'cat-03';
+    });
+  }, [lines, balances, branchId]);
 
   /**
    * Chốt hoá đơn — một dispatch duy nhất cho cả 4 bước của transaction:
@@ -115,6 +131,18 @@ export const CartPanel: FC = () => {
       message.error('Số tiền khách đưa chưa đủ để thanh toán.');
       return;
     }
+    if (hasOutOfStockLines) {
+      const outOfStockLine = lines.find((line) => {
+        const currentStock = stockOf(balances, branchId, line.productId);
+        if (currentStock > 0) return false;
+        const product = productById(line.productId);
+        return product?.categoryId !== 'cat-03';
+      });
+      message.error(
+        `Sản phẩm "${outOfStockLine?.productName}" đã hết hàng, không thể thanh toán.`,
+      );
+      return;
+    }
 
     // Thu ngân đang đăng nhập; nếu là quản lý thì lấy người trực ca tại quầy.
     const fallbackCashier = cashiersOfBranch(branchId)[0];
@@ -127,7 +155,7 @@ export const CartPanel: FC = () => {
       unitCosts[line.productId] = productById(line.productId)?.costPrice ?? 0;
     }
 
-    const sale = buildSalesOrder({
+const sale = buildSalesOrder({
       state: posState,
       cashierId,
       cashierName,
@@ -138,6 +166,51 @@ export const CartPanel: FC = () => {
     if (sale === null) return;
 
     dispatch(saleCompleted(sale));
+
+    // Persist hoá đơn xuống DB trong 1 transaction (hoa_don + chi_tiet_hoa_don).
+    void (async () => {
+      try {
+        const created = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/hoa-don/with-lines`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+            },
+            body: JSON.stringify({
+              idChiNhanh: sale.order.branchId,
+              idThuNgan: user?.idNhanVien ?? cashierId,
+              caLamViec: sale.order.shiftCode,
+              ngayBan: sale.order.soldAt,
+              hinhThucTt: sale.order.paymentMethod,
+              sdtThanhVien: sale.order.memberPhone || undefined,
+              subTotal: sale.order.subTotal,
+              giamGia: sale.order.discountTotal,
+              vatTotal: sale.order.vatTotal,
+              grandTotal: sale.order.grandTotal,
+              tienKhachDua: sale.tendered,
+              tienThoi: sale.order.changeAmount,
+              lines: sale.order.lines.map((line) => ({
+                idSanPham: line.productId,
+                soLuong: line.quantity,
+                donGia: line.unitPrice,
+                giamGiaDong: line.lineDiscount,
+                vatPhantram: line.vatPercent,
+                thanhTien: line.lineTotal,
+                donGiaVon: line.unitCost,
+              })),
+            }),
+          },
+        );
+        if (!created.ok) {
+          const err = await created.json().catch(() => null);
+          console.warn('Không lưu được hoá đơn xuống DB:', err);
+        }
+      } catch (e) {
+        console.warn('Không lưu được hoá đơn xuống DB:', e);
+      }
+    })();
   };
 
   return (
@@ -354,7 +427,7 @@ export const CartPanel: FC = () => {
           size="large"
           block
           className="cart-checkout-btn"
-          disabled={lines.length === 0 || isTenderInsufficient}
+          disabled={lines.length === 0 || isTenderInsufficient || hasOutOfStockLines}
           onClick={handleCheckout}
         >
           Thanh toán {totals.grandTotal > 0 && formatVND(totals.grandTotal)}

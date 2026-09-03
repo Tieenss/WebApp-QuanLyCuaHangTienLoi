@@ -38,7 +38,7 @@ export const CheckoutSuccessModal: FC = () => {
 
   const handlePrint = (): void => {
     try {
-      printHtml(buildReceiptHtml(order), `Hoá đơn ${order.code}`);
+      printHtml(buildReceiptHtml(order, '', '', ''), `Hoá đơn ${order.code}`);
     } catch {
       // `printHtml` ném lỗi khi trình duyệt chặn popup.
       message.error(

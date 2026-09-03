@@ -1,6 +1,5 @@
 import { useEffect, useState, type FC } from 'react';
 import {
-  Alert,
   App as AntdApp,
   Avatar,
   Button,
@@ -42,7 +41,6 @@ import {
   type ChangePasswordFormValues,
   type ProfileFormValues,
 } from '@/types';
-import { branchNameById } from '@/mockData/branches';
 import './AccountPage.css';
 
 const { Text, Paragraph } = Typography;
@@ -66,9 +64,15 @@ export const AccountPage: FC = () => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
 
-  const { user, activeBranchId, sessionPassword } = useAppSelector(
+  const { user, activeBranchId } = useAppSelector(
     (state) => state.auth,
   );
+  const branches = useAppSelector((state) => state.branch.branches);
+  const branchNameById = (id: string | null): string => {
+    if (id === null) return 'Toàn chuỗi';
+    const branch = branches.find((b) => b.id === id);
+    return branch?.name ?? 'Chi nhánh không xác định';
+  };
 
   const [profileForm] = Form.useForm<ProfileFormValues>();
   const [passwordForm] = Form.useForm<ChangePasswordFormValues>();
@@ -282,17 +286,6 @@ export const AccountPage: FC = () => {
                   ),
                   children: (
                     <>
-                      {/* Phiên khôi phục từ localStorage không giữ mật khẩu. */}
-                      {sessionPassword === null && (
-                        <Alert
-                          type="warning"
-                          showIcon
-                          className="account-alert"
-                          message="Cần đăng nhập lại"
-                          description="Phiên hiện tại được khôi phục từ lần đăng nhập trước nên hệ thống không xác thực được mật khẩu cũ. Vui lòng đăng xuất và đăng nhập lại để đổi mật khẩu."
-                        />
-                      )}
-
                       <Form<ChangePasswordFormValues>
                         form={passwordForm}
                         layout="vertical"
@@ -314,8 +307,7 @@ export const AccountPage: FC = () => {
                                   // chỗ người dùng cần sửa.
                                   validator: (_rule, value: string) =>
                                     value === undefined ||
-                                    value === '' ||
-                                    value === sessionPassword
+                                    value === ''
                                       ? Promise.resolve()
                                       : Promise.reject(
                                           new Error('Mật khẩu hiện tại không đúng.'),
@@ -349,7 +341,7 @@ export const AccountPage: FC = () => {
                                 },
                                 {
                                   validator: (_rule, value: string) =>
-                                    value === undefined || value !== sessionPassword
+                                    value === undefined || value !== ''
                                       ? Promise.resolve()
                                       : Promise.reject(
                                           new Error(
@@ -404,7 +396,7 @@ export const AccountPage: FC = () => {
                             type="primary"
                             htmlType="submit"
                             icon={<SaveOutlined />}
-                            disabled={sessionPassword === null}
+                            disabled={false}
                           >
                             Đổi mật khẩu
                           </Button>

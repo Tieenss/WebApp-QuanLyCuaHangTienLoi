@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
+import attendanceReducer from './slices/attendanceSlice';
 import uiReducer from './slices/uiSlice';
 import posReducer from './slices/posSlice';
 import inventoryReducer from './slices/inventorySlice';
@@ -8,10 +9,18 @@ import payrollReducer from './slices/payrollSlice';
 import stockReducer from './slices/stockSlice';
 import cashbookReducer from './slices/cashbookSlice';
 import purchaseReducer from './slices/purchaseSlice';
+import branchReducer from './slices/branchSlice';
+import productReducer from './slices/productSlice';
+import transferReducer from './slices/transferSlice';
+import employeeReducer from './slices/employeeSlice';
+import categoryReducer from './slices/categorySlice';
+import salesOrderReducer from './slices/salesOrderSlice';
+import { cashbookPersistence } from './cashbookPersistence';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    attendance: attendanceReducer,
     ui: uiReducer,
     pos: posReducer,
     // `inventory` giữ bộ lọc UI của trang Kho; `stock` giữ dữ liệu tồn kho thật.
@@ -21,7 +30,15 @@ export const store = configureStore({
     payroll: payrollReducer,
     cashbook: cashbookReducer,
     purchase: purchaseReducer,
+    transfer: transferReducer,
+    employee: employeeReducer,
+    branch: branchReducer,
+    product: productReducer,
+    category: categoryReducer,
+    salesOrder: salesOrderReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().prepend(cashbookPersistence.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

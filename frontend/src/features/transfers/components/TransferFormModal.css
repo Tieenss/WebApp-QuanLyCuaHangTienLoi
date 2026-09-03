@@ -1,0 +1,63 @@
+/*
+ * TransferFormModal.css — form lập phiếu xuất kho nội bộ
+ * (features/transfers/components/TransferFormModal).
+ */
+
+/* Alert tuyến luân chuyển và alert cảnh báo thiếu tồn. */
+.transfer-alert {
+  margin-bottom: 18px;
+}
+
+/* Mũi tên giữa kho xuất và kho nhận trong tiêu đề alert. */
+.transfer-route-arrow {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+/* Hàng chứa ô chọn cửa hàng nhận và ngày xuất. */
+.transfer-head-fields {
+  width: 100%;
+}
+
+/* Ô chọn cửa hàng cần rộng vì tên có cả mã chi nhánh. */
+.transfer-field-branch {
+  min-width: 400px;
+}
+
+.transfer-field-branch .ant-select {
+  width: 100%;
+}
+
+/* ── Bảng dòng hàng ──────────────────────────────────────────────── */
+.transfer-line-table {
+  margin-bottom: 12px;
+}
+
+.transfer-line-product,
+.transfer-line-input {
+  width: 100%;
+}
+
+/* Tồn Kho Tổng đang dưới ngưỡng tối thiểu — nhắc cân nhắc trước khi xuất. */
+.transfer-stock-low {
+  color: #f59e0b;
+}
+
+.transfer-add-row {
+  margin-bottom: 18px;
+}
+
+/* ── Khối tổng kết ───────────────────────────────────────────────── */
+.transfer-totals {
+  margin-bottom: 12px;
+}
+
+.transfer-grand-total {
+  color: #e31837;
+  font-size: 15px;
+}
+
+.transfer-foot-note {
+  margin: 0;
+  font-size: 12px;
+}

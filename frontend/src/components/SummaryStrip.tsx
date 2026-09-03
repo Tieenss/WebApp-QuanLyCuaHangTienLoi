@@ -1,6 +1,7 @@
 import type { FC } from 'react';
-import { Card, Col, Row, Statistic } from 'antd';
+import { Card, Statistic } from 'antd';
 import { BRAND } from '@/config/brand';
+import './SummaryStrip.css';
 
 /** Một ô số liệu tóm tắt. */
 export interface SummaryItem {
@@ -15,7 +16,10 @@ export interface SummaryItem {
 
 interface SummaryStripProps {
   items: SummaryItem[];
-  /** Số cột trên màn hình lớn; mặc định chia đều theo số item. */
+  /**
+   * Số cột cố định trên màn hình lớn; bỏ trống thì flexbox tự co giãn đều
+   * theo số item (xem CSS).
+   */
   columns?: number;
 }
 
@@ -26,26 +30,26 @@ interface SummaryStripProps {
  * hiện tại — phù hợp cho tổng công nợ, tổng giá trị tồn, số phiếu chờ duyệt.
  */
 export const SummaryStrip: FC<SummaryStripProps> = ({ items, columns }) => {
-  const span = Math.max(4, Math.floor(24 / (columns ?? (items.length || 1))));
-
+  const style =
+    columns !== undefined && columns > 0
+      ? ({ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } as const)
+      : undefined;
   return (
-    <Row gutter={[16, 16]}>
+    <div className="summary-strip" style={style}>
       {items.map((item) => (
-        <Col xs={12} sm={12} md={8} xl={span} key={item.key}>
-          <Card styles={{ body: { padding: '16px 18px' } }}>
-            <Statistic
-              title={item.title}
-              value={item.value}
-              suffix={item.suffix}
-              valueStyle={{
-                color: item.color ?? BRAND.textHeading,
-                fontSize: 22,
-                fontWeight: 700,
-              }}
-            />
-          </Card>
-        </Col>
+        <Card key={item.key} styles={{ body: { padding: '16px 18px' } }}>
+          <Statistic
+            title={item.title}
+            value={item.value}
+            suffix={item.suffix}
+            valueStyle={{
+              color: item.color ?? BRAND.textHeading,
+              fontSize: 22,
+              fontWeight: 700,
+            }}
+          />
+        </Card>
       ))}
-    </Row>
+    </div>
   );
 };

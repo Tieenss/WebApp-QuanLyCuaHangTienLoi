@@ -1,4 +1,4 @@
-import { useMemo, type FC } from 'react';
+import { useEffect, useMemo, type FC } from 'react';
 import {
   App as AntdApp,
   Button,
@@ -23,7 +23,8 @@ import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  deleteSupplier,
+  deleteSupplierThunk,
+  fetchSuppliers,
   setCategoryFilter,
   setModalOpen,
   setSearchQuery,
@@ -31,7 +32,6 @@ import {
   setStatusFilter,
 } from '@/store/slices/supplierSlice';
 import type { Supplier } from '@/types';
-import { mockProducts } from '@/mockData/products';
 import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
@@ -54,9 +54,14 @@ export const SuppliersPage: FC = () => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
 
-  const { suppliers, searchQuery, categoryFilter, statusFilter } = useAppSelector(
+  const { suppliers, searchQuery, categoryFilter, statusFilter, loading } = useAppSelector(
     (state) => state.supplier,
   );
+  const products = useAppSelector((state) => state.product.products);
+
+  useEffect(() => {
+    dispatch(fetchSuppliers());
+  }, [dispatch]);
 
   const filtered = useMemo(
     () =>
@@ -79,11 +84,11 @@ export const SuppliersPage: FC = () => {
   /** Số SKU mỗi nhà cung cấp đang cung ứng. */
   const skuCountMap = useMemo(() => {
     const map = new Map<string, number>();
-    for (const product of mockProducts) {
+    for (const product of products) {
       map.set(product.supplierId, (map.get(product.supplierId) ?? 0) + 1);
     }
     return map;
-  }, []);
+  }, [products]);
 
   const summary = useMemo<SummaryItem[]>(() => {
     const active = suppliers.filter((supplier) => supplier.status === 'Active');
@@ -159,7 +164,7 @@ export const SuppliersPage: FC = () => {
   };
 
   const handleDelete = (supplier: Supplier): void => {
-    dispatch(deleteSupplier(supplier.id));
+    dispatch(deleteSupplierThunk(supplier.id));
     message.success(`Đã xoá nhà cung cấp "${supplier.name}".`);
   };
 
@@ -363,6 +368,7 @@ export const SuppliersPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
+          loading={loading}
           scroll={{ x: 1800 }}
           pagination={{
             pageSize: 10,

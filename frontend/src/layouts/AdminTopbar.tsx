@@ -21,7 +21,6 @@ import {
   ShopOutlined,
   ShoppingCartOutlined,
   SwapOutlined,
-  UserSwitchOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getLandingPath } from '@/config/modules';
@@ -37,10 +36,8 @@ import {
   SYSTEM_WIDE_ROLES,
   USER_ROLE,
   USER_ROLE_LABEL,
-  USER_ROLES,
   type UserRole,
 } from '@/types';
-import { mockBranches } from '@/mockData/branches';
 import { lowStockBalances } from '@/store/slices/stockSlice';
 import './AdminTopbar.css';
 
@@ -62,6 +59,7 @@ export const AdminTopbar: FC = () => {
 
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
   const { isSidebarCollapsed, globalSearch } = useAppSelector((state) => state.ui);
+  const branches = useAppSelector((state) => state.branch.branches);
 
   const role: UserRole = user?.role ?? USER_ROLE.Cashier;
   /** Admin và Kế toán xem số liệu tổng hợp nên được chọn "Toàn chuỗi". */
@@ -75,10 +73,10 @@ export const AdminTopbar: FC = () => {
     const allowed = user?.allowedBranchIds ?? [];
     const selectable =
       isSystemWide || allowed.length === 0
-        ? mockBranches
-        : mockBranches.filter((branch) => allowed.includes(branch.id));
+        ? branches
+        : branches.filter((branch: { id: string }) => allowed.includes(branch.id));
 
-    const options = selectable.map((branch) => ({
+    const options = selectable.map((branch: { id: string; code: string; name: string }) => ({
       value: branch.id,
       label: `${branch.code} — ${branch.name}`,
     }));
@@ -86,7 +84,7 @@ export const AdminTopbar: FC = () => {
     return isSystemWide
       ? [{ value: ALL_BRANCHES, label: 'Toàn chuỗi (tất cả chi nhánh)' }, ...options]
       : options;
-  }, [isSystemWide, user?.allowedBranchIds]);
+  }, [isSystemWide, user?.allowedBranchIds, branches]);
 
   /** Số mặt hàng dưới ngưỡng tồn tối thiểu — dùng làm badge thông báo. */
   const balances = useAppSelector((state) => state.stock.balances);
@@ -95,7 +93,7 @@ export const AdminTopbar: FC = () => {
     [balances, activeBranchId],
   );
 
-  /** Menu tài khoản: hồ sơ, đổi mật khẩu, đổi vai trò nhanh (demo), đăng xuất. */
+  /** Menu tài khoản: hồ sơ, đổi mật khẩu, đăng xuất. */
   const userMenuItems: MenuProps['items'] = [
     {
       key: 'account-profile',
@@ -106,18 +104,6 @@ export const AdminTopbar: FC = () => {
       key: 'account-password',
       icon: <LockOutlined />,
       label: 'Đổi mật khẩu',
-    },
-    { type: 'divider' },
-    {
-      key: 'role-group',
-      type: 'group',
-      label: 'Chuyển đổi vai trò (demo)',
-      children: USER_ROLES.map((item) => ({
-        key: `role-${item}`,
-        icon: <UserSwitchOutlined />,
-        label: USER_ROLE_LABEL[item],
-        disabled: item === role,
-      })),
     },
     { type: 'divider' },
     {

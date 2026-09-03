@@ -1,16 +1,18 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import { Button, Card, DatePicker, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
   BankOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { BRAND } from '@/config/brand';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchCashbook } from '@/store/slices/cashbookSlice';
 import {
   CASH_CATEGORY,
   CASH_CATEGORY_LABEL,
@@ -21,13 +23,13 @@ import {
   USER_ROLE,
   type CashEntry,
   type CashFlowDirection,
+  type CashBookSummary,
 } from '@/types';
-import { mockBranches } from '@/mockData/branches';
-import { summarizeCashBook } from '@/mockData/cashbook';
 import { dayjs, formatDate, lastNDays } from '@/utils/dateUtils';
 import { formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { CapitalInjectionModal } from './components/CapitalInjectionModal';
+import { ManualEntryModal } from './components/ManualEntryModal';
 import './CashbookPage.css';
 
 const { Text } = Typography;
@@ -43,13 +45,19 @@ const { RangePicker } = DatePicker;
  * Admin lập tay phiếu cấp vốn.
  */
 export const CashbookPage: FC = () => {
+  const dispatch = useAppDispatch();
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
-  /** Sổ quỹ hiện hành — có cả phiếu vừa sinh từ bán hàng và duyệt lương. */
   const allEntries = useAppSelector((state) => state.cashbook.entries);
 
-  /** Chỉ Admin được cấp vốn (ma trận phân quyền, dòng "Cấp vốn"). */
+  // Nạp sổ quỹ từ backend khi vào trang.
+  useEffect(() => {
+    void dispatch(fetchCashbook());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const canInjectCapital = user?.role === USER_ROLE.Admin;
   const [isCapitalModalOpen, setCapitalModalOpen] = useState(false);
+  const [isManualModalOpen, setManualModalOpen] = useState(false);
 
   const [search, setSearch] = useState('');
   const [directionFilter, setDirectionFilter] = useState<string | null>(null);
@@ -71,7 +79,10 @@ export const CashbookPage: FC = () => {
         const matchCategory =
           categoryFilter === null || entry.category === categoryFilter;
         const matchBranch =
-          branchFilter === null || entry.branchId === branchFilter;
+          branchFilter === null ||
+          entry.branchId === branchFilter ||
+          // Phiếu không gắn chi nhánh (vốn, OPENING) hiển thị ở mọi filter.
+          entry.branchId === null;
         const matchRange =
           entry.entryDate >= range.from && entry.entryDate <= range.to;
         return (
@@ -81,7 +92,28 @@ export const CashbookPage: FC = () => {
     [allEntries, search, directionFilter, categoryFilter, branchFilter, range],
   );
 
-  /** Tổng hợp trên tập phiếu đang lọc, không phải toàn bộ sổ. */
+  const summarizeCashBook = (entries: CashEntry[]): CashBookSummary => {
+    const totalReceipt = entries
+      .filter((e) => e.direction === CASH_FLOW_DIRECTION.Receipt)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const totalPayment = entries
+      .filter((e) => e.direction === CASH_FLOW_DIRECTION.Payment)
+      .reduce((sum, e) => sum + e.amount, 0);
+    const lastEntry = entries[0];
+    return {
+      openingBalance: 50_000_000,
+      totalReceipt,
+      totalPayment,
+      closingBalance: lastEntry?.runningBalance ?? 50_000_000,
+      cashOnHand: entries
+        .filter((e) => e.paymentMethod === PAYMENT_METHOD.Cash)
+        .reduce((sum, e) => sum + (e.direction === CASH_FLOW_DIRECTION.Receipt ? e.amount : -e.amount), 0),
+      bankBalance: entries
+        .filter((e) => e.paymentMethod !== PAYMENT_METHOD.Cash)
+        .reduce((sum, e) => sum + (e.direction === CASH_FLOW_DIRECTION.Receipt ? e.amount : -e.amount), 0),
+    };
+  };
+
   const bookSummary = useMemo(() => summarizeCashBook(filtered), [filtered]);
 
   const summary = useMemo<SummaryItem[]>(
@@ -123,6 +155,7 @@ export const CashbookPage: FC = () => {
     [bookSummary],
   );
 
+  const branches = useAppSelector((state) => state.branch.branches);
   const filters: ToolbarFilter[] = [
     {
       key: 'direction',
@@ -150,7 +183,7 @@ export const CashbookPage: FC = () => {
       placeholder: 'Chi nhánh',
       value: branchFilter,
       onChange: setBranchFilter,
-      options: mockBranches.map((branch) => ({
+      options: branches.map((branch) => ({
         value: branch.id,
         label: branch.name,
       })),
@@ -304,22 +337,12 @@ export const CashbookPage: FC = () => {
         description="Theo dõi dòng tiền mặt và chuyển khoản tại cửa hàng cùng tổng công ty."
         extra={
           <Space wrap>
-            <RangePicker
-              value={[dayjs(range.from), dayjs(range.to)]}
-              format="DD/MM/YYYY"
-              allowClear={false}
-              onChange={(values) => {
-                // `allowClear={false}` nên values luôn có 2 phần tử hợp lệ.
-                if (values === null) return;
-                const [from, to] = values;
-                if (from === null || to === null) return;
-                setRange({
-                  from: from.format('YYYY-MM-DD'),
-                  to: to.format('YYYY-MM-DD'),
-                });
-              }}
-            />
-
+            <Button
+              icon={<PlusOutlined />}
+              onClick={() => setManualModalOpen(true)}
+            >
+              Thêm phiếu
+            </Button>
             {canInjectCapital && (
               <Button
                 type="primary"
@@ -329,6 +352,20 @@ export const CashbookPage: FC = () => {
                 Cấp vốn
               </Button>
             )}
+            <RangePicker
+              value={[dayjs(range.from), dayjs(range.to)]}
+              format="DD/MM/YYYY"
+              allowClear={false}
+              onChange={(values) => {
+                if (values === null) return;
+                const [from, to] = values;
+                if (from === null || to === null) return;
+                setRange({
+                  from: from.format('YYYY-MM-DD'),
+                  to: to.format('YYYY-MM-DD'),
+                });
+              }}
+            />
           </Space>
         }
       />
@@ -369,6 +406,10 @@ export const CashbookPage: FC = () => {
       <CapitalInjectionModal
         open={isCapitalModalOpen}
         onClose={() => setCapitalModalOpen(false)}
+      />
+      <ManualEntryModal
+        open={isManualModalOpen}
+        onClose={() => setManualModalOpen(false)}
       />
     </>
   );

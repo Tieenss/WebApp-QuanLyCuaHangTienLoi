@@ -1,6 +1,6 @@
 import type { CSSProperties, FC } from 'react';
-import { categoryById } from '@/mockData/categories';
 import { BRAND } from '@/config/brand';
+import { useAppSelector } from '@/store/hooks';
 import './ProductThumb.css';
 
 interface ProductThumbProps {
@@ -12,26 +12,34 @@ interface ProductThumbProps {
   productName?: string;
 }
 
-/**
- * Ảnh đại diện sản phẩm.
- *
- * MVP không host ảnh sản phẩm nên mặc định render emoji + màu của danh mục.
- * Cách này giữ lưới POS hiển thị tức thì và không phụ thuộc mạng ngoài; khi có
- * ảnh thật chỉ cần truyền `imageUrl` là component tự đổi.
- */
+const FALLBACK = { name: 'Sản phẩm', icon: '📦', color: BRAND.textSecondary };
+
 export const ProductThumb: FC<ProductThumbProps> = ({
   categoryId,
   size = 44,
   imageUrl,
   productName,
 }) => {
-  const category = categoryById(categoryId);
-  const color = category?.color ?? BRAND.textSecondary;
+  // Lấy category thật từ Redux (load từ DB)
+  const categories = useAppSelector((state) => state.category.categories);
+  const categoryFromDb = categories.find((c) => c.id === categoryId);
+  const categoryImageUrl = (categoryFromDb as any)?.imageUrl || '';
+  const category = categoryFromDb
+    ? {
+        name: categoryFromDb.name,
+        icon: (categoryFromDb as any).iconEmoji || (categoryFromDb as any).icon || FALLBACK.icon,
+        color: (categoryFromDb as any).colorHex || (categoryFromDb as any).color || FALLBACK.color,
+      }
+    : FALLBACK;
+  const color = category.color ?? FALLBACK.color;
 
-  if (imageUrl !== undefined && imageUrl !== '') {
+  // Ưu tiên: imageUrl truyền vào > imageUrl của danh mục > icon emoji
+  const finalImageUrl = imageUrl || categoryImageUrl;
+
+  if (finalImageUrl !== undefined && finalImageUrl !== '') {
     return (
       <img
-        src={imageUrl}
+        src={finalImageUrl}
         alt={productName ?? 'Sản phẩm'}
         width={size}
         height={size}
@@ -52,7 +60,7 @@ export const ProductThumb: FC<ProductThumbProps> = ({
         } as CSSProperties
       }
     >
-      {category?.icon ?? '📦'}
+      {category?.icon ?? FALLBACK.icon}
     </div>
   );
 };

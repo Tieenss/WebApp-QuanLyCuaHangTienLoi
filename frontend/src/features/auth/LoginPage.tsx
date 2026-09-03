@@ -1,60 +1,34 @@
-import { useEffect, useState, type FC } from 'react';
+import { useEffect, type FC } from 'react';
 import {
   Alert,
   Button,
-  Card,
-  Checkbox,
-  Divider,
   Form,
   Input,
-  Space,
-  Tag,
+  Checkbox,
   Typography,
 } from 'antd';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { APP_FULL_NAME } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { clearAuthError, loginSucceeded } from '@/store/slices/authSlice';
-import { USER_ROLE_DESCRIPTION, USER_ROLE_LABEL, type LoginFormValues } from '@/types';
-import { mockAccounts } from '@/mockData/accounts';
+import { clearAuthError, loginAsync } from '@/store/slices/authSlice';
+import type { LoginFormValues } from '@/types';
 import './LoginPage.css';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Paragraph } = Typography;
 
-/**
- * Module 0 — Trang Đăng nhập.
- *
- * Chỉ chứa phần form; khung 2 cột và panel thương hiệu do `AuthLayout` dựng,
- * việc chặn người đã đăng nhập cũng nằm ở layout đó.
- *
- * Có sẵn 3 tài khoản demo tương ứng 3 vai trò; bấm vào là tự điền form để
- * người xem thử được phân quyền ngay mà không cần tra tài liệu.
- */
 export const LoginPage: FC = () => {
   const [form] = Form.useForm<LoginFormValues>();
   const dispatch = useAppDispatch();
 
   const error = useAppSelector((state) => state.auth.error);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmitting = useAppSelector((state) => state.auth.isSubmitting);
 
-  // Xoá lỗi cũ khi mở lại trang để không hiện thông báo của lần trước.
   useEffect(() => {
     dispatch(clearAuthError());
   }, [dispatch]);
 
   const handleSubmit = (values: LoginFormValues): void => {
-    setIsSubmitting(true);
-    // Giả lập độ trễ mạng để trạng thái loading của nút hiển thị rõ.
-    window.setTimeout(() => {
-      dispatch(loginSucceeded(values));
-      setIsSubmitting(false);
-    }, 450);
-  };
-
-  /** Điền nhanh thông tin một tài khoản demo vào form. */
-  const fillDemoAccount = (username: string, password: string): void => {
-    form.setFieldsValue({ username, password, remember: true });
-    dispatch(clearAuthError());
+    dispatch(loginAsync(values));
   };
 
   return (
@@ -92,7 +66,7 @@ export const LoginPage: FC = () => {
         >
           <Input
             prefix={<UserOutlined className="login-input-icon" />}
-            placeholder="admin / manager / cashier"
+            placeholder="Nhập tên đăng nhập"
             autoComplete="username"
           />
         </Form.Item>
@@ -124,44 +98,6 @@ export const LoginPage: FC = () => {
           Đăng nhập
         </Button>
       </Form>
-
-      <Divider plain className="login-divider">
-        <Text type="secondary" className="login-divider-text">
-          Tài khoản trải nghiệm theo vai trò
-        </Text>
-      </Divider>
-
-      <Space direction="vertical" size={8} className="login-demo-list">
-        {mockAccounts.map((account) => (
-          <button
-            type="button"
-            key={account.id}
-            className="demo-account-row"
-            onClick={() => fillDemoAccount(account.username, account.password)}
-          >
-            <span className="demo-account-info">
-              <Text strong className="demo-account-role">
-                {USER_ROLE_LABEL[account.role]}
-              </Text>
-              <Text type="secondary" className="demo-account-desc">
-                {USER_ROLE_DESCRIPTION[account.role]}
-              </Text>
-            </span>
-            <Tag color="red" className="demo-account-tag">
-              {account.username}
-            </Tag>
-          </button>
-        ))}
-      </Space>
-
-      <Card size="small" className="login-hint-card">
-        <Text type="secondary" className="login-hint-text">
-          Mật khẩu dùng chung cho cả 3 tài khoản demo:{' '}
-          <Text code copyable>
-            circlek@123
-          </Text>
-        </Text>
-      </Card>
     </div>
   );
 };

@@ -1,12 +1,33 @@
-import { useMemo, useState, type FC } from 'react';
-import { Avatar, Card, Space, Table, Tag, Typography } from 'antd';
+import { useEffect, useMemo, useState, type FC } from 'react';
+import {
+  Avatar,
+  Button,
+  Card,
+  Popconfirm,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+} from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { RecordStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  deleteEmployeeThunk,
+  fetchEmployees,
+  setEmployeeModalOpen,
+  setSelectedEmployee,
+} from '@/store/slices/employeeSlice';
+import { fetchBranches } from '@/store/slices/branchSlice';
 import {
   EMPLOYMENT_TYPE,
   EMPLOYMENT_TYPE_LABEL,
@@ -18,42 +39,47 @@ import {
   type Employee,
   type ShiftCode,
 } from '@/types';
-import { mockEmployees } from '@/mockData/employees';
-import { mockBranches } from '@/mockData/branches';
 import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
+import { EmployeeFormModal } from './components/EmployeeFormModal';
 import './EmployeesPage.css';
 
 const { Text } = Typography;
 
-/** Màu tag theo ca làm việc — ca đêm dùng màu tối để dễ phân biệt. */
 const SHIFT_COLOR: Record<ShiftCode, string> = {
   MORNING: 'gold',
   AFTERNOON: 'orange',
   NIGHT: 'geekblue',
 };
 
-/**
- * Module 4 — Quản lý Nhân viên.
- *
- * Quản lý chi nhánh chỉ thấy nhân sự thuộc các chi nhánh được phân công;
- * Admin chuỗi thấy toàn bộ.
- */
 export const EmployeesPage: FC = () => {
+  const dispatch = useAppDispatch();
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
+  const { employees, loading } = useAppSelector((state) => state.employee);
+  const branchesState = useAppSelector((state) => state.branch.branches);
+
+  useEffect(() => {
+    dispatch(fetchEmployees());
+    if (branchesState.length === 0) {
+      dispatch(fetchBranches());
+    }
+  }, [dispatch, branchesState.length]);
 
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState<string | null>(activeBranchId);
   const [shiftFilter, setShiftFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
 
-  /** Giới hạn theo quyền trước khi áp bộ lọc của người dùng. */
   const scoped = useMemo(() => {
     const allowed = user?.allowedBranchIds ?? [];
-    if (allowed.length === 0) return mockEmployees;
-    return mockEmployees.filter((employee) => allowed.includes(employee.branchId));
-  }, [user?.allowedBranchIds]);
+    const enriched = employees.map((emp) => ({
+      ...emp,
+      branchName: emp.branchName || branchesState.find((b) => b.id === emp.branchId)?.name || '',
+    }));
+    if (allowed.length === 0) return enriched;
+    return enriched.filter((employee) => allowed.includes(employee.branchId));
+  }, [user?.allowedBranchIds, employees, branchesState]);
 
   const filtered = useMemo(
     () =>
@@ -86,7 +112,6 @@ export const EmployeesPage: FC = () => {
     );
     const monthlyCost = active.reduce(
       (sum, employee) =>
-        // Part-time quy đổi 8 giờ/ca × 22 ca/tháng để ước tính chi phí.
         sum + (employee.baseSalary > 0 ? employee.baseSalary : employee.hourlyWage * 8 * 22),
       0,
     );
@@ -122,13 +147,14 @@ export const EmployeesPage: FC = () => {
   }, [scoped]);
 
   const branchOptions = useMemo(() => {
+    const branches = branchesState;
     const allowed = user?.allowedBranchIds ?? [];
     const list =
       allowed.length === 0
-        ? mockBranches
-        : mockBranches.filter((branch) => allowed.includes(branch.id));
+        ? branches
+        : branches.filter((branch) => allowed.includes(branch.id));
     return list.map((branch) => ({ value: branch.id, label: branch.name }));
-  }, [user?.allowedBranchIds]);
+  }, [branchesState, user?.allowedBranchIds]);
 
   const filters: ToolbarFilter[] = [
     {
@@ -160,6 +186,20 @@ export const EmployeesPage: FC = () => {
       })),
     },
   ];
+
+  const handleEdit = (employee: Employee): void => {
+    dispatch(setSelectedEmployee(employee));
+    dispatch(setEmployeeModalOpen(true));
+  };
+
+  const handleAdd = (): void => {
+    dispatch(setSelectedEmployee(null));
+    dispatch(setEmployeeModalOpen(true));
+  };
+
+  const handleDelete = (id: string): void => {
+    dispatch(deleteEmployeeThunk(id));
+  };
 
   const columns: ColumnsType<Employee> = [
     {
@@ -273,6 +313,32 @@ export const EmployeesPage: FC = () => {
       fixed: 'right',
       render: (status: Employee['status']) => <RecordStatusTag status={status} />,
     },
+    {
+      title: '',
+      key: 'actions',
+      align: 'center',
+      width: 90,
+      fixed: 'right',
+      render: (_, row) => (
+        <Space size={0}>
+          <Button
+            type="text"
+            icon={<EditOutlined className="action-edit-icon" />}
+            onClick={() => handleEdit(row)}
+          />
+          <Popconfirm
+            title="Xoá nhân viên?"
+            description={`Xoá "${row.fullName}" khỏi danh sách?`}
+            okText="Xoá"
+            cancelText="Huỷ"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete(row.id)}
+          >
+            <Button type="text" icon={<DeleteOutlined className="action-delete-icon" />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
 
   const handleExport = (): void => {
@@ -306,9 +372,14 @@ export const EmployeesPage: FC = () => {
         title="Quản lý nhân viên"
         description="Danh sách nhân sự, ca làm việc được phân công, chi nhánh và vai trò hệ thống."
         extra={
-          <Tag color="red" className="tag-no-margin">
-            {filtered.length} / {scoped.length} nhân sự
-          </Tag>
+          <Space wrap>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              Thêm nhân viên
+            </Button>
+            <Tag color="red" className="tag-no-margin">
+              {filtered.length} / {scoped.length} nhân sự
+            </Tag>
+          </Space>
         }
       />
 
@@ -334,6 +405,7 @@ export const EmployeesPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
+          loading={loading}
           scroll={{ x: 1700 }}
           pagination={{
             pageSize: 12,
@@ -342,6 +414,8 @@ export const EmployeesPage: FC = () => {
           }}
         />
       </Card>
+
+      <EmployeeFormModal />
     </>
   );
 };

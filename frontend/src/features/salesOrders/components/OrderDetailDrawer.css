@@ -1,0 +1,118 @@
+/*
+ * OrderDetailDrawer — style cho drawer chi tiết hoá đơn.
+ *
+ * Bố cục chia 4 khối (tóm tắt, metadata, bảng hàng, tổng tiền), tone màu
+ * đỏ thương hiệu ở các con số tổng để tạo điểm nhấn thị giác.
+ */
+
+.order-detail-drawer .ant-drawer-body {
+  padding: 18px 24px;
+}
+
+/* ── Khối 1: Tóm tắt ────────────────────────────────────────────── */
+
+.odd-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fff1f3 0%, #ffffff 100%);
+  border: 1px solid #f5c2cb;
+}
+
+.odd-label {
+  font-size: 12px;
+  display: block;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.odd-grand-total {
+  font-size: 26px;
+  font-weight: 700;
+  color: #e31837;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.odd-summary-right {
+  text-align: right;
+}
+
+.odd-payment {
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
+/* ── Khối 2: Metadata ───────────────────────────────────────────── */
+
+.odd-descriptions .ant-descriptions-item-label {
+  width: 120px;
+  background: #f9fafb;
+  font-weight: 500;
+}
+
+/* ── Khối 3: Bảng sản phẩm ──────────────────────────────────────── */
+
+.odd-section-title {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.odd-line-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.odd-line-unit {
+  font-size: 11.5px;
+}
+
+.odd-line-discount {
+  font-size: 12px;
+}
+
+.odd-line-table .ant-table-thead > tr > th {
+  background: #f9fafb;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ── Khối 4: Tổng kết tiền ──────────────────────────────────────── */
+
+.odd-totals {
+  padding: 16px 20px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.odd-totals-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.odd-totals-grand {
+  border-top: 1px dashed #9ca3af;
+  margin-top: 6px;
+  padding-top: 10px;
+}
+
+.odd-grand-total-cell {
+  font-size: 17px;
+  color: #e31837;
+}
+
+.odd-totals-cash {
+  font-size: 13px;
+}
+
+.odd-change {
+  color: #10b981;
+}

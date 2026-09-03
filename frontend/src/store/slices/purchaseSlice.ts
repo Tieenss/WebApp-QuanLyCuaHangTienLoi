@@ -1,14 +1,11 @@
-import { createAction, createSlice } from '@reduxjs/toolkit';
+import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   DOCUMENT_STATUS,
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '@/types';
-import { mockPurchaseOrders } from '@/mockData/warehouseDocuments';
-import { DISTRIBUTION_CENTER_ID, branchNameById } from '@/mockData/branches';
-import { productById } from '@/mockData/products';
-import { supplierNameById } from '@/mockData/suppliers';
+import { phieuNhapApi, type PhieuNhapDTO } from '@/api/phieuNhap';
 
 /**
  * Module 8 — Nhập kho từ nhà cung cấp (dữ liệu ghi được).
@@ -30,11 +27,47 @@ import { supplierNameById } from '@/mockData/suppliers';
 
 export interface PurchaseState {
   orders: PurchaseOrder[];
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: PurchaseState = {
-  orders: mockPurchaseOrders,
+  orders: [],
+  loading: false,
+  error: null,
 };
+
+const mapDtoToOrder = (dto: PhieuNhapDTO): PurchaseOrder => ({
+  id: dto.id,
+  code: dto.maPhieu,
+  supplierId: dto.idNcc || '',
+  supplierName: '',
+  branchId: dto.idChiNhanh || '',
+  branchName: '',
+  orderDate: dto.ngayDatHang || '',
+  expectedDate: dto.ngayDuKienGiao || null,
+  receivedDate: dto.ngayNhanThucTe || null,
+  status: (dto.trangThai as any) || 'PENDING',
+  subTotal: dto.subTotal || 0,
+  vatTotal: dto.vatTotal || 0,
+  discount: dto.giamGia || 0,
+  grandTotal: dto.grandTotal || 0,
+  paidAmount: dto.daThanhToan || 0,
+  debtAmount: dto.congNo || 0,
+  note: dto.ghiChu || '',
+  createdAt: dto.ngayTao || '',
+  createdBy: '',
+  idNguoiNhap: dto.idNguoiNhap || '',
+  lines: [],
+});
+
+export const fetchPurchaseOrders = createAsyncThunk(
+  'purchase/fetchAll',
+  async () => {
+    const data = await phieuNhapApi.getAll();
+    return data.map(mapDtoToOrder);
+  },
+);
 
 /** Một dòng hàng người dùng nhập trên form. */
 export interface PurchaseDraftLine {
@@ -62,39 +95,30 @@ export const purchaseReceived = createAction<{
  */
 export const buildPurchaseOrder = (input: {
   supplierId: string;
+  supplierName: string;
   lines: PurchaseDraftLine[];
   orderDate: string;
   note: string;
   createdBy: string;
-  /** Số phiếu đã có, dùng để sinh mã tiếp theo. */
   existingCount: number;
 }): PurchaseOrder | null => {
   const lines: PurchaseOrderLine[] = [];
 
   input.lines.forEach((draft, index) => {
-    const product = productById(draft.productId);
-    if (!product || draft.quantity <= 0) return;
+    if (draft.quantity <= 0) return;
 
     lines.push({
       id: `pol-live-${input.existingCount}-${index}`,
-      productId: product.id,
-      sku: product.sku,
-      productName: product.name,
-      unit: product.unit,
+      productId: draft.productId,
+      sku: '',
+      productName: '',
+      unit: '',
       orderedQuantity: draft.quantity,
       receivedQuantity: draft.quantity,
       unitCost: draft.unitCost,
-      vatPercent: product.vatPercent,
+      vatPercent: 0,
       lineTotal: draft.quantity * draft.unitCost,
-      expiryDate: product.isPerishable
-        ? // Hạn dùng tính từ ngày nhập theo `shelfLifeDays` của sản phẩm.
-          new Date(
-            new Date(input.orderDate).getTime() +
-              product.shelfLifeDays * 24 * 60 * 60 * 1000,
-          )
-            .toISOString()
-            .slice(0, 10)
-        : null,
+      expiryDate: null,
     });
   });
 
@@ -112,13 +136,11 @@ export const buildPurchaseOrder = (input: {
       input.existingCount + 1,
     ).padStart(3, '0')}`,
     supplierId: input.supplierId,
-    supplierName: supplierNameById(input.supplierId),
-    // BR-05: luôn là Kho Tổng.
-    branchId: DISTRIBUTION_CENTER_ID,
-    branchName: branchNameById(DISTRIBUTION_CENTER_ID),
+    supplierName: input.supplierName,
+    branchId: '',
+    branchName: '',
     orderDate: input.orderDate,
     expectedDate: input.orderDate,
-    // Hàng đã vào kho ngay khi lập phiếu.
     receivedDate: input.orderDate,
     status: DOCUMENT_STATUS.Completed,
     lines,
@@ -126,7 +148,6 @@ export const buildPurchaseOrder = (input: {
     vatTotal,
     discount: 0,
     grandTotal,
-    // Thanh toán ngay khi nhập, không theo dõi công nợ.
     paidAmount: grandTotal,
     createdBy: input.createdBy,
     note: input.note,
@@ -149,6 +170,19 @@ export const purchaseSlice = createSlice({
   },
 
   extraReducers: (builder) => {
+    builder
+      .addCase(fetchPurchaseOrders.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPurchaseOrders.fulfilled, (state, action) => {
+        state.loading = false;
+        state.orders = action.payload;
+      })
+      .addCase(fetchPurchaseOrders.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Lỗi tải phiếu nhập';
+      });
     // Bước 1: lưu phiếu nhập, mới nhất lên đầu.
     builder.addCase(purchaseReceived, (state, action) => {
       state.orders.unshift(action.payload.order);

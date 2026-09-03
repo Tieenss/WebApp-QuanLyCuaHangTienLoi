@@ -153,29 +153,29 @@ export interface PurchaseOrderLine {
 
 /** Module 8 — Phiếu nhập kho / Đơn mua hàng (PO). */
 export interface PurchaseOrder {
-  id: ID;
-  /** Mã phiếu dạng PN-20260826-001. */
-  code: string;
-  supplierId: ID;
-  supplierName: string;
-  /** Kho nhận hàng. */
-  branchId: ID;
-  branchName: string;
-  orderDate: string;
-  expectedDate: string;
-  receivedDate: string | null;
-  status: DocumentStatus;
-  lines: PurchaseOrderLine[];
-  /** Tổng tiền hàng trước VAT. */
-  subTotal: VND;
-  vatTotal: VND;
-  discount: VND;
-  /** Tổng phải trả = subTotal + vatTotal - discount. */
-  grandTotal: VND;
-  /** Đã thanh toán cho NCC. */
-  paidAmount: VND;
-  createdBy: string;
-  note: string;
+    id: ID;
+    /** Mã phiếu dạng PN-20260826-001. */
+    code: string;
+    supplierId: ID;
+    supplierName: string;
+    /** Kho nhận hàng. */
+    branchId: ID;
+    branchName: string;
+    orderDate: string;
+    expectedDate: string;
+    receivedDate: string | null;
+    status: DocumentStatus;
+    lines: PurchaseOrderLine[];
+    /** Tổng tiền hàng trước VAT. */
+    subTotal: VND;
+    vatTotal: VND;
+    discount: VND;
+    /** Tổng phải trả = subTotal + vatTotal - discount. */
+    grandTotal: VND;
+    /** Đã thanh toán cho NCC. */
+    paidAmount: VND;
+    createdBy: string;
+    note: string;
 }
 
 /** Module 9 — Dòng chi tiết phiếu xuất nội bộ. */

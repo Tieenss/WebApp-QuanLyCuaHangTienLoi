@@ -47,7 +47,7 @@ export interface Branch {
   /** Giờ mở cửa, "24/7" với cửa hàng hoạt động liên tục. */
   openingHours: string;
   managerName: string;
-  managerId: ID;
+  managerId?: ID;
   employeeCount: number;
   /** Diện tích sàn (m2), dùng để tính doanh thu trên mỗi m2. */
   areaSqm: number;
@@ -60,5 +60,5 @@ export interface Branch {
 /** Giá trị form thêm/sửa chi nhánh (bỏ các field hệ thống tự sinh). */
 export type BranchFormValues = Omit<
   Branch,
-  'id' | 'code' | 'employeeCount' | 'monthlyRevenue'
+  'id' | 'employeeCount' | 'monthlyRevenue'
 >;

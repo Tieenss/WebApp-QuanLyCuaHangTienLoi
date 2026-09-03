@@ -1,0 +1,91 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< com.erp:cuahangtienloi >-----------------------
+[INFO] Building cuahangtienloi 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.3.1:run (default-cli) > test-compile @ cuahangtienloi >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ cuahangtienloi ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 0 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ cuahangtienloi ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ cuahangtienloi ---
+[INFO] skip non existing resourceDirectory D:\claudedesktop\WebApp-QuanLyCuaHangTienLoi\backend\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ cuahangtienloi ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] <<< spring-boot:3.3.1:run (default-cli) < test-compile @ cuahangtienloi <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.3.1:run (default-cli) @ cuahangtienloi ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.1)
+
+2026-09-01T22:49:15.072+07:00  INFO 11608 --- [cuahangtienloi] [           main] c.e.c.CuahangtienloiApplication          : Starting CuahangtienloiApplication using Java 21.0.11 with PID 11608 (D:\claudedesktop\WebApp-QuanLyCuaHangTienLoi\backend\target\classes started by Admin in D:\claudedesktop\WebApp-QuanLyCuaHangTienLoi\backend)
+2026-09-01T22:49:15.074+07:00 DEBUG 11608 --- [cuahangtienloi] [           main] c.e.c.CuahangtienloiApplication          : Running with Spring Boot v3.3.1, Spring v6.1.10
+2026-09-01T22:49:15.074+07:00  INFO 11608 --- [cuahangtienloi] [           main] c.e.c.CuahangtienloiApplication          : No active profile set, falling back to 1 default profile: "default"
+2026-09-01T22:49:15.597+07:00  INFO 11608 --- [cuahangtienloi] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-01T22:49:15.677+07:00  INFO 11608 --- [cuahangtienloi] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 74 ms. Found 19 JPA repository interfaces.
+2026-09-01T22:49:16.120+07:00  INFO 11608 --- [cuahangtienloi] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-09-01T22:49:16.131+07:00  INFO 11608 --- [cuahangtienloi] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-01T22:49:16.131+07:00  INFO 11608 --- [cuahangtienloi] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.25]
+2026-09-01T22:49:16.181+07:00  INFO 11608 --- [cuahangtienloi] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-09-01T22:49:16.182+07:00  INFO 11608 --- [cuahangtienloi] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1072 ms
+2026-09-01T22:49:16.326+07:00  INFO 11608 --- [cuahangtienloi] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-09-01T22:49:16.376+07:00  INFO 11608 --- [cuahangtienloi] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.2.Final
+2026-09-01T22:49:16.409+07:00  INFO 11608 --- [cuahangtienloi] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-09-01T22:49:16.631+07:00  INFO 11608 --- [cuahangtienloi] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-09-01T22:49:16.651+07:00  INFO 11608 --- [cuahangtienloi] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-01T22:49:17.546+07:00  INFO 11608 --- [cuahangtienloi] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@c67395
+2026-09-01T22:49:17.548+07:00  INFO 11608 --- [cuahangtienloi] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-01T22:49:19.045+07:00  INFO 11608 --- [cuahangtienloi] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-09-01T22:49:19.047+07:00  INFO 11608 --- [cuahangtienloi] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-09-01T22:49:19.675+07:00  INFO 11608 --- [cuahangtienloi] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-09-01T22:49:20.115+07:00  WARN 11608 --- [cuahangtienloi] [           main] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Failed to start bean 'webServerStartStop'
+2026-09-01T22:49:20.118+07:00  INFO 11608 --- [cuahangtienloi] [           main] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-09-01T22:49:20.119+07:00  INFO 11608 --- [cuahangtienloi] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-09-01T22:49:20.458+07:00  INFO 11608 --- [cuahangtienloi] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-09-01T22:49:20.476+07:00  INFO 11608 --- [cuahangtienloi] [           main] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-09-01T22:49:20.493+07:00 ERROR 11608 --- [cuahangtienloi] [           main] o.s.b.d.LoggingFailureAnalysisReporter   : 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Web server failed to start. Port 8080 was already in use.
+
+Action:
+
+Identify and stop the process that's listening on port 8080 or configure this application to listen on another port.
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  7.574 s
+[INFO] Finished at: 2026-09-01T22:49:20+07:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:3.3.1:run (default-cli) on project cuahangtienloi: Process terminated with exit code: 1 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException

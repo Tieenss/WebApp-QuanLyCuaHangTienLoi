@@ -15,13 +15,6 @@
   color: #e31837;
 }
 
-/* ── Ô "Đã thanh toán" ───────────────────────────────────────────── */
-
-/* Space xếp dọc chiếm hết chiều rộng ô để Progress kéo dài hết. */
-.po-cell-full {
-  width: 100%;
-}
-
 /* ── Chi tiết phiếu (dòng mở rộng) ───────────────────────────────── */
 
 /* Space bọc chi tiết chiếm hết chiều rộng. */

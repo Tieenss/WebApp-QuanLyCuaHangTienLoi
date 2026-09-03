@@ -7,12 +7,15 @@ import {
   DashboardOutlined,
   DeploymentUnitOutlined,
   FileDoneOutlined,
+  FileTextOutlined,
   ImportOutlined,
   ScanOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
+  TagsOutlined,
   TeamOutlined,
   TruckOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import type { ModuleIconKey } from '@/config/modules';
 
@@ -25,9 +28,11 @@ import type { ModuleIconKey } from '@/config/modules';
 const ICON_MAP: Record<ModuleIconKey, FC> = {
   dashboard: DashboardOutlined,
   pos: ShoppingCartOutlined,
+  'sales-order': FileTextOutlined,
   branch: ShopOutlined,
   employee: TeamOutlined,
   product: AppstoreOutlined,
+  category: TagsOutlined,
   supplier: TruckOutlined,
   warehouse: DeploymentUnitOutlined,
   purchase: ImportOutlined,
@@ -36,6 +41,7 @@ const ICON_MAP: Record<ModuleIconKey, FC> = {
   attendance: ClockCircleOutlined,
   cashbook: BankOutlined,
   report: BarChartOutlined,
+  'account-manage': UserOutlined,
 };
 
 interface ModuleIconProps {

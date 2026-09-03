@@ -1,16 +1,8 @@
-/*
- * AdminLayout.css — khung giao diện khu quản trị (layouts/AdminLayout):
- * sidebar điều hướng, breadcrumb, vùng nội dung, footer.
- *
- * Topbar nằm ở AdminTopbar.css. Các lớp tiện ích dùng chung toàn app
- * (.numeric-cell, .mono-code, .dense-table) nằm ở index.css.
- */
 
 .app-layout {
   min-height: 100vh;
 }
 
-/* ── Sidebar ─────────────────────────────────────────────────────── */
 .app-sider {
   position: sticky;
   top: 0;

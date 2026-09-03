@@ -7,23 +7,19 @@ import {
   LogoutOutlined,
   ShopOutlined,
   SwapOutlined,
-  UserSwitchOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { getLandingPath } from '@/config/modules';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { logout, setActiveBranch, switchRole } from '@/store/slices/authSlice';
+import { logout, setActiveBranch } from '@/store/slices/authSlice';
 import { setPosBranch } from '@/store/slices/posSlice';
 import {
   SHIFT_CODE,
   SHIFT_SHORT_LABEL,
   USER_ROLE,
   USER_ROLE_LABEL,
-  USER_ROLES,
   type ShiftCode,
   type UserRole,
 } from '@/types';
-import { activeStores } from '@/mockData/branches';
 import logo from '@/assets/logo.png';
 import './PosLayout.css';
 
@@ -57,6 +53,7 @@ export const PosLayout: FC = () => {
   const user = useAppSelector((state) => state.auth.user);
   const branchId = useAppSelector((state) => state.pos.branchId);
   const sessionOrderCount = useAppSelector((state) => state.pos.sessionOrderCount);
+  const branches = useAppSelector((state) => state.branch.branches);
 
   const role: UserRole = user?.role ?? USER_ROLE.Cashier;
   /** Thu ngân không có quyền vào bất kỳ trang quản trị nào. */
@@ -68,16 +65,17 @@ export const PosLayout: FC = () => {
    */
   const branchOptions = useMemo(() => {
     const allowed = user?.allowedBranchIds ?? [];
+    const activeStores = branches.filter((b: { status: string }) => b.status === 'Active');
     const selectable =
       allowed.length === 0
         ? activeStores
-        : activeStores.filter((branch) => allowed.includes(branch.id));
+        : activeStores.filter((branch: { id: string }) => allowed.includes(branch.id));
 
-    return selectable.map((branch) => ({
+    return selectable.map((branch: { id: string; code: string; name: string }) => ({
       value: branch.id,
       label: `${branch.code} — ${branch.name}`,
     }));
-  }, [user?.allowedBranchIds]);
+  }, [user?.allowedBranchIds, branches]);
 
   /** Đổi quầy bán: đồng bộ luôn chi nhánh đang xem của khu quản trị. */
   const handleBranchChange = (value: string): void => {
@@ -85,24 +83,12 @@ export const PosLayout: FC = () => {
     dispatch(setActiveBranch(value));
   };
 
-  /** Menu tài khoản: hồ sơ, đổi vai trò nhanh (demo), đăng xuất. */
+  /** Menu tài khoản: hồ sơ, đăng xuất. */
   const userMenuItems: MenuProps['items'] = [
     {
       key: 'account',
       icon: <IdcardOutlined />,
       label: 'Tài khoản của tôi',
-    },
-    { type: 'divider' },
-    {
-      key: 'role-group',
-      type: 'group',
-      label: 'Chuyển đổi vai trò (demo)',
-      children: USER_ROLES.map((item) => ({
-        key: `role-${item}`,
-        icon: <UserSwitchOutlined />,
-        label: USER_ROLE_LABEL[item],
-        disabled: item === role,
-      })),
     },
     { type: 'divider' },
     {
@@ -123,14 +109,6 @@ export const PosLayout: FC = () => {
     if (key === 'account') {
       navigate('/account');
       return;
-    }
-
-    if (key.startsWith('role-')) {
-      const nextRole = key.replace('role-', '') as UserRole;
-      dispatch(switchRole(nextRole));
-      // Mỗi vai trò có trang chính riêng: Thu ngân/Quản lý ở quầy, Thủ kho về
-      // tồn kho, Admin/Kế toán về Dashboard.
-      navigate(getLandingPath(nextRole));
     }
   };
 
