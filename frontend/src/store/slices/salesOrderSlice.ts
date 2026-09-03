@@ -82,6 +82,18 @@ export const orderCancelled = createAction<{
   cancelledAt: string;
 }>('salesOrder/cancelled');
 
+/**
+ * Action phát sau khi POS lưu hoá đơn xuống DB thành công: thay bản ghi local
+ * (id `so-live-...`) bằng bản ghi thật (id UUID + mã HD do backend sinh) để
+ * lịch sử hoá đơn và drawer chi tiết truy vấn đúng dữ liệu đã lưu.
+ */
+export const orderSaved = createAction<{
+  /** Id local của hoá đơn vừa chốt ở POS. */
+  localId: string;
+  /** Bản ghi thật trả về từ API. */
+  order: SalesOrder;
+}>('salesOrder/saved');
+
 export const salesOrderSlice = createSlice({
   name: 'salesOrder',
   initialState,
@@ -132,6 +144,17 @@ export const salesOrderSlice = createSlice({
       const cancelStamp = `[Huỷ ${action.payload.cancelledAt.slice(0, 16).replace('T', ' ')} bởi ${action.payload.performedBy}]`;
       order.note =
         order.note === '' ? cancelStamp : `${order.note}\n${cancelStamp}`;
+    });
+
+    // POS lưu DB thành công: thay bản ghi local bằng bản ghi thật.
+    builder.addCase(orderSaved, (state, action) => {
+      const index = state.orders.findIndex(
+        (item) => item.id === action.payload.localId,
+      );
+      if (index !== -1) state.orders[index] = action.payload.order;
+      if (state.selectedOrderId === action.payload.localId) {
+        state.selectedOrderId = action.payload.order.id;
+      }
     });
   },
 });

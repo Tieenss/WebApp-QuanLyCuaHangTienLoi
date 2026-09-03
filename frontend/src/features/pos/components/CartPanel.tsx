@@ -34,6 +34,7 @@ import {
   setTenderedAmount,
   updateLineQuantity,
 } from '@/store/slices/posSlice';
+import { orderSaved } from '@/store/slices/salesOrderSlice';
 import {
   PAYMENT_IS_CASH,
   PAYMENT_METHOD,
@@ -167,7 +168,9 @@ const sale = buildSalesOrder({
 
     dispatch(saleCompleted(sale));
 
-    // Persist hoá đơn xuống DB trong 1 transaction (hoa_don + chi_tiet_hoa_don).
+    // Persist hoá đơn xuống DB trong 1 transaction (hoa_don + chi_tiet_hoa_don),
+    // rồi thay hoá đơn local bằng bản ghi thật (mã HD do backend sinh) để
+    // "Lịch sử hoá đơn" hiển thị đúng dữ liệu đã lưu.
     void (async () => {
       try {
         const created = await fetch(
@@ -206,7 +209,21 @@ const sale = buildSalesOrder({
         if (!created.ok) {
           const err = await created.json().catch(() => null);
           console.warn('Không lưu được hoá đơn xuống DB:', err);
+          return;
         }
+        const saved = await created.json();
+        dispatch(
+          orderSaved({
+            localId: sale.order.id,
+            order: {
+              ...sale.order,
+              id: saved.id,
+              code: saved.maHoaDon ?? sale.order.code,
+              branchName: saved.tenChiNhanh ?? '',
+              cashierName: saved.tenThuNgan ?? sale.order.cashierName,
+            },
+          }),
+        );
       } catch (e) {
         console.warn('Không lưu được hoá đơn xuống DB:', e);
       }

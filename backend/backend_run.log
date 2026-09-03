@@ -1,0 +1,50 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.1)
+
+2026-09-03T11:00:23.575+07:00  INFO 9044 --- [           main] c.e.c.CuahangtienloiApplication          : Starting CuahangtienloiApplication v0.0.1-SNAPSHOT using Java 21.0.11 with PID 9044 (D:\claudedesktop\WebApp-QuanLyCuaHangTienLoi\backend\target\cuahangtienloi-0.0.1-SNAPSHOT.jar started by Admin in D:\claudedesktop\WebApp-QuanLyCuaHangTienLoi\backend)
+2026-09-03T11:00:23.578+07:00  INFO 9044 --- [           main] c.e.c.CuahangtienloiApplication          : No active profile set, falling back to 1 default profile: "default"
+2026-09-03T11:00:24.502+07:00  INFO 9044 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-03T11:00:24.607+07:00  INFO 9044 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 93 ms. Found 19 JPA repository interfaces.
+2026-09-03T11:00:25.338+07:00  INFO 9044 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-09-03T11:00:25.352+07:00  INFO 9044 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-03T11:00:25.352+07:00  INFO 9044 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.25]
+2026-09-03T11:00:25.398+07:00  INFO 9044 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-09-03T11:00:25.400+07:00  INFO 9044 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1743 ms
+2026-09-03T11:00:25.560+07:00  INFO 9044 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-03T11:00:26.418+07:00  INFO 9044 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@69a40b3c
+2026-09-03T11:00:26.419+07:00  INFO 9044 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-03T11:00:26.481+07:00  INFO 9044 --- [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-09-03T11:00:26.543+07:00  INFO 9044 --- [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.2.Final
+2026-09-03T11:00:26.579+07:00  INFO 9044 --- [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-09-03T11:00:26.907+07:00  INFO 9044 --- [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-09-03T11:00:28.435+07:00  INFO 9044 --- [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-09-03T11:00:28.441+07:00  INFO 9044 --- [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-09-03T11:00:29.322+07:00  WARN 9044 --- [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-09-03T11:00:29.346+07:00  WARN 9044 --- [           main] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: a62b0ffc-a514-4ba0-b0cb-ff1c0fd8d601
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-09-03T11:00:29.356+07:00  INFO 9044 --- [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-09-03T11:00:29.958+07:00  INFO 9044 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'
+2026-09-03T11:00:29.970+07:00  INFO 9044 --- [           main] c.e.c.CuahangtienloiApplication          : Started CuahangtienloiApplication in 6.861 seconds (process running for 7.348)
+2026-09-03T11:00:29.975+07:00  INFO 9044 --- [           main] c.erp.cuahangtienloi.seeder.DataSeeder   : DataSeeder disabled - using existing database tables
+
+=========================================================
+   ? SERVER ?Ã KH?I ??NG THÀNH CÔNG! 
+   ? Tr?ng thái: S?n sàng ph?c v?
+   ? C?ng (Port): 8080
+   ? Truy c?p  : http://localhost:8080
+=========================================================
+
+2026-09-03T11:01:51.484+07:00  INFO 9044 --- [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-03T11:01:51.488+07:00  INFO 9044 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-03T11:01:51.489+07:00  INFO 9044 --- [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms

@@ -89,8 +89,12 @@ export const SalesOrdersPage: FC = () => {
 
   const isStoreManager = user?.role === USER_ROLE.StoreManager;
   const isCashier = user?.role === USER_ROLE.Cashier;
-  const branchScope = isStoreManager ? user?.branchId ?? null : null;
-  const cashierScope = isCashier ? user?.employeeCode ?? null : null;
+  /**
+   * Phạm vi dữ liệu theo chi nhánh của người dùng — khoá cứng với mọi vai trò
+   * gắn chi nhánh (QUAN_LY, THU_NGAN), chỉ vai trò trụ sở mới xem toàn chuỗi.
+   */
+  const branchScope = user?.branchId ?? null;
+  const cashierScope = isCashier ? user?.idNhanVien ?? null : null;
   /**
    * Chỉ Thu ngân và Quản lý chi nhánh mới được hoàn tiền — Admin và Kế toán
    * không trực tiếp thao tác két, chỉ giám sát qua sổ quỹ / báo cáo.

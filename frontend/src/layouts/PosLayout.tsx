@@ -62,6 +62,9 @@ export const PosLayout: FC = () => {
   /**
    * Quầy bán được: chỉ cửa hàng đang hoạt động (kho tổng không có POS), và
    * thu hẹp theo chi nhánh người dùng được phân công. Mảng rỗng = không giới hạn.
+   *
+   * Thu ngân / quản lý chi nhánh chỉ thấy đúng chi nhánh của mình — không
+   * chọn được quầy khác. Vai trò trụ sở (branchId null) mới thấy toàn bộ.
    */
   const branchOptions = useMemo(() => {
     const allowed = user?.allowedBranchIds ?? [];
@@ -71,11 +74,23 @@ export const PosLayout: FC = () => {
         ? activeStores
         : activeStores.filter((branch: { id: string }) => allowed.includes(branch.id));
 
-    return selectable.map((branch: { id: string; code: string; name: string }) => ({
+    const ownBranch = user?.branchId ?? null;
+    const visible =
+      ownBranch === null
+        ? selectable
+        : selectable.filter((branch: { id: string }) => branch.id === ownBranch);
+
+    return visible.map((branch: { id: string; code: string; name: string }) => ({
       value: branch.id,
       label: `${branch.code} — ${branch.name}`,
     }));
-  }, [user?.allowedBranchIds, branches]);
+  }, [user?.allowedBranchIds, user?.branchId, branches]);
+
+  /**
+   * Thu ngân bị khoá theo chi nhánh được phân công nên Select chỉ để hiển thị;
+   * chỉ vai trò trụ sở (không có branchId) mới đổi được quầy.
+   */
+  const canSwitchBranch = (user?.branchId ?? null) === null;
 
   /** Đổi quầy bán: đồng bộ luôn chi nhánh đang xem của khu quản trị. */
   const handleBranchChange = (value: string): void => {
@@ -126,11 +141,13 @@ export const PosLayout: FC = () => {
 
           <Select
             className="pos-branch-select"
-            value={branchId}
+            value={branchId || undefined}
+            placeholder="Chưa gán chi nhánh"
             options={branchOptions}
             onChange={handleBranchChange}
+            disabled={!canSwitchBranch || branchOptions.length === 0}
             prefix={<ShopOutlined className="pos-branch-icon" />}
-            showSearch
+            showSearch={canSwitchBranch}
             optionFilterProp="label"
           />
         </div>

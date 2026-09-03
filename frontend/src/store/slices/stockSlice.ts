@@ -9,6 +9,7 @@ import {
   type StockBalance,
   type StockLedgerEntry,
   type StockLevel,
+  type LedgerType,
   type StockTransfer,
 } from '@/types';
 import { tonKhoApi, theKhoApi, type TonKhoDTO, type TheKhoDTO } from '@/api/tonKho';
@@ -53,35 +54,39 @@ const initialState: StockState = {
 };
 
 const mapTonKhoToBalance = (dto: TonKhoDTO): StockBalance => ({
-  productId: dto.idSanPham,
+  id: `${dto.idChiNhanh}-${dto.idSanPham}`,
   branchId: dto.idChiNhanh,
-  productName: '',
   branchName: '',
+  productId: dto.idSanPham,
+  sku: '',
+  productName: '',
+  categoryName: '',
+  unit: '',
   quantity: dto.soLuongTon || 0,
   averageCost: dto.giaVonTrungBinh || 0,
-  totalValue: dto.giaTriTon || 0,
+  stockValue: dto.giaTriTon || (dto.soLuongTon || 0) * (dto.giaVonTrungBinh || 0),
   minStock: dto.tonToiThieu || 0,
   maxStock: dto.tonToiDa || 0,
-  lastUpdated: dto.lanBienDongCuoi || new Date().toISOString(),
+  nearestExpiryDate: dto.hanSuDungGanNhat ?? null,
+  lastMovementAt: dto.lanBienDongCuoi || new Date().toISOString(),
 });
 
 const mapTheKhoToEntry = (dto: TheKhoDTO): StockLedgerEntry => ({
   id: dto.id,
-  timestamp: dto.ngayPhatSinh,
-  productId: dto.idSanPham,
-  productName: '',
+  occurredAt: dto.ngayPhatSinh,
   branchId: dto.idChiNhanh,
   branchName: '',
-  type: (dto.loaiGiaoDich as any) || 'ADJUSTMENT',
-  quantity: dto.soLuong,
-  unitPrice: dto.donGia || 0,
-  totalValue: dto.thanhTien || 0,
-  balanceBefore: dto.tonTruoc || 0,
-  balanceAfter: dto.tonSau || 0,
-  referenceCode: dto.maChungTu,
-  performedBy: dto.nguoiThucHien,
-  expiryDate: dto.hanSuDung,
-  note: dto.ghiChu,
+  productId: dto.idSanPham,
+  sku: '',
+  productName: '',
+  type: (dto.loaiGiaoDich as LedgerType) || LEDGER_TYPE.Adjustment,
+  quantityChange: dto.soLuong,
+  balanceBefore: dto.tonTruoc ?? 0,
+  balanceAfter: dto.tonSau ?? 0,
+  unitCost: dto.donGia ?? 0,
+  referenceCode: dto.maChungTu ?? '',
+  performedBy: dto.nguoiThucHien ?? '',
+  note: dto.ghiChu ?? '',
 });
 
 export const fetchStock = createAsyncThunk('stock/fetchAll', async () => {
