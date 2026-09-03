@@ -37,6 +37,7 @@ import {
   RevenueTrendChart,
 } from './components/DashboardCharts';
 import './DashboardPage.css';
+import { API_BASE_URL } from '@/config/api';
 
 const { Text } = Typography;
 
@@ -153,7 +154,7 @@ export const DashboardPage: FC = () => {
           sorted.map(async (hd) => {
             try {
               const res = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/chi-tiet-hoa-don/by-hoa-don/${hd.id}`,
+                `${API_BASE_URL}/api/chi-tiet-hoa-don/by-hoa-don/${hd.id}`,
                 { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } },
               );
               if (res.ok) lineMap[hd.id] = await res.json();

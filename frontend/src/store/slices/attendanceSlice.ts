@@ -3,8 +3,7 @@ import type { AttendanceRecord, AttendanceStatus, ShiftCode } from '@/types';
 import { chamCongApi, type ChamCongDTO } from '@/api/chamCong';
 import { today } from '@/utils/dateUtils';
 import dayjs from 'dayjs';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+import { API_BASE_URL } from '@/config/api';
 
 export interface AttendanceState {
   records: AttendanceRecord[];

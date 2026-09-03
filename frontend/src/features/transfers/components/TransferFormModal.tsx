@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
+import { API_BASE_URL } from '@/config/api';
 import {
   Alert,
   App as AntdApp,
@@ -236,7 +237,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
 
       // Gọi API backend để lưu DB
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/phieu-xuat-kho`, {
+        const response = await fetch(`${API_BASE_URL}/api/phieu-xuat-kho`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

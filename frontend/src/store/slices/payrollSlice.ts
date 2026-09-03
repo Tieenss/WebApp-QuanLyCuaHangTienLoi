@@ -12,6 +12,7 @@ import {
 } from '@/types';
 import { bangLuongApi, type BangLuongDTO } from '@/api/bangLuong';
 import { nowIso } from '@/utils/dateUtils';
+import { API_BASE_URL } from '@/config/api';
 
 /**
  * Module 11 — Duyệt lương 2 tầng.
@@ -107,7 +108,7 @@ export const fetchPayroll = createAsyncThunk(
   },
 );
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+
 
 /** Cập nhật bảng lương (duyệt / xác nhận). */
 export const updatePayroll = createAsyncThunk(
