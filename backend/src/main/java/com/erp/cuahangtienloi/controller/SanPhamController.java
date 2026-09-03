@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -163,7 +164,7 @@ public class SanPhamController {
         }
         if (sp.getIdNhaCungCap() != null) {
             nhaCungCapRepository.findById(sp.getIdNhaCungCap())
-                    .ifPresent(ncc -> dto.setTenNhaCungCap(ncc.getTenNhaCungCap()));
+                    .ifPresent(ncc -> dto.setTenNhaCungCap(ncc.getTenNcc()));
         }
 
         return dto;

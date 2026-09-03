@@ -10,8 +10,8 @@ import {
 } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
 import {
-  addCategory,
-  updateCategory,
+  createCategory,
+  updateCategoryThunk,
 } from '@/store/slices/categorySlice';
 import {
   RECORD_STATUS,
@@ -53,7 +53,12 @@ export const CategoryFormModal: FC<CategoryFormModalProps> = ({
   useEffect(() => {
     if (!open) return;
     if (editing !== null) {
-      form.setFieldsValue(editing);
+      // Form dùng name="icon"/"color", map từ iconEmoji/colorHex của Redux
+      form.setFieldsValue({
+        ...editing,
+        icon: (editing as any).iconEmoji || (editing as any).icon || '',
+        color: (editing as any).colorHex || (editing as any).color || '',
+      } as any);
       return;
     }
     form.resetFields();
@@ -70,16 +75,16 @@ export const CategoryFormModal: FC<CategoryFormModalProps> = ({
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      if (isEditing) {
-        dispatch(updateCategory({ id: editing.id, values }));
+      if (isEditing && editing) {
+        await dispatch(updateCategoryThunk({ id: editing.id, values })).unwrap();
         message.success('Đã cập nhật danh mục.');
       } else {
-        dispatch(addCategory(values));
+        await dispatch(createCategory(values)).unwrap();
         message.success('Đã thêm danh mục mới.');
       }
       onClose();
-    } catch {
-      // Lỗi validate đã hiển thị tại field tương ứng.
+    } catch (error: any) {
+      message.error(error?.message || 'Có lỗi xảy ra');
     }
   };
 
@@ -113,6 +118,14 @@ export const CategoryFormModal: FC<CategoryFormModalProps> = ({
           tooltip="Một emoji đơn lẻ để hiển thị ở lưới sản phẩm POS."
         >
           <Input placeholder="VD: 🌭" maxLength={4} />
+        </Form.Item>
+
+        <Form.Item
+          name="imageUrl"
+          label="URL ảnh đại diện (tuỳ chọn)"
+          tooltip="Nếu có, sẽ ưu tiên hiển thị ảnh thay cho emoji. Nhập URL ảnh (vd: https://example.com/img.jpg)."
+        >
+          <Input placeholder="https://example.com/image.jpg" />
         </Form.Item>
 
         <Form.Item

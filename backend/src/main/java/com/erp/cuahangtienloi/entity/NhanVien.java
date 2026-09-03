@@ -3,6 +3,7 @@ package com.erp.cuahangtienloi.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.UUID;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,6 +20,9 @@ public class NhanVien {
     @Column(name = "ma_nhan_vien", unique = true)
     private String maNhanVien;
 
+    @Column(name = "ten_dang_nhap", unique = true)
+    private String tenDangNhap;
+
     @Column(name = "ho_ten")
     private String hoTen;
 
@@ -32,6 +36,29 @@ public class NhanVien {
 
     @Column(name = "vai_tro")
     private String vaiTro;
+
+    private String viTri;
+
+    @Column(name = "loai_hop_dong")
+    private String loaiHopDong;
+
+    @Column(name = "ca_mac_dinh")
+    private String caMacDinh;
+
+    @Column(name = "luong_theo_gio")
+    private Integer luongTheoGio;
+
+    @Column(name = "luong_cung")
+    private Integer luongCung;
+
+    @Column(name = "so_tai_khoan")
+    private String soTaiKhoan;
+
+    @Column(name = "ten_ngan_hang")
+    private String tenNganHang;
+
+    @Column(name = "ngay_vao_lam")
+    private LocalDate ngayVaoLam;
 
     @Column(name = "id_chi_nhanh")
     private UUID idChiNhanh;

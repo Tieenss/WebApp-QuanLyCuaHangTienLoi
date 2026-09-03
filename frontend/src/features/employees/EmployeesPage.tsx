@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import {
   Avatar,
   Button,
@@ -22,10 +22,12 @@ import { RecordStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  deleteEmployee,
+  deleteEmployeeThunk,
+  fetchEmployees,
   setEmployeeModalOpen,
   setSelectedEmployee,
 } from '@/store/slices/employeeSlice';
+import { fetchBranches } from '@/store/slices/branchSlice';
 import {
   EMPLOYMENT_TYPE,
   EMPLOYMENT_TYPE_LABEL,
@@ -54,8 +56,15 @@ const SHIFT_COLOR: Record<ShiftCode, string> = {
 export const EmployeesPage: FC = () => {
   const dispatch = useAppDispatch();
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
-  const { employees } = useAppSelector((state) => state.employee);
+  const { employees, loading } = useAppSelector((state) => state.employee);
   const branchesState = useAppSelector((state) => state.branch.branches);
+
+  useEffect(() => {
+    dispatch(fetchEmployees());
+    if (branchesState.length === 0) {
+      dispatch(fetchBranches());
+    }
+  }, [dispatch, branchesState.length]);
 
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState<string | null>(activeBranchId);
@@ -64,9 +73,13 @@ export const EmployeesPage: FC = () => {
 
   const scoped = useMemo(() => {
     const allowed = user?.allowedBranchIds ?? [];
-    if (allowed.length === 0) return employees;
-    return employees.filter((employee) => allowed.includes(employee.branchId));
-  }, [user?.allowedBranchIds, employees]);
+    const enriched = employees.map((emp) => ({
+      ...emp,
+      branchName: emp.branchName || branchesState.find((b) => b.id === emp.branchId)?.name || '',
+    }));
+    if (allowed.length === 0) return enriched;
+    return enriched.filter((employee) => allowed.includes(employee.branchId));
+  }, [user?.allowedBranchIds, employees, branchesState]);
 
   const filtered = useMemo(
     () =>
@@ -185,7 +198,7 @@ export const EmployeesPage: FC = () => {
   };
 
   const handleDelete = (id: string): void => {
-    dispatch(deleteEmployee(id));
+    dispatch(deleteEmployeeThunk(id));
   };
 
   const columns: ColumnsType<Employee> = [
@@ -392,6 +405,7 @@ export const EmployeesPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
+          loading={loading}
           scroll={{ x: 1700 }}
           pagination={{
             pageSize: 12,

@@ -1,4 +1,4 @@
-import { createAction, createSlice } from '@reduxjs/toolkit';
+import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   DOCUMENT_STATUS,
@@ -6,6 +6,7 @@ import {
   type StockTransfer,
   type TransferLine,
 } from '@/types';
+import { phieuXuatKhoApi, type PhieuXuatKhoDTO } from '@/api/phieuXuatKho';
 
 /**
  * Module 9 — Xuất kho nội bộ (dữ liệu ghi được).
@@ -53,7 +54,33 @@ export const transferShipped = createAction<{
   performedBy: string;
 }>('transfer/shipped');
 
-export const DISTRIBUTION_CENTER_ID = 'br-0001';
+const mapDtoToTransfer = (dto: PhieuXuatKhoDTO): StockTransfer => ({
+  id: dto.id,
+  code: dto.maPhieu,
+  fromBranchId: dto.idChiNhanhXuat || '',
+  fromBranchName: '',
+  toBranchId: dto.idChiNhanhNhan || '',
+  toBranchName: '',
+  createdById: dto.idNguoiTao || '',
+  createdByName: '',
+  approverId: dto.idNguoiDuyet || null,
+  approverName: '',
+  receiverId: dto.idNguoiNhan || null,
+  receiverName: '',
+  requestDate: dto.ngayYeuCau || '',
+  shippedDate: dto.ngayXuatThucTe || null,
+  receivedDate: dto.ngayNhanThucTe || null,
+  status: (dto.trangThai as any) || 'PENDING',
+  note: dto.ghiChu || '',
+  lines: [],
+});
+
+export const fetchTransfers = createAsyncThunk('transfer/fetchAll', async () => {
+  const data = await phieuXuatKhoApi.getAll();
+  return data.map(mapDtoToTransfer);
+});
+
+export const DISTRIBUTION_CENTER_ID = 'a1b2c3d4-0001-0000-0000-000000000001'; // Kho Tổng Circle K Miền Nam
 export const DISTRIBUTION_CENTER_NAME = 'Kho Tổng';
 
 /**
@@ -180,6 +207,10 @@ export const transferSlice = createSlice({
   },
 
   extraReducers: (builder) => {
+    builder
+      .addCase(fetchTransfers.fulfilled, (state, action) => {
+        state.transfers = action.payload;
+      });
     // Bước 1: lưu phiếu xuất (áp dụng cho cả PENDING và COMPLETED), mới nhất
     // lên đầu. Khi status = PENDING, tồn kho chưa bị đụng — stockSlice không
     // lắng nghe action này (xem extraReducers bên dưới).

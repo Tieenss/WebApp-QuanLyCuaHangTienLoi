@@ -41,13 +41,18 @@ public class NhaCungCapController {
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody NhaCungCap request) {
-        if (nhaCungCapRepository.existsByMaNhaCungCap(request.getMaNcc())) {
+        if (nhaCungCapRepository.existsByMaNcc(request.getMaNcc())) {
             return ResponseEntity.badRequest().body(new ErrorResponse("Mã NCC đã tồn tại"));
         }
 
         NhaCungCap ncc = new NhaCungCap();
         ncc.setId(UUID.randomUUID());
-        ncc.setMaNcc(request.getMaNcc());
+        // Tự sinh mã NCC nếu frontend không gửi (ma_ncc NOT NULL)
+        String maNcc = request.getMaNcc();
+        if (maNcc == null || maNcc.isBlank()) {
+            maNcc = "NCC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        }
+        ncc.setMaNcc(maNcc);
         ncc.setTenNcc(request.getTenNcc());
         ncc.setMaSoThue(request.getMaSoThue());
         ncc.setSoDienThoai(request.getSoDienThoai());

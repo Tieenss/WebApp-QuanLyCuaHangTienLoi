@@ -1,4 +1,4 @@
-import { useMemo, type FC } from 'react';
+import { useEffect, useMemo, type FC } from 'react';
 import { Button, Card, Progress, Space, Switch, Table, Tabs, Tag, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { HistoryOutlined } from '@ant-design/icons';
@@ -9,6 +9,7 @@ import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { LedgerTypeTag, StockLevelTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchStock } from '@/store/slices/stockSlice';
 import {
   openLedgerDrawer,
   resetInventoryFilters,
@@ -77,11 +78,52 @@ export const InventoryPage: FC = () => {
   const allCategories = useAppSelector((state) => state.category.categories);
 
   const productById = (id: string) => allProducts.find((p) => p.id === id);
+  const branchById = (id: string) => allBranches.find((b) => b.id === id);
+
+  useEffect(() => {
+    if (allBalances.length === 0) {
+      dispatch(fetchStock());
+    }
+  }, [dispatch, allBalances.length]);
+
+  // Enrich tồn kho: thêm tên sản phẩm, tên chi nhánh, mã SKU
+  const enrichedBalances = useMemo(
+    () =>
+      allBalances.map((b) => {
+        const product = productById(b.productId);
+        const branch = branchById(b.branchId);
+        const category = product ? allCategories.find((c) => c.id === product.categoryId) : null;
+        return {
+          ...b,
+          productName: b.productName || product?.name || '',
+          branchName: b.branchName || branch?.name || '',
+          sku: (b as any).sku || product?.sku || '',
+          categoryName: (b as any).categoryName || category?.name || '',
+        };
+      }),
+    [allBalances, allProducts, allBranches, allCategories],
+  );
+
+  // Enrich thẻ kho
+  const enrichedLedger = useMemo(
+    () =>
+      allLedger.map((l) => {
+        const product = productById(l.productId);
+        const branch = branchById(l.branchId);
+        return {
+          ...l,
+          productName: l.productName || product?.name || '',
+          branchName: l.branchName || branch?.name || '',
+          sku: (l as any).sku || product?.sku || '',
+        };
+      }),
+    [allLedger, allProducts, allBranches],
+  );
 
   /** Tồn kho sau khi áp toàn bộ bộ lọc. */
   const balances = useMemo(
     () =>
-      allBalances.filter((balance) => {
+      enrichedBalances.filter((balance) => {
         const matchSearch = matchKeyword(searchKeyword, [
           balance.productName,
           balance.sku,
@@ -107,7 +149,7 @@ export const InventoryPage: FC = () => {
         return matchSearch && matchBranch && matchCategory && matchLevel && matchExpiry;
       }),
     [
-      allBalances,
+      enrichedBalances,
       searchKeyword,
       branchFilter,
       categoryFilter,
@@ -120,7 +162,7 @@ export const InventoryPage: FC = () => {
   /** Thẻ kho sau khi áp bộ lọc. */
   const ledgerEntries = useMemo(
     () =>
-      allLedger.filter((entry) => {
+      enrichedLedger.filter((entry) => {
         const matchSearch = matchKeyword(searchKeyword, [
           entry.productName,
           entry.sku,
@@ -136,7 +178,7 @@ export const InventoryPage: FC = () => {
 
         return matchSearch && matchBranch && matchType && matchCategory;
       }),
-    [allLedger, searchKeyword, branchFilter, ledgerTypeFilter, categoryFilter, allProducts],
+    [enrichedLedger, searchKeyword, branchFilter, ledgerTypeFilter, categoryFilter, allProducts],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
@@ -403,7 +445,7 @@ export const InventoryPage: FC = () => {
   const ledgerColumns: ColumnsType<StockLedgerEntry> = [
     {
       title: 'Thời điểm',
-      dataIndex: 'occurredAt',
+      dataIndex: 'timestamp',
       width: 150,
       fixed: 'left',
       render: (value: string) => (
@@ -445,7 +487,7 @@ export const InventoryPage: FC = () => {
     },
     {
       title: 'Nhập / Xuất',
-      dataIndex: 'quantityChange',
+      dataIndex: 'quantity',
       align: 'right',
       width: 110,
       render: (value: number) => (

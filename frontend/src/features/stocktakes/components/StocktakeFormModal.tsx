@@ -1,10 +1,11 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import {
   Button,
   DatePicker,
   Form,
   Input,
   InputNumber,
+  message,
   Modal,
   Select,
   Space,
@@ -13,8 +14,9 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
-import { useAppSelector } from '@/store/hooks';
-import { stockOf } from '@/store/slices/stockSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchStock, stockOf } from '@/store/slices/stockSlice';
+import { fetchProducts } from '@/store/slices/productSlice';
 import { DOCUMENT_STATUS, type Stocktake, type StocktakeLine } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
 import type { Dayjs } from 'dayjs';
@@ -70,10 +72,17 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
   const balances = useAppSelector((state) => state.stock.balances);
   const branches = useAppSelector((state) => state.branch.branches);
   const products = useAppSelector((state) => state.product.products);
-  const stocktakeCount = 22;
 
   const sellableProducts = products.filter((p) => p.status === 'Active');
   const branchById = (id: string) => branches.find((b) => b.id === id);
+
+  // Load stock + products chỉ khi mở modal — tránh fetch lặp mỗi lần re-render
+  const dispatch = useAppDispatch();
+  useEffect(() => {
+    if (!open) return;
+    dispatch(fetchStock());
+    dispatch(fetchProducts());
+  }, [dispatch, open]);
 
   const [branchId, setBranchId] = useState<string | null>(null);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
@@ -246,34 +255,69 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
   ];
 
   const handleSubmit = (): void => {
-    form.validateFields().then((values) => {
+    form.validateFields().then(async (values) => {
       const validRows = rows.filter((row) => row.productId !== '');
       if (validRows.length === 0) return;
 
+      const missingReason = validRows.find(
+        (row) => row.varianceQuantity !== 0 && !row.reason,
+      );
+      if (missingReason) {
+        message.error(
+          `Vui lòng chọn nguyên nhân lệch cho sản phẩm "${missingReason.productName || missingReason.sku}"`,
+        );
+        return;
+      }
+
       const varianceLines = validRows.filter((row) => row.varianceQuantity !== 0);
-
       const branch = branchById(values.branchId);
-      const newStocktake = {
-        id: `st-${String(stocktakeCount + 1).padStart(4, '0')}`,
-        code: `KK-${dayjs().format('YYYY-MM-DD')}-${String(stocktakeCount + 1).padStart(4, '0')}`,
-        branchId: values.branchId,
-        branchName: branch?.name ?? '',
-        countDate: values.countDate.format('YYYY-MM-DD'),
-        status: DOCUMENT_STATUS.Pending,
-        lines: validRows.map((row) => ({
-          ...row,
-          id: `stl-new-${row.key}`,
-        })),
-        totalItemsCounted: validRows.length,
-        totalVarianceItems: varianceLines.length,
-        totalVarianceValue: varianceLines.reduce((sum, row) => sum + row.varianceValue, 0),
-        countedBy: branch?.managerName ?? 'Thủ kho',
-        approvedBy: null,
-        note: values.note,
-      };
 
-      onSuccess(newStocktake);
-      onClose();
+      try {
+        const { phieuKiemKeApi } = await import('@/api/phieuKiemKe');
+        const created = await phieuKiemKeApi.createWithLines({
+          idChiNhanh: values.branchId,
+          ngayKiemKe: values.countDate.format('YYYY-MM-DD'),
+          ghiChu: values.note,
+          lines: validRows.map((row) => ({
+            idPhieuKiemKe: '00000000-0000-0000-0000-000000000000',
+            idSanPham: row.productId,
+            tonHeThong: row.systemQuantity,
+            tonThucTe: row.countedQuantity,
+            soLuongLech: row.varianceQuantity,
+            lyDoLech: row.reason,
+            donGiaVon: row.unitCost,
+            giaTriLech: row.varianceValue,
+          })),
+        });
+
+        const newStocktake = {
+          id: created.id!,
+          code: created.maPhieu ?? '',
+          branchId: values.branchId,
+          branchName: branch?.name ?? '',
+          countDate: values.countDate.format('YYYY-MM-DD'),
+          status: DOCUMENT_STATUS.Pending,
+          lines: validRows.map((row) => ({
+            ...row,
+            id: `stl-new-${row.key}`,
+          })),
+          totalItemsCounted: validRows.length,
+          totalVarianceItems: varianceLines.length,
+          totalVarianceValue: varianceLines.reduce((sum, row) => sum + row.varianceValue, 0),
+          countedBy: branch?.managerName ?? 'Thủ kho',
+          approvedBy: null,
+          note: values.note,
+        };
+
+        // Reload danh sách
+        onSuccess(newStocktake);
+        onClose();
+      } catch (e: any) {
+        console.error('[StocktakeForm] create error:', e);
+        alert('Lỗi tạo phiếu kiểm kê: ' + (e.message || e));
+      }
+    }).catch((err) => {
+      console.error('[StocktakeForm] validate error:', err);
     });
   };
 

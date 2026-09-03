@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   CASH_CATEGORY,
@@ -10,6 +10,7 @@ import {
   type CashFlowDirection,
   type PayrollRow,
 } from '@/types';
+import { soQuyApi, type SoQuyDTO } from '@/api/soQuy';
 import { payrollPaid } from './payrollSlice';
 import { saleCompleted } from './posSlice';
 import { purchaseReceived } from './purchaseSlice';
@@ -38,7 +39,41 @@ export const OPENING_BALANCE = 50_000_000;
 export interface CashbookState {
   /** Sổ quỹ, mới nhất trước. */
   entries: CashEntry[];
+  /** Đang tải dữ liệu từ backend. */
+  loading: boolean;
 }
+
+/**
+ * Map 1 bản ghi backend (SoQuyDTO) sang shape frontend (CashEntry).
+ * Tên trường khác nhau: maChungTu↔code, hangMuc↔category, soTien↔amount,
+ * doiTuong↔counterparty, dienGiai↔description, maChungTuLienQuan↔referenceCode.
+ */
+const mapDtoToEntry = (dto: SoQuyDTO): CashEntry => ({
+  id: dto.id ?? `sq-${dto.maChungTu}`,
+  code: dto.maChungTu ?? '',
+  direction: dto.direction,
+  category: dto.hangMuc,
+  branchId: dto.idChiNhanh ?? null,
+  branchName: dto.tenChiNhanh ?? '',
+  entryDate: dto.entryDate ?? '',
+  amount: dto.soTien,
+  paymentMethod: (dto.hinhThucTt ?? 'CASH') as CashEntry['paymentMethod'],
+  counterparty: dto.doiTuong,
+  referenceCode: dto.maChungTuLienQuan ?? null,
+  description: dto.dienGiai ?? '',
+  status: (dto.trangThai ?? 'COMPLETED') as CashEntry['status'],
+  createdBy: dto.tenNguoiTao ?? '',
+  runningBalance: dto.runningBalance ?? 0,
+});
+
+/** Tải toàn bộ sổ quỹ từ backend. */
+export const fetchCashbook = createAsyncThunk('cashbook/fetchAll', async () => {
+  const list = await soQuyApi.getAll();
+  // Backend trả theo thứ tự DB; sắp giảm theo entry_date để mới nhất trước.
+  return list
+    .map(mapDtoToEntry)
+    .sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+});
 
 /**
  * Sinh mã phiếu `PT-YYYYMMDD-NNN` (thu) hoặc `PC-YYYYMMDD-NNN` (chi).
@@ -79,6 +114,7 @@ const reindex = (entries: CashEntry[]): CashEntry[] => {
 
 const initialState: CashbookState = {
   entries: [],
+  loading: false,
 };
 
 /** Dữ liệu tối thiểu để tạo một phiếu mới; phần còn lại slice tự điền. */
@@ -237,6 +273,18 @@ export const cashbookSlice = createSlice({
   },
 
   extraReducers: (builder) => {
+    builder
+      .addCase(fetchCashbook.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchCashbook.fulfilled, (state, action) => {
+        state.loading = false;
+        state.entries = action.payload;
+      })
+      .addCase(fetchCashbook.rejected, (state) => {
+        state.loading = false;
+      });
+
     /**
      * Bước 4 của transaction bán hàng: phiếu THU hạng mục BAN_HANG.
      *

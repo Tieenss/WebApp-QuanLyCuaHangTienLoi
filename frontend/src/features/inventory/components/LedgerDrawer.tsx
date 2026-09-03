@@ -25,8 +25,10 @@ export const LedgerDrawer: FC = () => {
   );
   const allLedger = useAppSelector((state) => state.stock.ledger);
   const products = useAppSelector((state) => state.product.products);
+  const branches = useAppSelector((state) => state.branch.branches);
 
   const productById = (id: string) => products.find((p) => p.id === id);
+  const branchById = (id: string) => branches.find((b) => b.id === id);
   const product = selectedProductId === null ? undefined : productById(selectedProductId);
 
   /** Thẻ kho của đúng sản phẩm (và chi nhánh nếu đang lọc). */
@@ -38,13 +40,18 @@ export const LedgerDrawer: FC = () => {
           entry.productId === selectedProductId &&
           (branchFilter === null || entry.branchId === branchFilter),
       )
+      .map((entry) => ({
+        ...entry,
+        productName: entry.productName || productById(entry.productId)?.name || '',
+        branchName: entry.branchName || branchById(entry.branchId)?.name || '',
+      }))
       .slice(0, 60);
-  }, [allLedger, selectedProductId, branchFilter]);
+  }, [allLedger, selectedProductId, branchFilter, products, branches]);
 
   const columns: ColumnsType<StockLedgerEntry> = [
     {
       title: 'Thời điểm',
-      dataIndex: 'occurredAt',
+      dataIndex: 'timestamp',
       width: 140,
       render: (value: string) => (
         <Text className="ledger-text-12">{formatDateTime(value)}</Text>
@@ -64,7 +71,7 @@ export const LedgerDrawer: FC = () => {
     },
     {
       title: 'Thay đổi',
-      dataIndex: 'quantityChange',
+      dataIndex: 'quantity',
       align: 'right',
       width: 90,
       render: (value: number) => (

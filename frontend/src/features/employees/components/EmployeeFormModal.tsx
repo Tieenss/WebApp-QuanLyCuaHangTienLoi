@@ -11,10 +11,12 @@ import {
 } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  addEmployee,
+  createEmployee,
+  fetchEmployees,
   setEmployeeModalOpen,
-  updateEmployee,
+  updateEmployeeThunk,
 } from '@/store/slices/employeeSlice';
+import { fetchBranches } from '@/store/slices/branchSlice';
 import {
   EMPLOYMENT_TYPE,
   EMPLOYMENT_TYPE_LABEL,
@@ -23,6 +25,7 @@ import {
   SHIFT_LABEL,
   USER_ROLE,
   USER_ROLE_LABEL,
+  BRANCH_KIND,
   type EmployeeFormValues,
 } from '@/types';
 import './EmployeeFormModal.css';
@@ -32,17 +35,6 @@ const ROLE_OPTIONS = Object.values(USER_ROLE).map((role) => ({
   label: USER_ROLE_LABEL[role],
 }));
 
-const BRANCH_OPTIONS = [
-  { value: 'DISTRIBUTION_CENTER', label: 'Kho tổng' },
-  { value: 'br-0101', label: 'Cửa hàng 0101' },
-  { value: 'br-0102', label: 'Cửa hàng 0102' },
-  { value: 'br-0103', label: 'Cửa hàng 0103' },
-  { value: 'br-0104', label: 'Cửa hàng 0104' },
-  { value: 'br-0201', label: 'Cửa hàng 0201' },
-  { value: 'br-0202', label: 'Cửa hàng 0202' },
-  { value: 'br-0301', label: 'Cửa hàng 0301' },
-];
-
 export const EmployeeFormModal: FC = () => {
   const [form] = Form.useForm<EmployeeFormValues>();
   const dispatch = useAppDispatch();
@@ -51,7 +43,22 @@ export const EmployeeFormModal: FC = () => {
   const { isModalOpen, selectedEmployee } = useAppSelector(
     (state) => state.employee,
   );
+  const branches = useAppSelector((state) => state.branch.branches);
   const isEditing = selectedEmployee !== null;
+
+  // Lọc chi nhánh theo vai trò: THU_KHO chỉ được chọn Kho tổng
+  const filterBranchesByRole = (role: string) => {
+    if (role === 'THU_KHO') {
+      return branches.filter((b) => b.kind === BRANCH_KIND.DistributionCenter);
+    }
+    return branches.filter((b) => b.kind === BRANCH_KIND.Store);
+  };
+
+  useEffect(() => {
+    if (branches.length === 0) {
+      dispatch(fetchBranches());
+    }
+  }, [branches.length, dispatch]);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -73,16 +80,22 @@ export const EmployeeFormModal: FC = () => {
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      if (isEditing) {
-        dispatch(updateEmployee({ id: selectedEmployee.id, values }));
+      // Nếu vai trò là ADMIN/KE_TOAN → KHÔNG gửi branchId (DB constraint)
+      if (values.role === 'ADMIN' || values.role === 'KE_TOAN') {
+        values.branchId = '';
+      }
+      if (isEditing && selectedEmployee) {
+        await dispatch(updateEmployeeThunk({ id: selectedEmployee.id, values })).unwrap();
         message.success('Đã cập nhật thông tin nhân viên.');
       } else {
-        dispatch(addEmployee(values));
+        await dispatch(createEmployee(values)).unwrap();
         message.success('Đã thêm nhân viên mới.');
       }
+      // Reload danh sách để cập nhật branchName từ Redux
+      dispatch(fetchEmployees());
       dispatch(setEmployeeModalOpen(false));
-    } catch {
-      // Lỗi validate đã được antd Form hiển thị tại từng field.
+    } catch (error: any) {
+      message.error(error?.message || 'Có lỗi xảy ra');
     }
   };
 
@@ -149,11 +162,38 @@ export const EmployeeFormModal: FC = () => {
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-              name="branchId"
-              label="Chi nhánh"
-              rules={[{ required: true, message: 'Chọn chi nhánh.' }]}
+              noStyle
+              shouldUpdate={(prev, curr) => prev.role !== curr.role}
             >
-              <Select options={BRANCH_OPTIONS} />
+              {({ getFieldValue }) => {
+                const role = getFieldValue('role');
+                const requiresBranch = !['ADMIN', 'KE_TOAN'].includes(role);
+                const filteredBranches = requiresBranch ? filterBranchesByRole(role) : [];
+                return (
+                  <Form.Item
+                    name="branchId"
+                    label={`Chi nhánh${requiresBranch ? (role === 'THU_KHO' ? ' (Thủ kho chỉ được gán Kho tổng)' : '') : ' (không bắt buộc với Admin/Kế toán)'}`}
+                    rules={
+                      requiresBranch
+                        ? [{ required: true, message: 'Chọn chi nhánh.' }]
+                        : []
+                    }
+                  >
+                    <Select
+                      options={filteredBranches.map((b) => ({ value: b.id, label: `${b.code} - ${b.name}` }))}
+                      allowClear
+                      disabled={!requiresBranch}
+                      placeholder={
+                        requiresBranch
+                          ? role === 'THU_KHO'
+                            ? 'Chọn Kho tổng'
+                            : 'Chọn chi nhánh'
+                          : 'Không cần chọn'
+                      }
+                    />
+                  </Form.Item>
+                );
+              }}
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>

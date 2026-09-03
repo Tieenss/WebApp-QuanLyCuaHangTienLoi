@@ -70,7 +70,7 @@ export interface Employee {
   avatarText: string;
 }
 
-export type EmployeeFormValues = Omit<Employee, 'id' | 'code' | 'avatarText' | 'branchName'>;
+export type EmployeeFormValues = Omit<Employee, 'id' | 'avatarText' | 'branchName'>;
 
 /**
  * Module 11 — Bản ghi chấm công của 1 nhân viên trong 1 ca.

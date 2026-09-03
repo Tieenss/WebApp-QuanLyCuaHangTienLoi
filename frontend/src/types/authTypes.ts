@@ -74,6 +74,8 @@ export const POS_ROLES: readonly UserRole[] = [
 /** Người dùng đang đăng nhập. */
 export interface AuthUser {
   id: ID;
+  /** ID nhân viên (`nhan_vien.id`) liên kết với tài khoản. NULL nếu chưa gán. */
+  idNhanVien?: ID | null;
   employeeCode: string;
   fullName: string;
   email: string;

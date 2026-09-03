@@ -155,7 +155,7 @@ export const CartPanel: FC = () => {
       unitCosts[line.productId] = productById(line.productId)?.costPrice ?? 0;
     }
 
-    const sale = buildSalesOrder({
+const sale = buildSalesOrder({
       state: posState,
       cashierId,
       cashierName,
@@ -166,6 +166,51 @@ export const CartPanel: FC = () => {
     if (sale === null) return;
 
     dispatch(saleCompleted(sale));
+
+    // Persist hoá đơn xuống DB trong 1 transaction (hoa_don + chi_tiet_hoa_don).
+    void (async () => {
+      try {
+        const created = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/hoa-don/with-lines`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+            },
+            body: JSON.stringify({
+              idChiNhanh: sale.order.branchId,
+              idThuNgan: user?.idNhanVien ?? cashierId,
+              caLamViec: sale.order.shiftCode,
+              ngayBan: sale.order.soldAt,
+              hinhThucTt: sale.order.paymentMethod,
+              sdtThanhVien: sale.order.memberPhone || undefined,
+              subTotal: sale.order.subTotal,
+              giamGia: sale.order.discountTotal,
+              vatTotal: sale.order.vatTotal,
+              grandTotal: sale.order.grandTotal,
+              tienKhachDua: sale.tendered,
+              tienThoi: sale.order.changeAmount,
+              lines: sale.order.lines.map((line) => ({
+                idSanPham: line.productId,
+                soLuong: line.quantity,
+                donGia: line.unitPrice,
+                giamGiaDong: line.lineDiscount,
+                vatPhantram: line.vatPercent,
+                thanhTien: line.lineTotal,
+                donGiaVon: line.unitCost,
+              })),
+            }),
+          },
+        );
+        if (!created.ok) {
+          const err = await created.json().catch(() => null);
+          console.warn('Không lưu được hoá đơn xuống DB:', err);
+        }
+      } catch (e) {
+        console.warn('Không lưu được hoá đơn xuống DB:', e);
+      }
+    })();
   };
 
   return (

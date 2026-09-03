@@ -22,6 +22,7 @@ export const authApi = {
     return {
       user: {
         id: data.user.id,
+        idNhanVien: data.user.idNhanVien || null,
         employeeCode: data.user.tenDangNhap || data.user.tenDangNhap,
         fullName: data.user.hoTen || data.user.tenDangNhap,
         email: data.user.email || '',

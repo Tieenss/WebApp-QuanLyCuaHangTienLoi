@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Table,
   Button,
@@ -14,6 +14,8 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { taiKhoanApi, type TaiKhoanDTO, type CreateTaiKhoanRequest } from '@/api/taiKhoan';
+import { chiNhanhApi, type ChiNhanhDTO } from '@/api/chiNhanh';
+import { nhanVienApi, type NhanVienDTO } from '@/api/nhanVien';
 import { USER_ROLE_LABEL, type UserRole } from '@/types';
 
 const VAI_TRO_OPTIONS = [
@@ -31,6 +33,9 @@ export const AccountManagementPage = () => {
   const [editing, setEditing] = useState<TaiKhoanDTO | null>(null);
   const [form] = Form.useForm();
   const [nhanVienOptions, setNhanVienOptions] = useState<any[]>([]);
+  const [branches, setBranches] = useState<ChiNhanhDTO[]>([]);
+  const [allNhanVien, setAllNhanVien] = useState<NhanVienDTO[]>([]);
+  const [selectedVaiTro, setSelectedVaiTro] = useState<string>('THU_NGAN');
 
   const fetchData = async () => {
     setLoading(true);
@@ -52,10 +57,52 @@ export const AccountManagementPage = () => {
     }
   };
 
+  const fetchBranches = async () => {
+    try {
+      const result = await chiNhanhApi.getAll();
+      setBranches(result);
+    } catch {
+      // ignore
+    }
+  };
+
+  const fetchAllNhanVien = async () => {
+    try {
+      const result = await nhanVienApi.getAll();
+      setAllNhanVien(result);
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     fetchData();
     fetchNhanVienOptions();
+    fetchBranches();
+    fetchAllNhanVien();
   }, []);
+
+  // NV chưa có tài khoản + lọc theo idChiNhanh được chọn
+  const filteredNhanVienOptions = useMemo(() => {
+    const chiNhanhId = form.getFieldValue('idChiNhanh');
+    return nhanVienOptions.filter((nv: any) => {
+      if (!chiNhanhId) return true;
+      return nv.idChiNhanh === chiNhanhId;
+    });
+  }, [nhanVienOptions, form, modalOpen]);
+
+  // Chỉ hiện chi nhánh nếu vai trò yêu cầu
+  const requiresBranch = !['ADMIN', 'KE_TOAN'].includes(selectedVaiTro);
+
+  // Cập nhật NV options khi chọn chi nhánh
+  const handleBranchChange = (value: string) => {
+    // Reset nhân viên đã chọn nếu không thuộc chi nhánh mới
+    const currentNvId = form.getFieldValue('idNhanVien');
+    if (currentNvId) {
+      const nvExists = nhanVienOptions.some((nv: any) => nv.id === currentNvId && nv.idChiNhanh === value);
+      if (!nvExists) form.setFieldValue('idNhanVien', undefined);
+    }
+  };
 
   const handleCreate = async (values: any) => {
     try {
@@ -219,19 +266,29 @@ export const AccountManagementPage = () => {
                 <Input.Password placeholder="Nhập mật khẩu" />
               </Form.Item>
 
-              <Form.Item name="idNhanVien" label="Nhân viên liên kết">
+              <Form.Item
+                name="vaiTro"
+                label="Vai trò"
+                rules={[{ required: true, message: 'Chọn vai trò' }]}
+              >
                 <Select
-                  placeholder="Chọn nhân viên"
-                  options={nhanVienOptions.map((nv: any) => ({
-                    value: nv.id,
-                    label: `${nv.hoTen} - ${nv.email}`,
-                  }))}
-                  allowClear
+                  placeholder="Chọn vai trò"
+                  options={VAI_TRO_OPTIONS}
+                  onChange={(v: string) => setSelectedVaiTro(v)}
                 />
               </Form.Item>
 
-              <Form.Item name="vaiTro" label="Vai trò">
-                <Select placeholder="Chọn vai trò" options={VAI_TRO_OPTIONS} />
+              <Form.Item name="idNhanVien" label="Nhân viên liên kết (tùy chọn)">
+                <Select
+                  placeholder="Chọn nhân viên chưa có tài khoản"
+                  options={nhanVienOptions.map((nv: any) => ({
+                    value: nv.id,
+                    label: `${nv.hoTen} - ${nv.email || ''}`,
+                  }))}
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
             </>
           )}

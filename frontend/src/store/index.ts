@@ -15,6 +15,7 @@ import transferReducer from './slices/transferSlice';
 import employeeReducer from './slices/employeeSlice';
 import categoryReducer from './slices/categorySlice';
 import salesOrderReducer from './slices/salesOrderSlice';
+import { cashbookPersistence } from './cashbookPersistence';
 
 export const store = configureStore({
   reducer: {
@@ -36,6 +37,8 @@ export const store = configureStore({
     category: categoryReducer,
     salesOrder: salesOrderReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().prepend(cashbookPersistence.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

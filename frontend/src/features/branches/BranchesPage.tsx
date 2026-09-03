@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import {
   Button,
   Card,
@@ -24,10 +24,12 @@ import { RecordStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  deleteBranch,
+  deleteBranchThunk,
+  fetchBranches,
   setBranchModalOpen,
   setSelectedBranch,
 } from '@/store/slices/branchSlice';
+import { fetchEmployees } from '@/store/slices/employeeSlice';
 import {
   BRANCH_KIND,
   BRANCH_KIND_LABEL,
@@ -46,7 +48,23 @@ const { Text } = Typography;
 
 export const BranchesPage: FC = () => {
   const dispatch = useAppDispatch();
-  const { branches } = useAppSelector((state) => state.branch);
+  const { branches, loading } = useAppSelector((state) => state.branch);
+  const employees = useAppSelector((state) => state.employee.employees);
+
+  useEffect(() => {
+    dispatch(fetchBranches());
+    dispatch(fetchEmployees());
+  }, [dispatch]);
+
+  // Enrich branches: đếm số NV thực tế theo idChiNhanh
+  const enrichedBranches = useMemo(
+    () =>
+      branches.map((b) => ({
+        ...b,
+        employeeCount: employees.filter((e) => e.branchId === b.id).length,
+      })),
+    [branches, employees],
+  );
 
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
@@ -55,7 +73,7 @@ export const BranchesPage: FC = () => {
 
   const filtered = useMemo(
     () =>
-      branches.filter((branch) => {
+      enrichedBranches.filter((branch) => {
         const matchSearch = matchKeyword(search, [
           branch.name,
           branch.code,
@@ -73,17 +91,17 @@ export const BranchesPage: FC = () => {
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
-    const stores = branches.filter(
+    const stores = enrichedBranches.filter(
       (branch) => branch.kind === BRANCH_KIND.Store,
     );
-    const active = branches.filter(
+    const active = enrichedBranches.filter(
       (branch) => branch.status === RECORD_STATUS.Active,
     );
-    const totalRevenue = branches.reduce(
+    const totalRevenue = enrichedBranches.reduce(
       (sum, branch) => sum + branch.monthlyRevenue,
       0,
     );
-    const totalEmployees = branches.reduce(
+    const totalEmployees = enrichedBranches.reduce(
       (sum, branch) => sum + branch.employeeCount,
       0,
     );
@@ -116,7 +134,7 @@ export const BranchesPage: FC = () => {
         color: BRAND.primaryRed,
       },
     ];
-  }, [branches]);
+  }, [enrichedBranches]);
 
   const filters: ToolbarFilter[] = [
     {
@@ -162,7 +180,7 @@ export const BranchesPage: FC = () => {
   };
 
   const handleDelete = (id: string): void => {
-    dispatch(deleteBranch(id));
+    dispatch(deleteBranchThunk(id));
   };
 
   const columns: ColumnsType<Branch> = [
@@ -369,6 +387,7 @@ export const BranchesPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
+          loading={loading}
           scroll={{ x: 1560 }}
           pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `${total} điểm bán` }}
         />

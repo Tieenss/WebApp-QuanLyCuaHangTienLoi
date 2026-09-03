@@ -1,5 +1,6 @@
 import type { CSSProperties, FC } from 'react';
 import { BRAND } from '@/config/brand';
+import { useAppSelector } from '@/store/hooks';
 import './ProductThumb.css';
 
 interface ProductThumbProps {
@@ -11,13 +12,7 @@ interface ProductThumbProps {
   productName?: string;
 }
 
-const FALLBACK_CATEGORY: Record<string, { name: string; icon: string; color: string }> = {
-  'cat-01': { name: 'Thức uống', icon: '☕', color: '#8B5CF6' },
-  'cat-02': { name: 'Thực phẩm', icon: '🍱', color: '#F97316' },
-  'cat-03': { name: 'Pha chế', icon: '🧋', color: '#EC4899' },
-  'cat-04': { name: 'Bánh', icon: '🍩', color: '#EAB308' },
-  'cat-05': { name: 'Snack', icon: '🍿', color: '#22C55E' },
-};
+const FALLBACK = { name: 'Sản phẩm', icon: '📦', color: BRAND.textSecondary };
 
 export const ProductThumb: FC<ProductThumbProps> = ({
   categoryId,
@@ -25,13 +20,26 @@ export const ProductThumb: FC<ProductThumbProps> = ({
   imageUrl,
   productName,
 }) => {
-  const category = FALLBACK_CATEGORY[categoryId] ?? { name: 'Sản phẩm', icon: '📦', color: BRAND.textSecondary };
-  const color = category.color ?? BRAND.textSecondary;
+  // Lấy category thật từ Redux (load từ DB)
+  const categories = useAppSelector((state) => state.category.categories);
+  const categoryFromDb = categories.find((c) => c.id === categoryId);
+  const categoryImageUrl = (categoryFromDb as any)?.imageUrl || '';
+  const category = categoryFromDb
+    ? {
+        name: categoryFromDb.name,
+        icon: (categoryFromDb as any).iconEmoji || (categoryFromDb as any).icon || FALLBACK.icon,
+        color: (categoryFromDb as any).colorHex || (categoryFromDb as any).color || FALLBACK.color,
+      }
+    : FALLBACK;
+  const color = category.color ?? FALLBACK.color;
 
-  if (imageUrl !== undefined && imageUrl !== '') {
+  // Ưu tiên: imageUrl truyền vào > imageUrl của danh mục > icon emoji
+  const finalImageUrl = imageUrl || categoryImageUrl;
+
+  if (finalImageUrl !== undefined && finalImageUrl !== '') {
     return (
       <img
-        src={imageUrl}
+        src={finalImageUrl}
         alt={productName ?? 'Sản phẩm'}
         width={size}
         height={size}
@@ -52,7 +60,7 @@ export const ProductThumb: FC<ProductThumbProps> = ({
         } as CSSProperties
       }
     >
-      {category?.icon ?? '📦'}
+      {category?.icon ?? FALLBACK.icon}
     </div>
   );
 };

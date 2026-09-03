@@ -31,6 +31,9 @@ public class DanhMuc {
     @Column(name = "icon_emoji")
     private String iconEmoji;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(name = "mau_hex")
     private String mauHex;
 

@@ -4,10 +4,12 @@ import com.erp.cuahangtienloi.entity.ChiTietKiemKe;
 import com.erp.cuahangtienloi.repository.ChiTietKiemKeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,7 +50,12 @@ public class ChiTietKiemKeController {
     }
 
     @PostMapping("/batch")
+    @Transactional
     public ResponseEntity<?> createBatch(@RequestBody List<ChiTietKiemKe> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return ResponseEntity.badRequest().body(new SuccessResponse("Danh sách chi tiết rỗng"));
+        }
+        List<ChiTietKiemKe> saved = new ArrayList<>();
         for (ChiTietKiemKe request : requests) {
             ChiTietKiemKe ct = new ChiTietKiemKe();
             ct.setId(UUID.randomUUID());
@@ -61,9 +68,10 @@ public class ChiTietKiemKeController {
             ct.setDonGiaVon(request.getDonGiaVon());
             ct.setGiaTriLech(request.getGiaTriLech());
             ct.setNgayTao(LocalDateTime.now());
-            chiTietKiemKeRepository.save(ct);
+            saved.add(chiTietKiemKeRepository.save(ct));
         }
-        return ResponseEntity.ok(new SuccessResponse("Tạo chi tiết kiểm kê thành công"));
+        chiTietKiemKeRepository.flush();
+        return ResponseEntity.ok(saved);
     }
 
     @DeleteMapping("/{id}")

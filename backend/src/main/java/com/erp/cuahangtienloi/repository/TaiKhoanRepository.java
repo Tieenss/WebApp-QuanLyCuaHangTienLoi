@@ -9,4 +9,5 @@ import java.util.UUID;
 @Repository
 public interface TaiKhoanRepository extends JpaRepository<TaiKhoan, UUID> {
     Optional<TaiKhoan> findByTenDangNhap(String tenDangNhap);
+    Optional<TaiKhoan> findByIdNhanVien(UUID idNhanVien);
 }

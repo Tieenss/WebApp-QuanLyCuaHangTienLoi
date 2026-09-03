@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import {
   Alert,
   App as AntdApp,
@@ -17,13 +17,15 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { ArrowRightOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { resolveStockLevel, stockOf } from '@/store/slices/stockSlice';
+import { fetchStock, resolveStockLevel, stockOf } from '@/store/slices/stockSlice';
 import {
   buildTransfer,
   transferShipped,
   type TransferDraftLine,
   DISTRIBUTION_CENTER_ID,
 } from '@/store/slices/transferSlice';
+import { chiNhanhApi, type ChiNhanhDTO } from '@/api/chiNhanh';
+import { chiTietPhieuXuatApi } from '@/api/phieuXuatKho';
 import { DOCUMENT_STATUS, STOCK_LEVEL, USER_ROLE, type DocumentStatus, type StockLevel } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
@@ -94,16 +96,42 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
 
   const isRequest = initialStatus === DOCUMENT_STATUS.Pending;
 
+  // Load cửa hàng (CUA_HANG_BAN_LE) từ API riêng
+  const [cuaHangOptions, setCuaHangOptions] = useState<ChiNhanhDTO[]>([]);
+  const [khoTongList, setKhoTongList] = useState<ChiNhanhDTO[]>([]);
+  useEffect(() => {
+    chiNhanhApi.getCuaHang()
+      .then((data) => setCuaHangOptions(data))
+      .catch(() => setCuaHangOptions([]));
+    chiNhanhApi.getKhoTong()
+      .then((data) => setKhoTongList(data))
+      .catch(() => setKhoTongList([]));
+    // Cũng load tồn kho để filter sản phẩm
+    dispatch(fetchStock());
+  }, [dispatch]);
+
+  // Auto-select kho tổng đầu tiên khi load xong
+  useEffect(() => {
+    if (khoTongList.length > 0) {
+      const exists = khoTongList.find((k) => k.id === fromBranchId);
+      if (!exists) {
+        const first = khoTongList[0];
+        if (first) setFromBranchId(first.id);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [khoTongList]);
+
   /**
    * StoreManager chỉ được yêu cầu xuất cho chi nhánh mình phụ trách; Thủ kho
    * và Admin chọn được mọi cửa hàng.
    */
   const availableBranches = useMemo(() => {
     if (user?.role === USER_ROLE.StoreManager && user.branchId !== null) {
-      return activeStores.filter((branch) => branch.id === user.branchId);
+      return cuaHangOptions.filter((branch) => branch.id === user.branchId);
     }
-    return activeStores;
-  }, [user]);
+    return cuaHangOptions;
+  }, [user, cuaHangOptions]);
 
   const defaultToBranchId =
     user?.role === USER_ROLE.StoreManager && user.branchId !== null
@@ -111,23 +139,29 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       : null;
 
   const [toBranchId, setToBranchId] = useState<string | null>(defaultToBranchId);
+  const [fromBranchId, setFromBranchId] = useState<string>(DISTRIBUTION_CENTER_ID);
+  console.log('[TransferForm] DEBUG fromBranchId:', fromBranchId);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
 
   /** Dọn form sau khi modal đóng hẳn (dùng sự kiện, không dùng effect). */
   const handleAfterClose = (): void => {
     form.resetFields();
     setToBranchId(defaultToBranchId);
+    setFromBranchId(DISTRIBUTION_CENTER_ID);
     setRows([emptyRow()]);
   };
 
-  /** Chỉ hàng Kho Tổng đang có tồn > 0 mới xuất được. */
+  /** Chỉ hàng có tồn > 0 ở kho xuất đã chọn mới xuất được. */
   const availableProducts = useMemo(
     () =>
       sellableProducts.filter(
-        (product) => stockOf(balances, DISTRIBUTION_CENTER_ID, product.id) > 0,
+        (product) => stockOf(balances, fromBranchId, product.id) > 0,
       ),
-    [balances],
+    [balances, fromBranchId],
   );
+
+  // Debug
+  console.log('[TransferForm] balances:', balances.length, 'fromBranchId:', fromBranchId, 'availableProducts:', availableProducts.length);
 
   const usedProductIds = useMemo(
     () => new Set(rows.map((row) => row.productId).filter((id) => id !== '')),
@@ -184,8 +218,8 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         return;
       }
 
-      const performedBy =
-        user === null ? 'Không xác định' : `${user.fullName} (${user.employeeCode})`;
+  const performedBy =
+    user === null ? 'Không xác định' : `${user.fullName} (${user.employeeCode})`;
 
       const transfer = buildTransfer({
         toBranchId: values.toBranchId,
@@ -199,6 +233,53 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         getProductById: productById,
       });
       if (transfer === null) return;
+
+      // Gọi API backend để lưu DB
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/phieu-xuat-kho`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
+          },
+          body: JSON.stringify({
+            maPhieu: '', // backend tự sinh
+            idChiNhanhXuat: fromBranchId,
+            idChiNhanhNhan: values.toBranchId,
+            idNguoiTao: user?.id,
+            ngayYeuCau: values.requestDate.format('YYYY-MM-DD'),
+            trangThai: initialStatus,
+            ghiChu: values.note?.trim() ?? '',
+          }),
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.message || 'Lỗi lưu phiếu xuất');
+        }
+
+        // Tạo chi tiết
+        const created = await response.json();
+        try {
+          await chiTietPhieuXuatApi.createBatch(
+            validRows.map((row, index) => ({
+              id: '',
+              idPhieuXuat: created.id,
+              idSanPham: row.productId,
+              soLuongYeuCau: row.quantity,
+              soLuongXuat: row.quantity,
+              soLuongNhan: row.quantity,
+              donGiaVon: 0,
+              thanhTien: 0,
+              thuTu: index,
+            })),
+          );
+        } catch (e) {
+          console.error('Lỗi tạo chi tiết phiếu xuất:', e);
+        }
+      } catch (e: any) {
+        message.error(e?.message || 'Có lỗi khi lưu phiếu xuất');
+        return;
+      }
 
       dispatch(transferShipped({ transfer, performedBy }));
 
@@ -383,6 +464,13 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         }}
       >
         <Space size={16} wrap className="transfer-head-fields">
+          <Form.Item label="Kho xuất" required>
+            <Select
+              value={fromBranchId}
+              onChange={setFromBranchId}
+              options={khoTongList.map((b) => ({ value: b.id, label: `${b.maChiNhanh} — ${b.tenChiNhanh}` }))}
+            />
+          </Form.Item>
           <Form.Item
             name="toBranchId"
             label="Cửa hàng nhận hàng"
@@ -397,7 +485,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
               onChange={setToBranchId}
               options={availableBranches.map((branch) => ({
                 value: branch.id,
-                label: `${branch.code} — ${branch.name}`,
+                label: `${(branch as any).maChiNhanh || branch.code} — ${(branch as any).tenChiNhanh || branch.name}`,
               }))}
             />
           </Form.Item>

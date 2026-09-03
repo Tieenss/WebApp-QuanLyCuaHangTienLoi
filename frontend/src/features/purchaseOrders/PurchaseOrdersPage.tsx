@@ -7,7 +7,10 @@ import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { DocumentStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
-import { useAppSelector } from '@/store/hooks';
+import { useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchPurchaseOrders } from '@/store/slices/purchaseSlice';
+import { chiTietPhieuNhapApi, type ChiTietPhieuNhapDTO } from '@/api/chiTietPhieuNhap';
 import {
   DOCUMENT_STATUS,
   DOCUMENT_STATUS_LABEL,
@@ -33,9 +36,60 @@ const { Text } = Typography;
  * MVP thanh toán ngay khi nhập, không theo dõi công nợ nhà cung cấp.
  */
 export const PurchaseOrdersPage: FC = () => {
+  const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-  const orders = useAppSelector((state) => state.purchase.orders);
+  const { orders, loading } = useAppSelector((state) => state.purchase);
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
+  const products = useAppSelector((state) => state.product.products);
+  const branches = useAppSelector((state) => state.branch.branches);
+
+  // Enrich orders: thêm tên NCC + tên kho
+  const enrichedOrders = useMemo(
+    () =>
+      orders.map((o) => ({
+        ...o,
+        supplierName: o.supplierName || suppliers.find((s) => s.id === o.supplierId)?.name || '',
+        branchName: o.branchName || branches.find((b) => b.id === o.branchId)?.name || '',
+      })),
+    [orders, suppliers, branches],
+  );
+
+  // Debug tạm thời
+  // console.log('[PurchaseOrders] orders:', orders.length, 'enriched:', enrichedOrders.length, 'branches:', branches.length, 'suppliers:', suppliers.length);
+
+  // Cache chi tiết phiếu nhập theo orderId
+  const [detailsCache, setDetailsCache] = useState<Record<string, ChiTietPhieuNhapDTO[]>>({});
+
+  const loadDetails = async (orderId: string) => {
+    if (detailsCache[orderId] !== undefined) return;
+    try {
+      const data = await chiTietPhieuNhapApi.getByPhieuNhap(orderId);
+      setDetailsCache((prev) => ({ ...prev, [orderId]: data }));
+    } catch {
+      setDetailsCache((prev) => ({ ...prev, [orderId]: [] }));
+    }
+  };
+
+  // Load chi tiết cho tất cả phiếu (sau khi load orders xong)
+  useEffect(() => {
+    if (enrichedOrders.length === 0) return;
+    Promise.all(
+      enrichedOrders.map(async (o) => {
+        if (detailsCache[o.id] !== undefined) return;
+        try {
+          const data = await chiTietPhieuNhapApi.getByPhieuNhap(o.id);
+          setDetailsCache((prev) => ({ ...prev, [o.id]: data }));
+        } catch {
+          setDetailsCache((prev) => ({ ...prev, [o.id]: [] }));
+        }
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrichedOrders.length]);
+
+  useEffect(() => {
+    dispatch(fetchPurchaseOrders());
+  }, [dispatch]);
 
   /** Admin và Thủ kho được lập phiếu nhập (ma trận phân quyền). */
   const canCreate =
@@ -48,7 +102,7 @@ export const PurchaseOrdersPage: FC = () => {
 
   const filtered = useMemo(
     () =>
-      orders.filter((order) => {
+      enrichedOrders.filter((order) => {
         const matchSearch = matchKeyword(search, [
           order.code,
           order.supplierName,
@@ -59,7 +113,7 @@ export const PurchaseOrdersPage: FC = () => {
           supplierFilter === null || order.supplierId === supplierFilter;
         return matchSearch && matchStatus && matchSupplier;
       }),
-    [orders, search, statusFilter, supplierFilter],
+    [enrichedOrders, search, statusFilter, supplierFilter],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
@@ -157,31 +211,34 @@ export const PurchaseOrdersPage: FC = () => {
       render: (value: string) => <Text className="po-text-12-5">{value}</Text>,
     },
     {
+      title: 'Số mặt hàng',
+      width: 110,
+      align: 'center',
+      render: (_: any, row: any) => {
+        const details = detailsCache[row.id];
+        if (details === undefined) return <Text type="secondary">...</Text>;
+        if (details.length === 0) return <Text type="secondary">—</Text>;
+        return <Tag color="blue">{details.length}</Tag>;
+      },
+    },
+    {
+      title: 'Số lượng nhận',
+      width: 120,
+      align: 'right',
+      render: (_: any, row: any) => {
+        const details = detailsCache[row.id];
+        if (details === undefined) return <Text type="secondary">...</Text>;
+        if (details.length === 0) return <Text type="secondary">—</Text>;
+        const total = details.reduce((sum, d) => sum + (d.soLuongNhan || 0), 0);
+        return <Text strong>{formatNumber(total)}</Text>;
+      },
+    },
+    {
       title: 'Ngày nhập kho',
       dataIndex: 'orderDate',
       width: 125,
       sorter: (a, b) => a.orderDate.localeCompare(b.orderDate),
       render: (value: string) => formatDate(value),
-    },
-    {
-      title: 'Số mặt hàng',
-      key: 'lineCount',
-      align: 'center',
-      width: 105,
-      render: (_, row) => <Text className="numeric-cell">{row.lines.length}</Text>,
-    },
-    {
-      title: 'Số lượng nhận',
-      key: 'totalQuantity',
-      align: 'right',
-      width: 120,
-      render: (_, row) => (
-        <Text className="numeric-cell">
-          {formatNumber(
-            row.lines.reduce((sum, line) => sum + line.receivedQuantity, 0),
-          )}
-        </Text>
-      ),
     },
     {
       title: 'Tiền hàng',
@@ -215,9 +272,13 @@ export const PurchaseOrdersPage: FC = () => {
     },
     {
       title: 'Người nhập',
-      dataIndex: 'createdBy',
+      dataIndex: 'idNguoiNhap',
       width: 200,
-      render: (value: string) => <Text className="po-text-12-5">{value}</Text>,
+      render: () => (
+        <Text className="po-text-12-5">
+          {user?.fullName || '—'}
+        </Text>
+      ),
     },
     {
       title: 'Trạng thái',
@@ -231,12 +292,34 @@ export const PurchaseOrdersPage: FC = () => {
 
   /** Bảng chi tiết mặt hàng khi mở rộng một phiếu nhập. */
   const renderDetail = (order: PurchaseOrder): ReactElement => {
+    // Load chi tiết từ cache hoặc fallback về order.lines
+    const details = detailsCache[order.id] || [];
+    // Map từ chi tiết DB sang PurchaseOrderLine
+    const mappedLines: PurchaseOrderLine[] = details.length > 0
+      ? details.map((d) => {
+          const product = products.find((p) => p.id === d.idSanPham);
+          return {
+            id: d.id,
+            productId: d.idSanPham,
+            sku: product?.sku || '',
+            productName: product?.name || '',
+            unit: product?.unit || '',
+            orderedQuantity: d.soLuongDat,
+            receivedQuantity: d.soLuongNhan,
+            unitCost: d.donGiaNhap,
+            vatPercent: d.vatPhantram,
+            lineTotal: d.thanhTien,
+            expiryDate: d.hanSuDung || null,
+          };
+        })
+      : order.lines;
+
     const lineColumns: ColumnsType<PurchaseOrderLine> = [
       {
         title: 'SKU',
         dataIndex: 'sku',
         width: 150,
-        render: (value: string) => <span className="mono-code">{value}</span>,
+        render: (value: string) => <span className="mono-code">{value || '—'}</span>,
       },
       { title: 'Sản phẩm', dataIndex: 'productName' },
       {
@@ -247,7 +330,6 @@ export const PurchaseOrdersPage: FC = () => {
         render: (value: number, row) => (
           <Text
             strong
-            // Dữ liệu lịch sử có phiếu NCC giao thiếu; tô vàng để dễ nhận ra.
             className={`numeric-cell${
               value > 0 && value < row.orderedQuantity ? ' po-received-short' : ''
             }`}
@@ -298,13 +380,19 @@ export const PurchaseOrdersPage: FC = () => {
 
     return (
       <Space direction="vertical" size={14} className="po-detail-full">
-        <Table<PurchaseOrderLine>
-          columns={lineColumns}
-          dataSource={order.lines}
-          rowKey="id"
-          size="small"
-          pagination={false}
-        />
+        {details.length === 0 ? (
+          <Text type="secondary" style={{ padding: 12, display: 'block' }}>
+            Đang tải chi tiết...
+          </Text>
+        ) : (
+          <Table<PurchaseOrderLine>
+            columns={lineColumns}
+            dataSource={mappedLines}
+            rowKey="id"
+            size="small"
+            pagination={false}
+          />
+        )}
 
         <Descriptions bordered size="small" column={4}>
           <Descriptions.Item label="Tiền hàng">
@@ -399,8 +487,22 @@ export const PurchaseOrdersPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
+          loading={loading}
           scroll={{ x: 1800 }}
-          expandable={{ expandedRowRender: renderDetail, columnWidth: 44 }}
+          expandable={{
+            expandedRowRender: (record) => {
+              try {
+                return renderDetail(record);
+              } catch (e) {
+                console.error('[PurchaseOrders] renderDetail error:', e);
+                return <Text type="danger">Lỗi render chi tiết</Text>;
+              }
+            },
+            columnWidth: 44,
+            onExpand: (expanded, record) => {
+              if (expanded) loadDetails(record.id);
+            },
+          }}
           pagination={{
             pageSize: 10,
             showSizeChanger: true,

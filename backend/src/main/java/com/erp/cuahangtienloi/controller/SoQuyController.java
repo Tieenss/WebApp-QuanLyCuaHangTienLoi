@@ -79,7 +79,16 @@ public class SoQuyController {
         sq.setMaChungTu(request.getMaChungTu());
         sq.setMaChungTuLienQuan(request.getMaChungTuLienQuan());
         sq.setIdChiNhanh(request.getIdChiNhanh());
-        sq.setIdNguoiTao(request.getIdNguoiTao());
+        // id_nguoi_tao NOT NULL theo DB — nếu frontend không gửi (session cũ
+        // chưa có idNhanVien) thì fallback nhân viên đầu tiên.
+        UUID idNguoiTao = request.getIdNguoiTao();
+        if (idNguoiTao == null || !nhanVienRepository.existsById(idNguoiTao)) {
+            idNguoiTao = nhanVienRepository.findAll().stream()
+                    .findFirst()
+                    .map(nv -> nv.getId())
+                    .orElse(null);
+        }
+        sq.setIdNguoiTao(idNguoiTao);
         sq.setDirection(request.getDirection());
         sq.setHangMuc(request.getHangMuc());
         sq.setHinhThucTt(request.getHinhThucTt() != null ? request.getHinhThucTt() : "CASH");

@@ -11,10 +11,12 @@ import {
 } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  addProduct,
+  createProduct,
   setProductModalOpen,
-  updateProduct,
+  updateProductThunk,
 } from '@/store/slices/productSlice';
+import { fetchSuppliers } from '@/store/slices/supplierSlice';
+import { fetchCategories } from '@/store/slices/categorySlice';
 import {
   PRODUCT_UNIT,
   PRODUCT_UNIT_LABEL,
@@ -41,10 +43,17 @@ export const ProductFormModal: FC = () => {
   const { isModalOpen, selectedProduct } = useAppSelector(
     (state) => state.product,
   );
+  const categories = useAppSelector((state) => state.category.categories);
+  const suppliers = useAppSelector((state) => state.supplier.suppliers);
+  const categoryOptions = categories.map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }));
+  const supplierOptions = suppliers.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }));
   const isEditing = selectedProduct !== null;
 
   useEffect(() => {
     if (!isModalOpen) return;
+    // Load dropdown data
+    dispatch(fetchCategories());
+    dispatch(fetchSuppliers());
     if (selectedProduct !== null) {
       form.setFieldsValue(selectedProduct);
       return;
@@ -59,21 +68,21 @@ export const ProductFormModal: FC = () => {
       status: RECORD_STATUS.Active,
       isPerishable: false,
     });
-  }, [isModalOpen, selectedProduct, form]);
+  }, [isModalOpen, selectedProduct, form, dispatch]);
 
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      if (isEditing) {
-        dispatch(updateProduct({ id: selectedProduct.id, values }));
+      if (isEditing && selectedProduct) {
+        await dispatch(updateProductThunk({ id: selectedProduct.id, values })).unwrap();
         message.success('Đã cập nhật thông tin sản phẩm.');
       } else {
-        dispatch(addProduct(values));
+        await dispatch(createProduct(values)).unwrap();
         message.success('Đã thêm sản phẩm mới.');
       }
       dispatch(setProductModalOpen(false));
-    } catch {
-      // Lỗi validate đã được antd Form hiển thị tại từng field.
+    } catch (error: any) {
+      message.error(error?.message || 'Có lỗi xảy ra');
     }
   };
 
@@ -130,7 +139,7 @@ export const ProductFormModal: FC = () => {
               label="Danh mục"
               rules={[{ required: true, message: 'Chọn danh mục.' }]}
             >
-              <Select placeholder="Chọn danh mục" options={[]} />
+              <Select placeholder="Chọn danh mục" options={categoryOptions} />
             </Form.Item>
           </Col>
         </Row>
@@ -159,6 +168,30 @@ export const ProductFormModal: FC = () => {
               ]}
             >
               <InputNumber className="product-amount-input" min={0} max={100} step={1} addonAfter="%" />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Form.Item
+              name="supplierId"
+              label="Nhà cung cấp"
+              rules={[{ required: true, message: 'Chọn nhà cung cấp.' }]}
+            >
+              <Select placeholder="Chọn nhà cung cấp" options={supplierOptions} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item
+              name="barcode"
+              label="Mã vạch (EAN-13)"
+              rules={[
+                { required: true, message: 'Vui lòng nhập mã vạch.' },
+                { pattern: /^\d{13}$/, message: 'Mã vạch phải đúng 13 chữ số.' },
+              ]}
+            >
+              <Input placeholder="8934567000011" maxLength={13} />
             </Form.Item>
           </Col>
         </Row>

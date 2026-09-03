@@ -7,19 +7,16 @@ import {
   LogoutOutlined,
   ShopOutlined,
   SwapOutlined,
-  UserSwitchOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { getLandingPath } from '@/config/modules';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { logout, setActiveBranch, switchRole } from '@/store/slices/authSlice';
+import { logout, setActiveBranch } from '@/store/slices/authSlice';
 import { setPosBranch } from '@/store/slices/posSlice';
 import {
   SHIFT_CODE,
   SHIFT_SHORT_LABEL,
   USER_ROLE,
   USER_ROLE_LABEL,
-  USER_ROLES,
   type ShiftCode,
   type UserRole,
 } from '@/types';
@@ -86,24 +83,12 @@ export const PosLayout: FC = () => {
     dispatch(setActiveBranch(value));
   };
 
-  /** Menu tài khoản: hồ sơ, đổi vai trò nhanh (demo), đăng xuất. */
+  /** Menu tài khoản: hồ sơ, đăng xuất. */
   const userMenuItems: MenuProps['items'] = [
     {
       key: 'account',
       icon: <IdcardOutlined />,
       label: 'Tài khoản của tôi',
-    },
-    { type: 'divider' },
-    {
-      key: 'role-group',
-      type: 'group',
-      label: 'Chuyển đổi vai trò (demo)',
-      children: USER_ROLES.map((item: UserRole) => ({
-        key: `role-${item}`,
-        icon: <UserSwitchOutlined />,
-        label: USER_ROLE_LABEL[item],
-        disabled: item === role,
-      })),
     },
     { type: 'divider' },
     {
@@ -124,14 +109,6 @@ export const PosLayout: FC = () => {
     if (key === 'account') {
       navigate('/account');
       return;
-    }
-
-    if (key.startsWith('role-')) {
-      const nextRole = key.replace('role-', '') as UserRole;
-      dispatch(switchRole(nextRole));
-      // Mỗi vai trò có trang chính riêng: Thu ngân/Quản lý ở quầy, Thủ kho về
-      // tồn kho, Admin/Kế toán về Dashboard.
-      navigate(getLandingPath(nextRole));
     }
   };
 

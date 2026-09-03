@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import {
   App as AntdApp,
   Button,
@@ -14,6 +14,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import {
   CheckCircleOutlined,
+  CalculatorOutlined,
   DollarOutlined,
   EditOutlined,
   LoginOutlined,
@@ -30,11 +31,13 @@ import {
   canApprovePayment,
   canConfirmHours,
   confirmHours,
+  fetchPayroll,
+  generatePayroll,
   openHourAdjust,
   payrollPaid,
   resetHourAdjust,
 } from '@/store/slices/payrollSlice';
-import { clockIn, clockOut } from '@/store/slices/attendanceSlice';
+import { clockInApi, clockOutApi, scheduleAttendance } from '@/store/slices/attendanceSlice';
 import {
   ATTENDANCE_STATUS,
   ATTENDANCE_STATUS_LABEL,
@@ -54,12 +57,14 @@ import {
 } from '@/types';
 import { today } from '@/utils/dateUtils';
 import { formatDate, formatDateTime, formatPeriod, formatTime, nowIso } from '@/utils/dateUtils';
+import dayjs from 'dayjs';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { HourAdjustModal } from './components/HourAdjustModal';
 import './AttendancePage.css';
 
-const CURRENT_PAYROLL_PERIOD = '2026-08';
+/** Kỳ lương hiện tại theo tháng thực (MM-YYYY). */
+const CURRENT_PAYROLL_PERIOD = dayjs().format('MM-YYYY');
 
 const { Text } = Typography;
 
@@ -81,15 +86,44 @@ export const AttendancePage: FC = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('my-shifts');
 
-  const handleClockIn = (id: string): void => {
-    dispatch(clockIn({ id, actorId: user?.id ?? '' }));
-    message.success('Đã check-in thành công.');
+  const handleClockIn = async (id: string): Promise<void> => {
+    try {
+      await dispatch(clockInApi(id)).unwrap();
+      message.success('Đã check-in thành công.');
+    } catch (e: any) {
+      message.error(e?.message || 'Check-in thất bại');
+    }
   };
 
-  const handleClockOut = (id: string): void => {
-    dispatch(clockOut({ id, actorId: user?.id ?? '' }));
-    message.success('Đã check-out thành công.');
+  const handleClockOut = async (id: string): Promise<void> => {
+    try {
+      await dispatch(clockOutApi(id)).unwrap();
+      message.success('Đã check-out thành công.');
+    } catch (e: any) {
+      message.error(e?.message || 'Check-out thất bại');
+    }
   };
+
+/**
+   * Khi user vào trang lần đầu, tự sinh lịch 7 ngày tới.
+   * Dùng `user.id` làm idNhanVien (phải khớp với nhan_vien.id trong DB).
+   */
+  useEffect(() => {
+    if (user?.idNhanVien) {
+      void dispatch(scheduleAttendance({ idNhanVien: user.idNhanVien, days: 7 }))
+        .unwrap()
+        .catch((e: any) => {
+          console.warn('Không thể sinh lịch ca tự động:', e?.message || e);
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.idNhanVien]);
+
+  /** Tải bảng lương tháng từ backend khi vào trang. */
+  useEffect(() => {
+    void dispatch(fetchPayroll());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Người đang thao tác — dùng cho mọi kiểm tra quyền duyệt. */
   const actor = useMemo(
@@ -105,10 +139,10 @@ export const AttendancePage: FC = () => {
   const myAttendance = useMemo(
     () =>
       attendanceRecords
-        .filter((record) => record.employeeId === user?.id)
+        .filter((record) => record.employeeId === (user?.idNhanVien ?? user?.id))
         .sort((a, b) => b.workDate.localeCompare(a.workDate))
         .slice(0, ATTENDANCE_DISPLAY_LIMIT),
-    [attendanceRecords, user?.id],
+    [attendanceRecords, user?.idNhanVien, user?.id],
   );
 
   const attendanceRegister = useMemo(
@@ -265,7 +299,7 @@ export const AttendancePage: FC = () => {
   ];
 
   const isOwnAndToday = (row: AttendanceRecord): boolean =>
-    row.employeeId === user?.id && row.workDate === today();
+    row.employeeId === (user?.idNhanVien ?? user?.id) && row.workDate === today();
 
   const renderClockIn = (value: string | null, row: AttendanceRecord) => {
     if (value === null && isOwnAndToday(row)) {
@@ -522,6 +556,16 @@ export const AttendancePage: FC = () => {
     message.success(
       `Đã duyệt chi ${rows.length} bảng lương, tổng ${formatVND(total)}. Đã ghi ${rows.length} phiếu chi vào sổ quỹ.`,
     );
+  };
+
+  /** Tạo bảng lương tháng từ dữ liệu chấm công, rồi tải lại. */
+  const handleGeneratePayroll = async (): Promise<void> => {
+    try {
+      await dispatch(generatePayroll(CURRENT_PAYROLL_PERIOD)).unwrap();
+      message.success(`Đã tạo bảng lương ${formatPeriod(CURRENT_PAYROLL_PERIOD)} từ chấm công.`);
+    } catch (e: any) {
+      message.error(e?.message || 'Lỗi tạo bảng lương');
+    }
   };
 
   const payrollColumns: ColumnsType<PayrollRow> = [
@@ -948,24 +992,33 @@ export const AttendancePage: FC = () => {
                       setSelectedIds([]);
                     }}
                     actions={
-                      approvableSelected.length > 0 && (
-                        <Popconfirm
-                          title={`Duyệt chi ${approvableSelected.length} bảng lương?`}
-                          description={`Tổng chi ${formatVND(
-                            approvableSelected.reduce(
-                              (sum, row) => sum + row.netPay,
-                              0,
-                            ),
-                          )}. Hành động này không hoàn tác được.`}
-                          okText="Duyệt chi"
-                          cancelText="Huỷ"
-                          onConfirm={handleApproveBatch}
+                      <>
+                        <Button
+                          type="default"
+                          icon={<CalculatorOutlined />}
+                          onClick={() => void handleGeneratePayroll()}
                         >
-                          <Button type="primary" icon={<DollarOutlined />}>
+                          Tạo bảng lương
+                        </Button>
+                        {approvableSelected.length > 0 && (
+                          <Popconfirm
+                            title={`Duyệt chi ${approvableSelected.length} bảng lương?`}
+                            description={`Tổng chi ${formatVND(
+                              approvableSelected.reduce(
+                                (sum, row) => sum + row.netPay,
+                                0,
+                              ),
+                            )}. Hành động này không hoàn tác được.`}
+                            okText="Duyệt chi"
+                            cancelText="Huỷ"
+                            onConfirm={handleApproveBatch}
+                          >
+                            <Button type="primary" icon={<DollarOutlined />}>
                             Duyệt chi {approvableSelected.length} bảng
                           </Button>
                         </Popconfirm>
-                      )
+                        )}
+                      </>
                     }
                   />
 

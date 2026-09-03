@@ -2,13 +2,19 @@ package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.BangLuongDTO;
 import com.erp.cuahangtienloi.entity.BangLuong;
+import com.erp.cuahangtienloi.entity.ChamCong;
+import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -22,6 +28,111 @@ public class BangLuongController {
     private final BangLuongRepository bangLuongRepository;
     private final NhanVienRepository nhanVienRepository;
     private final ChiNhanhRepository chiNhanhRepository;
+    private final ChamCongRepository chamCongRepository;
+
+    /**
+     * Tự động tổng hợp bảng lương 1 tháng cho TẤT CẢ nhân viên từ dữ liệu chấm công.
+     * Idempotent: nếu (nhân viên, tháng) đã tồn tại thì bỏ qua (UNIQUE constraint).
+     *
+     * @param thangNam định dạng MM-YYYY, ví dụ "09-2026"
+     */
+    @PostMapping("/generate/{thangNam}")
+    @Transactional
+    public ResponseEntity<?> generateForMonth(@PathVariable String thangNam) {
+        try {
+            YearMonth ym = YearMonth.parse(thangNam, DateTimeFormatter.ofPattern("MM-yyyy"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new SuccessResponse("Tháng không hợp lệ, dùng MM-YYYY"));
+        }
+
+        LocalDate firstDay = YearMonth.parse(thangNam, DateTimeFormatter.ofPattern("MM-yyyy")).atDay(1);
+        LocalDate lastDay = firstDay.plusMonths(1).minusDays(1);
+
+        List<NhanVien> employees = nhanVienRepository.findAll();
+        // Chi nhánh đầu tiên có nhân viên — dùng cho ADMIN/KE_TOAN (không có chi nhánh).
+        final UUID firstBranchId = employees.stream()
+                .map(NhanVien::getIdChiNhanh)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        int created = 0;
+        for (NhanVien nv : employees) {
+            // Bỏ qua nhân viên không có chi nhánh (chưa được phân công) —
+            // bảng bang_luong yêu cầu id_chi_nhanh NOT NULL.
+            // Ngoại lệ: ADMIN/Kế toán không có chi nhánh → gán chi nhánh đầu tiên.
+            UUID idChiNhanh = nv.getIdChiNhanh();
+            if (idChiNhanh == null) {
+                if ("ADMIN".equals(nv.getVaiTro()) || "KE_TOAN".equals(nv.getVaiTro())) {
+                    idChiNhanh = firstBranchId;
+                }
+                if (idChiNhanh == null) continue;
+            }
+            // Bỏ qua nếu đã có
+            if (bangLuongRepository.findByIdNhanVienAndThangNam(nv.getId(), thangNam).isPresent()) {
+                continue;
+            }
+
+            // Tổng hợp chấm công trong tháng
+            List<ChamCong> records = chamCongRepository
+                    .findByIdNhanVienAndWorkDateBetween(nv.getId(), firstDay, lastDay);
+
+            BigDecimal tongGio = BigDecimal.ZERO;
+            BigDecimal tongOt = BigDecimal.ZERO;
+            int soCa = 0;
+            boolean isPartTime = "PART_TIME".equals(nv.getLoaiHopDong());
+            for (ChamCong cc : records) {
+                if (!"PRESENT".equals(cc.getTrangThai()) && !"LATE".equals(cc.getTrangThai())) {
+                    continue;
+                }
+                if (cc.getTongGioLam() != null) {
+                    // Giờ thực tế đã chấm công (check-in/out) — dùng cho mọi loại hợp đồng.
+                    tongGio = tongGio.add(cc.getTongGioLam());
+                } else if (!isPartTime && cc.getCheckInAt() != null && cc.getCheckOutAt() != null) {
+                    // FULL_TIME: fallback theo giờ ca chuẩn khi chưa check-out.
+                    // PART_TIME: chỉ trả lương theo giờ thực tế chấm, không fallback.
+                    long minutes = java.time.Duration.between(cc.getCheckInAt(), cc.getCheckOutAt()).toMinutes();
+                    tongGio = tongGio.add(BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP));
+                }
+                if (cc.getOvertimeHours() != null) tongOt = tongOt.add(cc.getOvertimeHours());
+                soCa++;
+            }
+
+            if (soCa == 0 && tongGio.signum() == 0) continue; // không có ca làm → bỏ qua
+
+            BigDecimal luongTheoGio = BigDecimal.valueOf(nv.getLuongTheoGio() != null ? nv.getLuongTheoGio() : 0);
+            BigDecimal luongCung = BigDecimal.valueOf(nv.getLuongCung() != null ? nv.getLuongCung() : 0);
+            BigDecimal tienOt = tongOt.multiply(luongTheoGio).multiply(BigDecimal.valueOf(1.5));
+            BigDecimal tienCongTheoGio = "PART_TIME".equals(nv.getLoaiHopDong())
+                    ? tongGio.multiply(luongTheoGio)
+                    : BigDecimal.ZERO;
+            BigDecimal tongTien = luongCung.add(tienCongTheoGio).add(tienOt);
+
+            BangLuong bl = new BangLuong();
+            bl.setId(UUID.randomUUID());
+            bl.setIdNhanVien(nv.getId());
+            bl.setIdChiNhanh(idChiNhanh);
+            bl.setLoaiHopDong(nv.getLoaiHopDong() != null ? nv.getLoaiHopDong() : "FULL_TIME");
+            bl.setThangNam(thangNam);
+            bl.setTongGioLam(tongGio);
+            bl.setOvertimeHours(tongOt);
+            bl.setTongSoCa(soCa);
+            bl.setLuongTheoGio(luongTheoGio);
+            bl.setLuongCung(luongCung);
+            bl.setLuongCungThucTe(luongCung);
+            bl.setTienCongTheoGio(tienCongTheoGio);
+            bl.setTienOt(tienOt);
+            bl.setThuong(BigDecimal.ZERO);
+            bl.setKhauTru(BigDecimal.ZERO);
+            bl.setTongTienLuong(tongTien);
+            bl.setTrangThai("CHO_XAC_NHAN");
+            bl.setNgayTao(LocalDateTime.now());
+            bl.setNgayCapNhat(LocalDateTime.now());
+            bangLuongRepository.save(bl);
+            created++;
+        }
+
+        return ResponseEntity.ok(new SuccessResponse("Đã tạo " + created + " bảng lương cho tháng " + thangNam));
+    }
 
     @GetMapping
     public ResponseEntity<List<BangLuongDTO>> getAll() {

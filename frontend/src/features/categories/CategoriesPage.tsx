@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type FC } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type FC } from 'react';
 import {
   App as AntdApp,
   Button,
@@ -19,7 +19,7 @@ import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { RecordStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { deleteCategory } from '@/store/slices/categorySlice';
+import { deleteCategoryThunk, fetchCategories } from '@/store/slices/categorySlice';
 import {
   RECORD_STATUS,
   USER_ROLE,
@@ -47,6 +47,10 @@ export const CategoriesPage: FC = () => {
   const user = useAppSelector((state) => state.auth.user);
   const categories = useAppSelector((state) => state.category.categories);
   const products = useAppSelector((state) => state.product.products);
+
+  useEffect(() => {
+    dispatch(fetchCategories());
+  }, [dispatch]);
 
   const canEdit =
     user?.role === USER_ROLE.Admin || user?.role === USER_ROLE.StoreManager;
@@ -161,7 +165,7 @@ export const CategoriesPage: FC = () => {
       });
       return;
     }
-    dispatch(deleteCategory(category.id));
+    dispatch(deleteCategoryThunk(category.id));
   };
 
   const columns: ColumnsType<Category> = [
@@ -169,24 +173,35 @@ export const CategoriesPage: FC = () => {
       title: 'Danh mục',
       dataIndex: 'name',
       width: 280,
-      render: (name: string, row) => (
-        <Space size={10}>
-          <div
-            className="category-icon-box"
-            style={{ '--cat-color': row.color } as CSSProperties}
-          >
-            {row.icon}
-          </div>
-          <span className="category-cell-info">
-            <Text strong className="product-name">
-              {name}
-            </Text>
-            <Text type="secondary" className="product-sub">
-              {row.code}
-            </Text>
-          </span>
-        </Space>
-      ),
+      render: (name: string, row) => {
+        // Map từ iconEmoji/colorHex (từ DB) - fallback về icon/color (mock cũ)
+        const icon = (row as any).iconEmoji || row.icon || '📦';
+        const color = (row as any).colorHex || row.color || '#000000';
+        const imageUrl = (row as any).imageUrl || '';
+        return (
+          <Space size={10}>
+            <div
+              className="category-icon-box"
+              style={{
+                '--cat-color': color,
+                backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              } as CSSProperties}
+            >
+              {!imageUrl && icon}
+            </div>
+            <span className="category-cell-info">
+              <Text strong className="product-name">
+                {name}
+              </Text>
+              <Text type="secondary" className="product-sub">
+                {row.code}
+              </Text>
+            </span>
+          </Space>
+        );
+      },
     },
     {
       title: 'Mô tả',

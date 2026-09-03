@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import { Button, Card, DatePicker, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -11,7 +11,8 @@ import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { BRAND } from '@/config/brand';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchCashbook } from '@/store/slices/cashbookSlice';
 import {
   CASH_CATEGORY,
   CASH_CATEGORY_LABEL,
@@ -44,8 +45,15 @@ const { RangePicker } = DatePicker;
  * Admin lập tay phiếu cấp vốn.
  */
 export const CashbookPage: FC = () => {
+  const dispatch = useAppDispatch();
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
   const allEntries = useAppSelector((state) => state.cashbook.entries);
+
+  // Nạp sổ quỹ từ backend khi vào trang.
+  useEffect(() => {
+    void dispatch(fetchCashbook());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canInjectCapital = user?.role === USER_ROLE.Admin;
   const [isCapitalModalOpen, setCapitalModalOpen] = useState(false);
@@ -71,7 +79,10 @@ export const CashbookPage: FC = () => {
         const matchCategory =
           categoryFilter === null || entry.category === categoryFilter;
         const matchBranch =
-          branchFilter === null || entry.branchId === branchFilter;
+          branchFilter === null ||
+          entry.branchId === branchFilter ||
+          // Phiếu không gắn chi nhánh (vốn, OPENING) hiển thị ở mọi filter.
+          entry.branchId === null;
         const matchRange =
           entry.entryDate >= range.from && entry.entryDate <= range.to;
         return (

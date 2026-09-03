@@ -11,9 +11,9 @@ import {
 } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  addBranch,
+  createBranch,
   setBranchModalOpen,
-  updateBranch,
+  updateBranchThunk,
 } from '@/store/slices/branchSlice';
 import {
   BRANCH_KIND,
@@ -67,16 +67,16 @@ export const BranchFormModal: FC = () => {
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      if (isEditing) {
-        dispatch(updateBranch({ id: selectedBranch.id, values }));
+      if (isEditing && selectedBranch) {
+        await dispatch(updateBranchThunk({ id: selectedBranch.id, values })).unwrap();
         message.success('Đã cập nhật thông tin chi nhánh.');
       } else {
-        dispatch(addBranch(values));
+        await dispatch(createBranch(values)).unwrap();
         message.success('Đã thêm chi nhánh mới.');
       }
       dispatch(setBranchModalOpen(false));
-    } catch {
-      // Lỗi validate đã được antd Form hiển thị tại từng field.
+    } catch (error: any) {
+      message.error(error?.message || 'Có lỗi xảy ra');
     }
   };
 

@@ -20,7 +20,7 @@ public class PhieuKiemKe {
     @Column(name = "ma_phieu", unique = true)
     private String maPhieu;
 
-    @Column(name = "id_chi_nhanh")
+    @Column(name = "id_chi_nhanh", nullable = false)
     private UUID idChiNhanh;
 
     @Column(name = "id_nguoi_tao")

@@ -78,19 +78,61 @@ public class TaiKhoanController {
             return ResponseEntity.badRequest().body(new ErrorResponse("Tên đăng nhập đã tồn tại"));
         }
 
+        // Nếu không chọn nhân viên có sẵn → tự tạo nhan_vien mới
+        UUID nhanVienId = request.getIdNhanVien();
+        if (nhanVienId == null) {
+            NhanVien newNv = new NhanVien();
+            newNv.setId(UUID.randomUUID());
+            newNv.setMaNhanVien("NV-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+            newNv.setTenDangNhap(request.getTenDangNhap());
+            newNv.setMatKhau(passwordEncoder.encode(request.getMatKhau()));
+            newNv.setHoTen(request.getTenDangNhap());
+            String vaiTro = request.getVaiTro() != null ? request.getVaiTro() : "THU_NGAN";
+            newNv.setVaiTro(vaiTro);
+            newNv.setLoaiHopDong("FULL_TIME");
+            newNv.setCaMacDinh("MORNING");
+            newNv.setNgayVaoLam(java.time.LocalDate.now());
+            newNv.setTrangThai("ACTIVE");
+            // Rule chk_vai_tro_chi_nhanh: ADMIN/KE_TOAN phải NULL id_chi_nhanh
+            if (!"ADMIN".equals(vaiTro) && !"KE_TOAN".equals(vaiTro)) {
+                // THU_KHO/QUAN_LY/THU_NGAN cần chi nhánh - mặc định NULL, user tự cập nhật sau
+                newNv.setIdChiNhanh(null);
+            } else {
+                newNv.setIdChiNhanh(null);
+            }
+            newNv.setNgayTao(LocalDateTime.now());
+            newNv.setNgayCapNhat(LocalDateTime.now());
+            nhanVienRepository.save(newNv);
+            nhanVienId = newNv.getId();
+        }
+
         TaiKhoan taiKhoan = new TaiKhoan();
         taiKhoan.setId(UUID.randomUUID());
         taiKhoan.setTenDangNhap(request.getTenDangNhap());
         taiKhoan.setMatKhauHash(passwordEncoder.encode(request.getMatKhau()));
-        taiKhoan.setIdNhanVien(request.getIdNhanVien());
+        taiKhoan.setIdNhanVien(nhanVienId);
         taiKhoan.setTrangThai("ACTIVE");
         taiKhoan.setNgayTao(LocalDateTime.now());
 
         taiKhoanRepository.save(taiKhoan);
 
-        if (request.getIdNhanVien() != null && request.getVaiTro() != null) {
-            nhanVienRepository.findById(request.getIdNhanVien()).ifPresent(nv -> {
-                nv.setVaiTro(request.getVaiTro());
+        if (request.getVaiTro() != null) {
+            final UUID finalNhanVienId = nhanVienId;
+            final String finalVaiTro = request.getVaiTro();
+            final String idChiNhanhReq = request.getIdChiNhanh();
+            nhanVienRepository.findById(finalNhanVienId).ifPresent(nv -> {
+                nv.setVaiTro(finalVaiTro);
+                // Nếu vai trò là ADMIN/KE_TOAN → bỏ chi nhánh
+                if ("ADMIN".equals(finalVaiTro) || "KE_TOAN".equals(finalVaiTro)) {
+                    nv.setIdChiNhanh(null);
+                } else if (idChiNhanhReq != null) {
+                    // Gán chi nhánh từ request
+                    try {
+                        nv.setIdChiNhanh(UUID.fromString(idChiNhanhReq));
+                    } catch (IllegalArgumentException e) {
+                        // ignore invalid UUID
+                    }
+                }
                 nhanVienRepository.save(nv);
             });
         }
@@ -113,6 +155,10 @@ public class TaiKhoanController {
                     if (request.getVaiTro() != null && tk.getIdNhanVien() != null) {
                         nhanVienRepository.findById(tk.getIdNhanVien()).ifPresent(nv -> {
                             nv.setVaiTro(request.getVaiTro());
+                            // Nếu đổi sang ADMIN/KE_TOAN → bỏ chi nhánh
+                            if ("ADMIN".equals(request.getVaiTro()) || "KE_TOAN".equals(request.getVaiTro())) {
+                                nv.setIdChiNhanh(null);
+                            }
                             nhanVienRepository.save(nv);
                         });
                     }

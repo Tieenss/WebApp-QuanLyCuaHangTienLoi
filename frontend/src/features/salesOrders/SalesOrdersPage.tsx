@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import {
   App as AntdApp,
   Button,
@@ -22,6 +22,8 @@ import {
   orderRefunded,
   setSelectedOrder,
 } from '@/store/slices/salesOrderSlice';
+import { hoaDonApi, type HoaDonDTO } from '@/api/hoaDon';
+import { chiTietHoaDonApi } from '@/api/chiTietHoaDon';
 import {
   ORDER_STATUS,
   PAYMENT_METHOD_LABEL,
@@ -36,6 +38,29 @@ import { OrderDetailDrawer } from './components/OrderDetailDrawer';
 import './SalesOrdersPage.css';
 
 const { Text } = Typography;
+
+/** Map HoaDonDTO (backend) → SalesOrder (frontend). Lines nạp riêng nếu cần. */
+const mapDtoToOrder = (dto: HoaDonDTO, branchName: string, cashierName: string): SalesOrder => ({
+  id: dto.id,
+  code: dto.maHoaDon ?? '',
+  branchId: dto.idChiNhanh,
+  branchName,
+  cashierId: dto.idThuNgan,
+  cashierName,
+  shiftCode: dto.caLamViec ?? 'MORNING',
+  soldAt: dto.ngayBan ?? '',
+  lines: [],
+  subTotal: dto.subTotal ?? 0,
+  discountTotal: dto.giamGia ?? 0,
+  vatTotal: dto.vatTotal ?? 0,
+  grandTotal: dto.grandTotal ?? 0,
+  paymentMethod: (dto.hinhThucTt ?? 'CASH') as PaymentMethod,
+  tenderedAmount: dto.tienKhachDua ?? 0,
+  changeAmount: dto.tienThoi ?? 0,
+  status: (dto.trangThai ?? 'COMPLETED') as SalesOrder['status'],
+  memberPhone: dto.sdtThanhVien ?? null,
+  note: dto.ghiChu ?? '',
+});
 
 /**
  * Module — Lịch sử hoá đơn bán hàng.
@@ -54,7 +79,10 @@ export const SalesOrdersPage: FC = () => {
   const { message } = AntdApp.useApp();
 
   const user = useAppSelector((state) => state.auth.user);
-  const orders = useAppSelector((state) => state.salesOrder.orders);
+  const sessionOrders = useAppSelector((state) => state.salesOrder.orders);
+  const branches = useAppSelector((state) => state.branch.branches);
+  const employees = useAppSelector((state) => state.employee.employees);
+  const products = useAppSelector((state) => state.product.products);
   const selectedOrderId = useAppSelector(
     (state) => state.salesOrder.selectedOrderId,
   );
@@ -73,6 +101,37 @@ export const SalesOrdersPage: FC = () => {
   const [branchFilter, setBranchFilter] = useState<string | null>(null);
   const [paymentFilter, setPaymentFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [apiOrders, setApiOrders] = useState<SalesOrder[]>([]);
+
+  // Nạp hoá đơn từ DB (hoa_don) khi vào trang — hợp nhất với đơn trong session.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      try {
+        const list = await hoaDonApi.getAll();
+        if (cancelled) return;
+        const branchNameOf = (id: string) =>
+          branches.find((b) => b.id === id)?.name ?? '';
+        const cashierNameOf = (id: string) =>
+          employees.find((e) => e.id === id)?.fullName ?? 'Thu ngân';
+        setApiOrders(list.map((d) => mapDtoToOrder(d, branchNameOf(d.idChiNhanh), cashierNameOf(d.idThuNgan))));
+      } catch {
+        // im lặng — vẫn hiện đơn trong session
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branches.length, employees.length]);
+
+  // Hợp nhất: API (DB) + session (đơn vừa bán chưa load lại trang).
+  const orders = useMemo(() => {
+    const seen = new Set(sessionOrders.map((o) => o.code));
+    const merged = [...sessionOrders, ...apiOrders.filter((o) => !seen.has(o.code))];
+    return merged.sort((a, b) => b.soldAt.localeCompare(a.soldAt));
+  }, [sessionOrders, apiOrders]);
 
   /** Lọc theo phạm vi dữ liệu của vai trò trước, rồi mới đến filter UI. */
   const scoped = useMemo(
@@ -381,6 +440,39 @@ export const SalesOrdersPage: FC = () => {
   /** Mở drawer chi tiết — `OrderDetailDrawer` đọc `selectedOrderId` từ slice. */
   const handleView = (order: SalesOrder): void => {
     dispatch(setSelectedOrder(order.id));
+    // Đơn từ DB có lines rỗng — nạp chi tiết từ API khi mở drawer.
+    if (order.lines.length === 0) {
+      void (async () => {
+        try {
+          const lines = await chiTietHoaDonApi.getByHoaDon(order.id);
+          setApiOrders((prev) =>
+            prev.map((o) =>
+              o.id === order.id
+                ? {
+                    ...o,
+                    lines: lines.map((l, i) => ({
+                      id: l.id ?? `line-${i}`,
+                      productId: l.idSanPham,
+                      sku: products.find((p) => p.id === l.idSanPham)?.sku ?? '',
+                      productName:
+                        products.find((p) => p.id === l.idSanPham)?.name ?? '',
+                      unit: '',
+                      unitPrice: l.donGia,
+                      quantity: l.soLuong,
+                      lineDiscount: l.giamGia ?? 0,
+                      vatPercent: 8,
+                      lineTotal: l.thanhTien,
+                      unitCost: 0,
+                    })),
+                  }
+                : o,
+            ),
+          );
+        } catch {
+          // bỏ qua — drawer hiện bảng trống
+        }
+      })();
+    }
   };
 
   /**

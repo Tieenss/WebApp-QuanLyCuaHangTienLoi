@@ -8,6 +8,6 @@ import java.util.UUID;
 
 @Repository
 public interface NhaCungCapRepository extends JpaRepository<NhaCungCap, UUID> {
-    Optional<NhaCungCap> findByMaNhaCungCap(String maNhaCungCap);
-    boolean existsByMaNhaCungCap(String maNhaCungCap);
+    Optional<NhaCungCap> findByMaNcc(String maNcc);
+    boolean existsByMaNcc(String maNcc);
 }

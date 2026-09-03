@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type FC } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type FC } from 'react';
 import {
   Button,
   Card,
@@ -25,10 +25,13 @@ import { RecordStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  deleteProduct,
+  deleteProductThunk,
+  fetchProducts,
   setProductModalOpen,
   setSelectedProduct,
 } from '@/store/slices/productSlice';
+import { fetchCategories } from '@/store/slices/categorySlice';
+import { fetchSuppliers } from '@/store/slices/supplierSlice';
 import { totalStockOf } from '@/store/slices/stockSlice';
 import {
   PRODUCT_UNIT_LABEL,
@@ -66,9 +69,31 @@ const marginPercent = (product: Product): number =>
  */
 export const ProductsPage: FC = () => {
   const dispatch = useAppDispatch();
-  const { products } = useAppSelector((state) => state.product);
+  const { products, loading } = useAppSelector((state) => state.product);
+
+  useEffect(() => {
+    dispatch(fetchProducts());
+  }, [dispatch]);
   const categories = useAppSelector((state) => state.category.categories);
+  const suppliers = useAppSelector((state) => state.supplier.suppliers);
   const balances = useAppSelector((state) => state.stock.balances);
+
+  useEffect(() => {
+    dispatch(fetchProducts());
+    dispatch(fetchCategories());
+    dispatch(fetchSuppliers());
+  }, [dispatch]);
+
+  // Enrich products với categoryName và supplierName từ Redux
+  const enrichedProducts = useMemo(
+    () =>
+      products.map((p) => ({
+        ...p,
+        categoryName: p.categoryName || categories.find((c) => c.id === p.categoryId)?.name || '',
+        supplierName: p.supplierName || suppliers.find((s) => s.id === p.supplierId)?.name || '',
+      })),
+    [products, categories, suppliers],
+  );
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
@@ -77,7 +102,7 @@ export const ProductsPage: FC = () => {
 
   const filtered = useMemo(
     () =>
-      products.filter((product) => {
+      enrichedProducts.filter((product) => {
         const matchSearch = matchKeyword(search, [
           product.name,
           product.sku,
@@ -93,11 +118,11 @@ export const ProductsPage: FC = () => {
           (perishableFilter === 'yes' ? product.isPerishable : !product.isPerishable);
         return matchSearch && matchCategory && matchStatus && matchPerishable;
       }),
-    [products, search, categoryFilter, statusFilter, perishableFilter],
+    [enrichedProducts, search, categoryFilter, statusFilter, perishableFilter],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
-    const active = products.filter(
+    const active = enrichedProducts.filter(
       (product) => product.status === RECORD_STATUS.Active,
     );
     const perishable = active.filter((product) => product.isPerishable);
@@ -110,7 +135,7 @@ export const ProductsPage: FC = () => {
         key: 'products',
         title: 'Sản phẩm đang kinh doanh',
         value: formatNumber(active.length),
-        suffix: `/ ${products.length} SKU`,
+        suffix: `/ ${enrichedProducts.length} SKU`,
         color: BRAND.primaryRed,
       },
       {
@@ -133,7 +158,7 @@ export const ProductsPage: FC = () => {
         color: BRAND.success,
       },
     ];
-  }, [products, categories]);
+  }, [enrichedProducts, categories]);
 
   const filters: ToolbarFilter[] = [
     {
@@ -143,7 +168,7 @@ export const ProductsPage: FC = () => {
       onChange: setCategoryFilter,
       options: categories.map((category) => ({
         value: category.id,
-        label: `${category.icon} ${category.name}`,
+        label: `${(category as any).iconEmoji || category.icon || '📦'} ${category.name}`,
       })),
       span: 6,
     },
@@ -180,7 +205,7 @@ export const ProductsPage: FC = () => {
   };
 
   const handleDelete = (id: string): void => {
-    dispatch(deleteProduct(id));
+    dispatch(deleteProductThunk(id));
   };
 
   const productColumns: ColumnsType<Product> = [
@@ -432,6 +457,7 @@ export const ProductsPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
+          loading={loading}
           scroll={{ x: 1900 }}
           pagination={{
             pageSize: 12,

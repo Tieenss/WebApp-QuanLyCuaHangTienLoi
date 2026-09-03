@@ -1,14 +1,16 @@
-import { createAction, createSlice } from '@reduxjs/toolkit';
+import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   PAYROLL_STATUS,
   USER_ROLE,
   paymentApproverRole,
   requiresHourConfirmation,
+  type EmploymentType,
   type PayrollRow,
+  type PayrollStatus,
   type UserRole,
 } from '@/types';
-
+import { bangLuongApi, type BangLuongDTO } from '@/api/bangLuong';
 import { nowIso } from '@/utils/dateUtils';
 
 /**
@@ -35,13 +37,100 @@ export interface PayrollState {
   adjustingId: string | null;
   /** Thông báo lỗi nghiệp vụ gần nhất (ví dụ tự duyệt cho mình). */
   error: string | null;
+  /** Trạng thái tải dữ liệu từ backend. */
+  loading: boolean;
 }
 
 const initialState: PayrollState = {
   rows: [],
   adjustingId: null,
   error: null,
+  loading: false,
 };
+
+/** Map từ backend DTO sang frontend PayrollRow. */
+const mapDtoToPayrollRow = (dto: BangLuongDTO): PayrollRow => ({
+  id: dto.id,
+  employeeId: dto.idNhanVien,
+  employeeCode: '',
+  employeeName: dto.tenNhanVien ?? '',
+  role: (dto.loaiHopDong === 'FULL_TIME' ? 'QUAN_LY' : 'THU_NGAN') as UserRole,
+  branchId: dto.idChiNhanh,
+  branchName: dto.tenChiNhanh ?? '',
+  period: dto.thangNam,
+  employmentType: dto.loaiHopDong as EmploymentType,
+  totalShifts: dto.tongSoCa,
+  totalHours: dto.tongGioLam,
+  adjustedHours: dto.gioDieuChinh ?? null,
+  adjustReason: dto.lyDoDieuChinh ?? '',
+  overtimeHours: dto.overtimeHours,
+  baseSalary: dto.luongCung,
+  shiftPay: dto.tienCongTheoGio,
+  overtimePay: dto.tienOt,
+  bonus: dto.thuong,
+  deduction: dto.khauTru,
+  netPay: dto.tongTienLuong,
+  status: (dto.trangThai || 'CHO_XAC_NHAN') as PayrollStatus,
+  confirmedBy: dto.tenNguoiXacNhan ?? null,
+  confirmedAt: dto.ngayXacNhan ?? null,
+  paidBy: dto.tenNguoiThanhToan ?? null,
+  paidAt: dto.ngayThanhToan ?? null,
+});
+
+/** Tải bảng lương từ backend (kèm enrich vai trò từ danh sách nhân viên). */
+export const fetchPayroll = createAsyncThunk(
+  'payroll/fetchAll',
+  async (_, { rejectWithValue }) => {
+    try {
+      const [list, nvList] = await Promise.all([
+        bangLuongApi.getAll(),
+        fetch(`${API_BASE_URL}/api/nhan-vien`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+          },
+        }).then((r) => r.json() as Promise<Array<{ id: string; vaiTro?: string; maNhanVien?: string; hoTen?: string }>>),
+      ]);
+
+      const roleById = new Map(nvList.map((nv) => [nv.id, nv.vaiTro]));
+      const codeById = new Map(nvList.map((nv) => [nv.id, nv.maNhanVien]));
+
+      return list.map((dto) => {
+        const row = mapDtoToPayrollRow(dto);
+        const role = roleById.get(dto.idNhanVien);
+        if (role) row.role = role as UserRole;
+        row.employeeCode = codeById.get(dto.idNhanVien) ?? '';
+        return row;
+      });
+    } catch (e: any) {
+      return rejectWithValue(e?.message || 'Lỗi tải bảng lương');
+    }
+  },
+);
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+
+/** Cập nhật bảng lương (duyệt / xác nhận). */
+export const updatePayroll = createAsyncThunk(
+  'payroll/update',
+  async ({ id, data }: { id: string; data: Partial<BangLuongDTO> }) => {
+    const dto = await bangLuongApi.update(id, data);
+    return mapDtoToPayrollRow(dto);
+  },
+);
+
+/** Tự tổng hợp bảng lương tháng từ dữ liệu chấm công, rồi tải lại. */
+export const generatePayroll = createAsyncThunk(
+  'payroll/generate',
+  async (thangNam: string, { rejectWithValue, dispatch }) => {
+    try {
+      await bangLuongApi.generate(thangNam);
+      await dispatch(fetchPayroll()).unwrap();
+      return thangNam;
+    } catch (e: any) {
+      return rejectWithValue(e?.message || 'Lỗi tạo bảng lương');
+    }
+  },
+);
 
 /** Người thực hiện hành động, truyền từ component vì slice không đọc state auth. */
 interface Actor {
@@ -227,23 +316,49 @@ export const payrollSlice = createSlice({
   },
 
   extraReducers: (builder) => {
-    /**
-     * Chuyển các dòng đã duyệt sang `DA_THANH_TOAN`.
-     *
-     * Component đã lọc bằng `canApprovePayment` trước khi dispatch, nhưng vẫn
-     * kiểm lại ở đây — action công khai nên có thể được gọi từ nơi khác.
-     */
-    builder.addCase(payrollPaid, (state, action) => {
-      for (const paidRow of action.payload.rows) {
-        const row = state.rows.find((item) => item.id === paidRow.id);
-        if (!row || row.status !== PAYROLL_STATUS.Confirmed) continue;
+    builder
+      .addCase(fetchPayroll.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPayroll.fulfilled, (state, action) => {
+        state.loading = false;
+        state.rows = action.payload;
+      })
+      .addCase(fetchPayroll.rejected, (state, action) => {
+        state.loading = false;
+        state.error = (action.payload as string) || 'Lỗi tải bảng lương';
+      })
+      .addCase(updatePayroll.fulfilled, (state, action) => {
+        const idx = state.rows.findIndex((r) => r.id === action.payload.id);
+        if (idx !== -1) state.rows[idx] = action.payload;
+      })
+      .addCase(updatePayroll.rejected, (state, action) => {
+        state.error = (action.payload as string) || 'Lỗi cập nhật bảng lương';
+      })
+      .addCase(generatePayroll.fulfilled, (state) => {
+        state.error = null;
+      })
+      .addCase(generatePayroll.rejected, (state, action) => {
+        state.error = (action.payload as string) || 'Lỗi tạo bảng lương';
+      })
+      /**
+       * Chuyển các dòng đã duyệt sang `DA_THANH_TOAN`.
+       *
+       * Component đã lọc bằng `canApprovePayment` trước khi dispatch, nhưng vẫn
+       * kiểm lại ở đây — action công khai nên có thể được gọi từ nơi khác.
+       */
+      .addCase(payrollPaid, (state, action) => {
+        for (const paidRow of action.payload.rows) {
+          const row = state.rows.find((item) => item.id === paidRow.id);
+          if (!row || row.status !== PAYROLL_STATUS.Confirmed) continue;
 
-        row.status = PAYROLL_STATUS.Paid;
-        row.paidBy = action.payload.approvedBy;
-        row.paidAt = action.payload.paidAt;
-      }
-      state.error = null;
-    });
+          row.status = PAYROLL_STATUS.Paid;
+          row.paidBy = action.payload.approvedBy;
+          row.paidAt = action.payload.paidAt;
+        }
+        state.error = null;
+      });
   },
 });
 

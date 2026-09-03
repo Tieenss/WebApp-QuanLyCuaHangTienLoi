@@ -76,6 +76,17 @@ export const daysUntil = (value: string | null): number | null => {
 
 /** Nhãn kỳ lương dạng "Tháng 08/2026" từ chuỗi YYYY-MM. */
 export const formatPeriod = (period: string): string => {
+  // period dạng MM-YYYY (ví dụ "09-2026") — parse thủ công để không bị Invalid Date.
+  const m = /^(\d{2})-(\d{4})$/.exec(period.trim());
+  if (m) {
+    const [, mm, yyyy] = m;
+    const monthNum = parseInt(mm, 10);
+    const names = [
+      'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+      'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
+    ];
+    return `${names[monthNum - 1] ?? `Tháng ${mm}`}/${yyyy}`;
+  }
   const parsed = dayjs(`${period}-01`);
   return `Tháng ${parsed.format('MM/YYYY')}`;
 };

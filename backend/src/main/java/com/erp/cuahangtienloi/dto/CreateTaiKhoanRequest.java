@@ -9,4 +9,5 @@ public class CreateTaiKhoanRequest {
     private String matKhau;
     private UUID idNhanVien;
     private String vaiTro;
+    private String idChiNhanh;
 }

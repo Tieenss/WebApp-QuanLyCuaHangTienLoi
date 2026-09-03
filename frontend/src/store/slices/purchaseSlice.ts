@@ -1,10 +1,11 @@
-import { createAction, createSlice } from '@reduxjs/toolkit';
+import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   DOCUMENT_STATUS,
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '@/types';
+import { phieuNhapApi, type PhieuNhapDTO } from '@/api/phieuNhap';
 
 /**
  * Module 8 — Nhập kho từ nhà cung cấp (dữ liệu ghi được).
@@ -26,11 +27,47 @@ import {
 
 export interface PurchaseState {
   orders: PurchaseOrder[];
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: PurchaseState = {
   orders: [],
+  loading: false,
+  error: null,
 };
+
+const mapDtoToOrder = (dto: PhieuNhapDTO): PurchaseOrder => ({
+  id: dto.id,
+  code: dto.maPhieu,
+  supplierId: dto.idNcc || '',
+  supplierName: '',
+  branchId: dto.idChiNhanh || '',
+  branchName: '',
+  orderDate: dto.ngayDatHang || '',
+  expectedDate: dto.ngayDuKienGiao || null,
+  receivedDate: dto.ngayNhanThucTe || null,
+  status: (dto.trangThai as any) || 'PENDING',
+  subTotal: dto.subTotal || 0,
+  vatTotal: dto.vatTotal || 0,
+  discount: dto.giamGia || 0,
+  grandTotal: dto.grandTotal || 0,
+  paidAmount: dto.daThanhToan || 0,
+  debtAmount: dto.congNo || 0,
+  note: dto.ghiChu || '',
+  createdAt: dto.ngayTao || '',
+  createdBy: '',
+  idNguoiNhap: dto.idNguoiNhap || '',
+  lines: [],
+});
+
+export const fetchPurchaseOrders = createAsyncThunk(
+  'purchase/fetchAll',
+  async () => {
+    const data = await phieuNhapApi.getAll();
+    return data.map(mapDtoToOrder);
+  },
+);
 
 /** Một dòng hàng người dùng nhập trên form. */
 export interface PurchaseDraftLine {
@@ -133,6 +170,19 @@ export const purchaseSlice = createSlice({
   },
 
   extraReducers: (builder) => {
+    builder
+      .addCase(fetchPurchaseOrders.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPurchaseOrders.fulfilled, (state, action) => {
+        state.loading = false;
+        state.orders = action.payload;
+      })
+      .addCase(fetchPurchaseOrders.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Lỗi tải phiếu nhập';
+      });
     // Bước 1: lưu phiếu nhập, mới nhất lên đầu.
     builder.addCase(purchaseReceived, (state, action) => {
       state.orders.unshift(action.payload.order);

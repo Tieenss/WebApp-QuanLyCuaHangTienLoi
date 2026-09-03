@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import {
   Card,
   Col,
@@ -10,6 +10,7 @@ import {
   Tabs,
   Tag,
   Typography,
+  message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -32,6 +33,8 @@ import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { EmptyState } from '@/components/EmptyState';
 import { BRAND, CHART_COLORS } from '@/config/brand';
 import { useAppSelector } from '@/store/hooks';
+import { hoaDonApi, type HoaDonDTO, type ChiTietHoaDonDTO } from '@/api/hoaDon';
+import { theKhoApi, type TheKhoDTO } from '@/api/tonKho';
 import {
   SHRINKAGE_REASON_LABEL,
   TIME_RANGE_LABEL,
@@ -41,7 +44,7 @@ import {
   type TimeRange,
   type TopSellingRow,
 } from '@/types';
-import { formatDate } from '@/utils/dateUtils';
+import { dayjs, formatDate } from '@/utils/dateUtils';
 import {
   formatNumber,
   formatRatio,
@@ -76,29 +79,44 @@ interface DashboardMetricsData {
   lowStockCount: number;
 }
 
-const buildDashboardMetrics = (_branchId: string | null, _range: TimeRange, _balances: unknown[]): DashboardMetricsData => ({
-  revenue: 0,
-  previousRevenue: 0,
-  orderCount: 0,
-  previousOrderCount: 0,
-  averageOrderValue: 0,
-  previousAverageOrderValue: 0,
-  grossProfit: 0,
-  previousGrossProfit: 0,
-  itemsSold: 0,
-  stockValue: 0,
-  lowStockCount: 0,
-});
+interface DashboardMetricsData {
+  revenue: number;
+  previousRevenue: number;
+  orderCount: number;
+  previousOrderCount: number;
+  averageOrderValue: number;
+  previousAverageOrderValue: number;
+  grossProfit: number;
+  previousGrossProfit: number;
+  itemsSold: number;
+  stockValue: number;
+  lowStockCount: number;
+}
 
-const buildProfitByBranch = (_range: TimeRange): ProfitReportRow[] => [];
+/** Khoảng ngày tương ứng TimeRange, dạng [fromDate, toDate] (YYYY-MM-DD). */
+const rangeToDateRange = (range: TimeRange): [string, string] => {
+  const now = dayjs();
+  switch (range) {
+    case 'today':
+      return [now.format('YYYY-MM-DD'), now.format('YYYY-MM-DD')];
+    case '7days':
+      return [now.subtract(6, 'day').format('YYYY-MM-DD'), now.format('YYYY-MM-DD')];
+    case '30days':
+      return [now.subtract(29, 'day').format('YYYY-MM-DD'), now.format('YYYY-MM-DD')];
+    case 'thisMonth':
+      return [now.startOf('month').format('YYYY-MM-DD'), now.format('YYYY-MM-DD')];
+  }
+};
 
-const buildProfitByCategory = (_branchId: string | null, _range: TimeRange): ProfitReportRow[] => [];
-
-const buildTopSelling = (_branchId: string | null, _range: TimeRange, _balances: unknown[], _limit: number): TopSellingRow[] => [];
-
-const buildShrinkageReport = (_branchId: string | null): ShrinkageReportRow[] => [];
-
-const buildCategoryRevenue = (_branchId: string | null, _range: TimeRange): CategoryRevenueData[] => [];
+/** Số ngày của kỳ so sánh trước (cùng độ dài). */
+const rangeLengthDays = (range: TimeRange): number => {
+  switch (range) {
+    case 'today': return 1;
+    case '7days': return 7;
+    case '30days': return 30;
+    case 'thisMonth': return dayjs().date();
+  }
+};
 
 /**
  * Module 13 — Báo cáo.
@@ -114,6 +132,114 @@ export const ReportsPage: FC = () => {
 
   const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [range, setRange] = useState<TimeRange>('30days');
+  const [invoices, setInvoices] = useState<HoaDonDTO[]>([]);
+  const [invoiceLines, setInvoiceLines] = useState<Record<string, ChiTietHoaDonDTO[]>>({});
+  const [ledger, setLedger] = useState<TheKhoDTO[]>([]);
+  const [, setLoading] = useState(false);
+
+  // Nạp dữ liệu gốc từ API khi vào trang.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      setLoading(true);
+      try {
+        const [hdList, ledgerList] = await Promise.all([
+          hoaDonApi.getAll(),
+          theKhoApi.getAll(),
+        ]);
+        if (cancelled) return;
+        setInvoices(hdList);
+        setLedger(ledgerList);
+
+        // Nạp chi tiết hoá đơn cho từng đơn (song song, giới hạn 200 đơn gần nhất).
+        const sorted = [...hdList]
+          .sort((a, b) => (b.ngayBan ?? '').localeCompare(a.ngayBan ?? ''))
+          .slice(0, 200);
+        const lineMap: Record<string, ChiTietHoaDonDTO[]> = {};
+        await Promise.all(
+          sorted.map(async (hd) => {
+            try {
+              const res = await fetch(
+                `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/chi-tiet-hoa-don/by-hoa-don/${hd.id}`,
+                { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } },
+              );
+              if (res.ok) lineMap[hd.id] = await res.json();
+            } catch {
+              lineMap[hd.id] = [];
+            }
+          }),
+        );
+        if (!cancelled) setInvoiceLines(lineMap);
+      } catch {
+        if (!cancelled) message.error('Lỗi tải dữ liệu báo cáo');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Hoá đơn COMPLETED trong kỳ + filter chi nhánh. */
+  const periodInvoices = useMemo(() => {
+    const [from, to] = rangeToDateRange(range);
+    return invoices.filter((hd) => {
+      const d = (hd.ngayBan ?? '').slice(0, 10);
+      return (
+        d >= from &&
+        d <= to &&
+        (hd.trangThai ?? 'COMPLETED') === 'COMPLETED' &&
+        (branchId === null || hd.idChiNhanh === branchId)
+      );
+    });
+  }, [invoices, range, branchId]);
+
+  /** Hoá đơn kỳ trước (cùng độ dài) để so sánh. */
+  const previousPeriodInvoices = useMemo(() => {
+    const days = rangeLengthDays(range);
+    const now = dayjs();
+    const from = now.subtract(days, 'day').format('YYYY-MM-DD');
+    const to = now.subtract(1, 'day').format('YYYY-MM-DD');
+    return invoices.filter((hd) => {
+      const d = (hd.ngayBan ?? '').slice(0, 10);
+      return (
+        d >= from &&
+        d <= to &&
+        (hd.trangThai ?? 'COMPLETED') === 'COMPLETED' &&
+        (branchId === null || hd.idChiNhanh === branchId)
+      );
+    });
+  }, [invoices, range, branchId]);
+
+  /** Giá vốn đơn vị theo sản phẩm (từ ton_kho.giaVonTrungBinh, lấy min mọi chi nhánh). */
+  const costByProduct = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const b of balances) {
+      const cost = Number(b.averageCost ?? 0);
+      if (cost > 0 && (!map.has(b.productId) || cost < (map.get(b.productId) ?? Infinity))) {
+        map.set(b.productId, cost);
+      }
+    }
+    return map;
+  }, [balances]);
+
+  /** Số lượng bán + doanh thu + COGS theo từng sản phẩm trong kỳ. */
+  const productStats = useMemo(() => {
+    const map = new Map<string, { qty: number; revenue: number; cogs: number }>();
+    for (const hd of periodInvoices) {
+      const lines = invoiceLines[hd.id] ?? [];
+      for (const line of lines) {
+        const prev = map.get(line.idSanPham) ?? { qty: 0, revenue: 0, cogs: 0 };
+        prev.qty += line.soLuong;
+        prev.revenue += line.thanhTien;
+        prev.cogs += line.soLuong * (costByProduct.get(line.idSanPham) ?? 0);
+        map.set(line.idSanPham, prev);
+      }
+    }
+    return map;
+  }, [periodInvoices, invoiceLines, costByProduct]);
 
   const branchNameById = (id: string | null): string => {
     if (id === null) return 'Toàn chuỗi';
@@ -123,10 +249,35 @@ export const ReportsPage: FC = () => {
 
   const productById = (id: string) => products.find((p) => p.id === id);
 
-  const metrics = useMemo(
-    () => buildDashboardMetrics(branchId, range, balances),
-    [branchId, range, balances],
-  );
+  const metrics = useMemo<DashboardMetricsData>(() => {
+    const revenue = periodInvoices.reduce((s, hd) => s + hd.grandTotal, 0);
+    const previousRevenue = previousPeriodInvoices.reduce((s, hd) => s + hd.grandTotal, 0);
+    const cogs = [...productStats.values()].reduce((s, v) => s + v.cogs, 0);
+    const itemsSold = [...productStats.values()].reduce((s, v) => s + v.qty, 0);
+    const stockValue = balances.reduce(
+      (sum, b) => sum + Number(b.stockValue ?? 0),
+      0,
+    );
+    const lowStockCount = balances.filter(
+      (b) => Number(b.quantity ?? 0) <= Number(b.minStock ?? 0),
+    ).length;
+    return {
+      revenue,
+      previousRevenue,
+      orderCount: periodInvoices.length,
+      previousOrderCount: previousPeriodInvoices.length,
+      averageOrderValue: periodInvoices.length === 0 ? 0 : Math.round(revenue / periodInvoices.length),
+      previousAverageOrderValue:
+        previousPeriodInvoices.length === 0
+          ? 0
+          : Math.round(previousRevenue / previousPeriodInvoices.length),
+      grossProfit: revenue - cogs,
+      previousGrossProfit: 0,
+      itemsSold,
+      stockValue,
+      lowStockCount,
+    };
+  }, [periodInvoices, previousPeriodInvoices, productStats, balances]);
 
   const summary = useMemo<SummaryItem[]>(() => {
     const grossMargin =
@@ -160,26 +311,169 @@ export const ReportsPage: FC = () => {
   }, [metrics]);
 
   // ── Báo cáo 1: Doanh thu ──────────────────────────────────────────────────────
-  const branchProfit = useMemo(() => buildProfitByBranch(range), [range]);
-  const categoryRevenue = useMemo(
-    () => buildCategoryRevenue(branchId, range),
-    [branchId, range],
-  );
+  const branchProfit = useMemo<ProfitReportRow[]>(() => {
+    // Chi phí vận hành theo chi nhánh từ sổ quỹ (PAYMENT) — đã nạp qua cashbookSlice.
+    // Ở đây chỉ tổng hợp doanh thu/COGS từ hoá đơn; chi phí đặt 0 (MVP).
+    const map = new Map<string, { revenue: number; cogs: number; orders: number }>();
+    for (const hd of invoices.filter(
+      (h) =>
+        (h.trangThai ?? 'COMPLETED') === 'COMPLETED' &&
+        (branchId === null || h.idChiNhanh === branchId),
+    )) {
+      const key = hd.idChiNhanh;
+      const prev = map.get(key) ?? { revenue: 0, cogs: 0, orders: 0 };
+      prev.revenue += hd.grandTotal;
+      prev.orders += 1;
+      map.set(key, prev);
+    }
+    // COGS chia theo chi nhánh từ line items
+    for (const hd of periodInvoices) {
+      const lines = invoiceLines[hd.id] ?? [];
+      for (const line of lines) {
+        const prev = map.get(hd.idChiNhanh);
+        if (prev) {
+          prev.cogs += line.soLuong * (costByProduct.get(line.idSanPham) ?? 0);
+        }
+      }
+    }
+    return [...map.entries()]
+      .map(([id, v]) => ({
+        id,
+        dimensionName: branchNameById(id),
+        revenue: v.revenue,
+        cogs: v.cogs,
+        grossProfit: v.revenue - v.cogs,
+        operatingCost: 0,
+        netProfit: v.revenue - v.cogs,
+        netMarginPercent: v.revenue === 0 ? 0 : ((v.revenue - v.cogs) / v.revenue) * 100,
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, periodInvoices, invoiceLines, costByProduct, branchId, branches]);
+
+  const categoryRevenue = useMemo<CategoryRevenueData[]>(() => {
+    const map = new Map<string, { name: string; revenue: number }>();
+    for (const hd of periodInvoices) {
+      const lines = invoiceLines[hd.id] ?? [];
+      for (const line of lines) {
+        const product = productById(line.idSanPham);
+        const catId = product?.categoryId ?? 'unknown';
+        const prev = map.get(catId) ?? { name: product?.categoryName || 'Khác', revenue: 0 };
+        prev.revenue += line.thanhTien;
+        map.set(catId, prev);
+      }
+    }
+    return [...map.entries()]
+      .map(([categoryId, v], index) => ({
+        categoryId,
+        categoryName: v.name,
+        revenue: v.revenue,
+        color: CHART_COLORS[index % CHART_COLORS.length] ?? BRAND.primaryRed,
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodInvoices, invoiceLines, products]);
 
   // ── Báo cáo 2: Lợi nhuận ──────────────────────────────────────────────────────
-  const categoryProfit = useMemo(
-    () => buildProfitByCategory(branchId, range),
-    [branchId, range],
-  );
+  const categoryProfit = useMemo<ProfitReportRow[]>(() => {
+    const map = new Map<string, { name: string; revenue: number; cogs: number }>();
+    for (const hd of periodInvoices) {
+      const lines = invoiceLines[hd.id] ?? [];
+      for (const line of lines) {
+        const product = productById(line.idSanPham);
+        const catId = product?.categoryId ?? 'unknown';
+        const prev = map.get(catId) ?? { name: product?.categoryName || 'Khác', revenue: 0, cogs: 0 };
+        prev.revenue += line.thanhTien;
+        prev.cogs += line.soLuong * (costByProduct.get(line.idSanPham) ?? 0);
+        map.set(catId, prev);
+      }
+    }
+    return [...map.entries()]
+      .map(([id, v]) => ({
+        id,
+        dimensionName: v.name,
+        revenue: v.revenue,
+        cogs: v.cogs,
+        grossProfit: v.revenue - v.cogs,
+        operatingCost: 0,
+        netProfit: v.revenue - v.cogs,
+        netMarginPercent: v.revenue === 0 ? 0 : ((v.revenue - v.cogs) / v.revenue) * 100,
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodInvoices, invoiceLines, costByProduct, products]);
 
   // ── Báo cáo 3: Hàng bán chạy ──────────────────────────────────────────────────
-  const topSelling = useMemo(
-    () => buildTopSelling(branchId, range, balances, 20),
-    [branchId, range, balances],
-  );
+  const topSelling = useMemo<TopSellingRow[]>(() => {
+    const stockByProduct = new Map<string, number>();
+    for (const b of balances) {
+      stockByProduct.set(
+        b.productId,
+        (stockByProduct.get(b.productId) ?? 0) + Number(b.quantity ?? 0),
+      );
+    }
+    return [...productStats.entries()]
+      .map(([productId, v]) => {
+        const product = productById(productId);
+        const margin = v.revenue === 0 ? 0 : ((v.revenue - v.cogs) / v.revenue) * 100;
+        return {
+          id: productId,
+          rank: 0,
+          sku: product?.sku ?? '',
+          productName: product?.name ?? '',
+          categoryName: product?.categoryName ?? '',
+          imageUrl: product?.imageUrl ?? '',
+          quantitySold: v.qty,
+          revenue: v.revenue,
+          grossProfit: v.revenue - v.cogs,
+          marginPercent: margin,
+          remainingStock: stockByProduct.get(productId) ?? 0,
+        };
+      })
+      .sort((a, b) => b.quantitySold - a.quantitySold)
+      .slice(0, 20)
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productStats, balances, products]);
 
-  // ── Báo cáo 4: Hao hụt / huỷ hàng ─────────────────────────────────────────────
-  const shrinkage = useMemo(() => buildShrinkageReport(branchId), [branchId]);
+  // ── Báo cáo 4: Hao hụt / huỷ hàng (từ the_kho các giao dịch điều chỉnh) ──────
+  const shrinkage = useMemo<ShrinkageReportRow[]>(() => {
+    const [from, to] = rangeToDateRange(range);
+    return ledger
+      .filter((tk) => {
+        const d = (tk.ngayPhatSinh ?? '').slice(0, 10);
+        const type = tk.loaiGiaoDich ?? '';
+        return (
+          d >= from &&
+          d <= to &&
+          (type.includes('ADJUST') || type.includes('SHRINKAGE') || type.includes('LOSS')) &&
+          (branchId === null || tk.idChiNhanh === branchId)
+        );
+      })
+      .map((tk) => {
+        const product = productById(tk.idSanPham);
+        const unitCost = Number(tk.donGia ?? 0);
+        const qty = Math.abs(tk.soLuong);
+        const branch = branches.find((b) => b.id === tk.idChiNhanh);
+        const lossValue = qty * unitCost;
+        return {
+          id: tk.id,
+          branchId: tk.idChiNhanh,
+          branchName: branch?.name ?? '',
+          sku: product?.sku ?? '',
+          productName: product?.name ?? '',
+          categoryName: product?.categoryName ?? '',
+          reason: 'LOST' as ShrinkageReason,
+          quantity: qty,
+          unitCost,
+          lossValue,
+          occurredAt: (tk.ngayPhatSinh ?? '').slice(0, 10),
+          shrinkageRatePercent: 0,
+        };
+      })
+      .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ledger, range, branchId, products, branches]);
 
   /** Tổng tổn thất theo từng nguyên nhân, cho biểu đồ tròn. */
   const shrinkageByReason = useMemo(() => {

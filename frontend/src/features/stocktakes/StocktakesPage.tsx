@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type FC, type ReactElement } from 'react';
 import { Button, Card, Descriptions, Modal, Space, Statistic, Table, Tag, Typography, message } from 'antd';
 const { Paragraph } = Typography;
 import type { ColumnsType } from 'antd/es/table';
@@ -8,7 +8,9 @@ import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { DocumentStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
-import { useAppSelector } from '@/store/hooks';
+import { phieuKiemKeApi, chiTietKiemKeApi } from '@/api/phieuKiemKe';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { fetchProducts } from '@/store/slices/productSlice';
 import {
   DOCUMENT_STATUS,
   DOCUMENT_STATUS_LABEL,
@@ -32,12 +34,124 @@ const { Text } = Typography;
  */
 export const StocktakesPage: FC = () => {
   const branches = useAppSelector((state) => state.branch.branches);
+  const products = useAppSelector((state) => state.product.products);
+  const productById = (id: string) => products.find((p) => p.id === id);
+  const dispatch = useAppDispatch();
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [balanceModal, setBalanceModal] = useState<Stocktake | null>(null);
   const [createModal, setCreateModal] = useState(false);
   const [stocktakes, setStocktakes] = useState<Stocktake[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [details, setDetails] = useState<Record<string, StocktakeLine[]>>({});
+
+  /** Map trạng thái DB sang enum frontend. */
+  const mapTrangThai = (db: string | undefined): DocumentStatus => {
+    switch (db) {
+      case 'DA_DUYET': return DOCUMENT_STATUS.Approved;
+      case 'DA_CAN_BANG': return DOCUMENT_STATUS.Balanced;
+      case 'CANCELLED': return DOCUMENT_STATUS.Cancelled;
+      case 'DANG_KIEM_KE':
+      default: return DOCUMENT_STATUS.Pending;
+    }
+  };
+
+  /** Tải danh sách phiếu + chi tiết (1 lần duy nhất). */
+  const loadStocktakes = async () => {
+    setLoading(true);
+    try {
+      const data = await phieuKiemKeApi.getAll();
+      const mapped = data.map((d) => ({
+        id: d.id!,
+        code: d.maPhieu ?? '',
+        branchId: d.idChiNhanh || '',
+        branchName: branches.find((b) => b.id === d.idChiNhanh)?.name || '',
+        countDate: d.ngayKiemKe || '',
+        status: mapTrangThai(d.trangThai),
+        lines: [],
+        totalItemsCounted: 0,
+        totalVarianceItems: 0,
+        totalVarianceValue: 0,
+        countedBy: '',
+        approvedBy: d.idNguoiDuyet || null,
+        note: d.ghiChu || '',
+      }));
+      setStocktakes(mapped);
+
+      // Load chi tiết cho tất cả phiếu (1 lần, tránh lazy-load khi expand)
+      const allDetails: Record<string, StocktakeLine[]> = {};
+      await Promise.all(
+        mapped.map(async (st) => {
+          try {
+            const lines = await chiTietKiemKeApi.getByPhieuKiemKe(st.id);
+            allDetails[st.id] = lines.map((d) => {
+              const product = productById(d.idSanPham);
+              return {
+                id: d.id ?? `d-${d.idSanPham}`,
+                productId: d.idSanPham,
+                sku: product?.sku ?? '',
+                productName: product?.name ?? '',
+                unit: product?.unit ?? '',
+                systemQuantity: d.tonHeThong,
+                countedQuantity: d.tonThucTe,
+                varianceQuantity: d.soLuongLech,
+                unitCost: Number(d.donGiaVon),
+                varianceValue: Number(d.giaTriLech),
+                reason: d.lyDoLech ?? '',
+              };
+            });
+          } catch {
+            allDetails[st.id] = [];
+          }
+        }),
+      );
+      setDetails(allDetails);
+
+      // Tính các thống kê trên bảng chính từ details đã load.
+      setStocktakes(
+        mapped.map((st) => {
+          const lines = allDetails[st.id] ?? [];
+          const totalItems = lines.length;
+          const varianceItems = lines.filter((l) => l.varianceQuantity !== 0).length;
+          const totalVarianceValue = lines.reduce(
+            (sum, l) => sum + l.varianceValue,
+            0,
+          );
+          return {
+            ...st,
+            lines,
+            totalItemsCounted: totalItems,
+            totalVarianceItems: varianceItems,
+            totalVarianceValue,
+          };
+        }),
+      );
+    } catch {
+      message.error('Lỗi tải danh sách phiếu kiểm kê');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const hasLoadedOnce = useRef(false);
+
+  useEffect(() => {
+    if (products.length === 0) {
+      dispatch(fetchProducts());
+    }
+    loadStocktakes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Khi products tải xong (chưa từng có), reload để enrich tên sản phẩm.
+  useEffect(() => {
+    if (!hasLoadedOnce.current && products.length > 0) {
+      hasLoadedOnce.current = true;
+      loadStocktakes();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
 
   const filtered = useMemo(
     () =>
@@ -57,15 +171,17 @@ export const StocktakesPage: FC = () => {
 
   const summary = useMemo<SummaryItem[]>(() => {
     const totalVarianceValue = stocktakes.reduce(
-      (sum, stocktake) => sum + stocktake.totalVarianceValue,
+      (sum, stocktake) =>
+        sum + (details[stocktake.id] ?? []).reduce((s, l) => s + l.varianceValue, 0),
       0,
     );
     const totalVarianceItems = stocktakes.reduce(
-      (sum, stocktake) => sum + stocktake.totalVarianceItems,
+      (sum, stocktake) =>
+        sum + (details[stocktake.id] ?? []).filter((l) => l.varianceQuantity !== 0).length,
       0,
     );
     const totalCounted = stocktakes.reduce(
-      (sum, stocktake) => sum + stocktake.totalItemsCounted,
+      (sum, stocktake) => sum + (details[stocktake.id] ?? []).length,
       0,
     );
     const pending = stocktakes.filter(
@@ -102,7 +218,7 @@ export const StocktakesPage: FC = () => {
         suffix: 'phiếu',
       },
     ];
-  }, [stocktakes]);
+  }, [stocktakes, details]);
 
   const filters: ToolbarFilter[] = [
     {
@@ -314,7 +430,16 @@ export const StocktakesPage: FC = () => {
       },
     ];
 
-    const sortedLines = [...stocktake.lines].sort(
+    const currentLines = details[stocktake.id] ?? [];
+
+    const totalItems = currentLines.length;
+    const varianceItems = currentLines.filter((l) => l.varianceQuantity !== 0).length;
+    const totalVarianceValue = currentLines.reduce(
+      (sum, l) => sum + l.varianceValue,
+      0,
+    );
+
+    const sortedLines = [...currentLines].sort(
       (a, b) => Math.abs(b.varianceQuantity) - Math.abs(a.varianceQuantity),
     );
 
@@ -323,22 +448,22 @@ export const StocktakesPage: FC = () => {
         <Space size={32} wrap>
           <Statistic
             title="Số dòng đã đếm"
-            value={stocktake.totalItemsCounted}
+            value={totalItems}
             valueStyle={{ fontSize: 18, fontWeight: 700 }}
           />
           <Statistic
             title="Dòng lệch tồn"
-            value={stocktake.totalVarianceItems}
+            value={varianceItems}
             valueStyle={{ fontSize: 18, fontWeight: 700, color: BRAND.warning }}
           />
           <Statistic
             title="Tổng giá trị lệch"
-            value={formatVND(stocktake.totalVarianceValue)}
+            value={formatVND(totalVarianceValue)}
             valueStyle={{
               fontSize: 18,
               fontWeight: 700,
               color:
-                stocktake.totalVarianceValue < 0 ? BRAND.error : BRAND.success,
+                totalVarianceValue < 0 ? BRAND.error : BRAND.success,
             }}
           />
         </Space>
@@ -392,36 +517,54 @@ export const StocktakesPage: FC = () => {
     return stocktake.status === DOCUMENT_STATUS.Pending;
   };
 
-  const handleApprove = (stocktake: Stocktake): void => {
-    setStocktakes((prev) =>
-      prev.map((s) =>
-        s.id === stocktake.id
-          ? { ...s, status: DOCUMENT_STATUS.Approved, approvedBy: 'Quản lý cửa hàng' }
-          : s,
-      ),
-    );
-    message.success(`Đã duyệt phiếu ${stocktake.code}`);
+  const handleApprove = async (stocktake: Stocktake): Promise<void> => {
+    try {
+      await phieuKiemKeApi.update(stocktake.id, { trangThai: 'DA_DUYET' });
+      setStocktakes((prev) =>
+        prev.map((s) =>
+          s.id === stocktake.id
+            ? { ...s, status: DOCUMENT_STATUS.Approved, approvedBy: 'Quản lý cửa hàng' }
+            : s,
+        ),
+      );
+      message.success(`Đã duyệt phiếu ${stocktake.code}`);
+    } catch (e: any) {
+      message.error('Lỗi duyệt phiếu: ' + (e?.message || e));
+    }
   };
 
   const handleBalance = (stocktake: Stocktake): void => {
     setBalanceModal(stocktake);
   };
 
-  const confirmBalance = (): void => {
+  const confirmBalance = async (): Promise<void> => {
     if (!balanceModal) return;
-    setStocktakes((prev) =>
-      prev.map((s) =>
-        s.id === balanceModal.id
-          ? { ...s, status: DOCUMENT_STATUS.Balanced }
-          : s,
-      ),
-    );
-    message.success(`Đã cân bằng kho cho phiếu ${balanceModal.code}`);
-    setBalanceModal(null);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await phieuKiemKeApi.update(balanceModal.id, {
+        trangThai: 'DA_CAN_BANG',
+        ngayCanBang: today,
+      });
+      setStocktakes((prev) =>
+        prev.map((s) =>
+          s.id === balanceModal.id
+            ? { ...s, status: DOCUMENT_STATUS.Balanced }
+            : s,
+        ),
+      );
+      message.success(`Đã cân bằng kho cho phiếu ${balanceModal.code}`);
+      setBalanceModal(null);
+    } catch (e: any) {
+      message.error('Lỗi cân bằng: ' + (e?.message || e));
+    }
   };
 
   const handleCreateSuccess = (stocktake: Stocktake): void => {
     setStocktakes((prev) => [stocktake, ...prev]);
+    // Lưu lines đã có sẵn trong stocktake để expand ngay không cần fetch lại.
+    if (stocktake.lines.length > 0) {
+      setDetails((prev) => ({ ...prev, [stocktake.id]: stocktake.lines }));
+    }
     message.success('Đã tạo phiếu kiểm kê');
   };
 
@@ -468,6 +611,7 @@ export const StocktakesPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
+          loading={loading}
           scroll={{ x: 1500 }}
           expandable={{ expandedRowRender: renderDetail, columnWidth: 44 }}
           pagination={{

@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   DOCUMENT_STATUS,
@@ -11,6 +11,7 @@ import {
   type StockLevel,
   type StockTransfer,
 } from '@/types';
+import { tonKhoApi, theKhoApi, type TonKhoDTO, type TheKhoDTO } from '@/api/tonKho';
 
 import { purchaseReceived } from './purchaseSlice';
 import { saleCompleted } from './posSlice';
@@ -40,12 +41,59 @@ export interface StockState {
   balances: StockBalance[];
   /** Sổ cái kho, mới nhất trước. */
   ledger: StockLedgerEntry[];
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: StockState = {
   balances: [],
   ledger: [],
+  loading: false,
+  error: null,
 };
+
+const mapTonKhoToBalance = (dto: TonKhoDTO): StockBalance => ({
+  productId: dto.idSanPham,
+  branchId: dto.idChiNhanh,
+  productName: '',
+  branchName: '',
+  quantity: dto.soLuongTon || 0,
+  averageCost: dto.giaVonTrungBinh || 0,
+  totalValue: dto.giaTriTon || 0,
+  minStock: dto.tonToiThieu || 0,
+  maxStock: dto.tonToiDa || 0,
+  lastUpdated: dto.lanBienDongCuoi || new Date().toISOString(),
+});
+
+const mapTheKhoToEntry = (dto: TheKhoDTO): StockLedgerEntry => ({
+  id: dto.id,
+  timestamp: dto.ngayPhatSinh,
+  productId: dto.idSanPham,
+  productName: '',
+  branchId: dto.idChiNhanh,
+  branchName: '',
+  type: (dto.loaiGiaoDich as any) || 'ADJUSTMENT',
+  quantity: dto.soLuong,
+  unitPrice: dto.donGia || 0,
+  totalValue: dto.thanhTien || 0,
+  balanceBefore: dto.tonTruoc || 0,
+  balanceAfter: dto.tonSau || 0,
+  referenceCode: dto.maChungTu,
+  performedBy: dto.nguoiThucHien,
+  expiryDate: dto.hanSuDung,
+  note: dto.ghiChu,
+});
+
+export const fetchStock = createAsyncThunk('stock/fetchAll', async () => {
+  const [tonKho, theKho] = await Promise.all([
+    tonKhoApi.getAll(),
+    theKhoApi.getAll(),
+  ]);
+  return {
+    balances: tonKho.map(mapTonKhoToBalance),
+    ledger: theKho.map(mapTheKhoToEntry),
+  };
+});
 
 /** Xác định mức cảnh báo tồn kho từ số lượng thực tế. */
 export const resolveStockLevel = (
@@ -405,6 +453,21 @@ export const stockSlice = createSlice({
   },
 
   extraReducers: (builder) => {
+    builder
+      .addCase(fetchStock.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchStock.fulfilled, (state, action) => {
+        state.loading = false;
+        state.balances = action.payload.balances;
+        state.ledger = action.payload.ledger;
+      })
+      .addCase(fetchStock.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Lỗi tải tồn kho';
+      });
+
     // Bước 2 và 3 của transaction bán hàng: trừ tồn kho + ghi thẻ kho.
     builder.addCase(saleCompleted, (state, action) => {
       applySale(state, action.payload.order);

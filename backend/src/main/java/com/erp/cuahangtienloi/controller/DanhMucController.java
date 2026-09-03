@@ -54,11 +54,17 @@ public class DanhMucController {
 
         DanhMuc dm = new DanhMuc();
         dm.setId(UUID.randomUUID());
-        dm.setMaDanhMuc(request.getMaDanhMuc());
+        // Tự sinh mã danh mục nếu frontend không gửi (ma_danh_muc NOT NULL)
+        String maDM = request.getMaDanhMuc();
+        if (maDM == null || maDM.isBlank()) {
+            maDM = "DM-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        }
+        dm.setMaDanhMuc(maDM);
         dm.setTenDanhMuc(request.getTenDanhMuc());
         dm.setParentId(request.getParentId());
         dm.setMoTa(request.getMoTa());
         dm.setIconEmoji(request.getIconEmoji());
+        dm.setImageUrl(request.getImageUrl());
         dm.setMauHex(request.getMauHex());
         dm.setThuTuHienThi(request.getThuTuHienThi() != null ? request.getThuTuHienThi() : 999);
         dm.setProductCount(0);
@@ -79,6 +85,7 @@ public class DanhMucController {
                     if (request.getParentId() != null) dm.setParentId(request.getParentId());
                     if (request.getMoTa() != null) dm.setMoTa(request.getMoTa());
                     if (request.getIconEmoji() != null) dm.setIconEmoji(request.getIconEmoji());
+                    if (request.getImageUrl() != null) dm.setImageUrl(request.getImageUrl());
                     if (request.getMauHex() != null) dm.setMauHex(request.getMauHex());
                     if (request.getThuTuHienThi() != null) dm.setThuTuHienThi(request.getThuTuHienThi());
                     if (request.getDangHoatDong() != null) dm.setDangHoatDong(request.getDangHoatDong());

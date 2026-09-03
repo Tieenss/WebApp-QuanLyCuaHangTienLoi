@@ -3,7 +3,9 @@ package com.erp.cuahangtienloi.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.UUID;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "chi_nhanh")
@@ -25,14 +27,50 @@ public class ChiNhanh {
     @Column(name = "dia_chi")
     private String diaChi;
 
+    @Column(name = "dia_chi_chi_tiet")
+    private String diaChiChiTiet;
+
+    @Column(name = "tinh_thanh")
+    private String tinhThanh;
+
+    @Column(name = "quan_huyen")
+    private String quanHuyen;
+
+    @Column(name = "vung_mien")
+    private String vungMien;
+
     @Column(name = "so_dien_thoai")
     private String soDienThoai;
+
+    @Column(name = "gio_mo_cua")
+    private String gioMoCua;
+
+    @Column(name = "dien_tich_m2")
+    private BigDecimal dienTichM2;
+
+    @Column(name = "doanh_thu_thang")
+    private Long doanhThuThang;
+
+    @Column(name = "ngay_khai_truong")
+    private LocalDate ngayKhaiTruong;
 
     @Column(name = "trang_thai")
     private String trangThai;
 
+    @Column(name = "loai", nullable = false)
+    private String loai;
+
     @Column(name = "loai_chi_nhanh")
     private String loaiChiNhanh;
+
+    @Column(name = "id_quan_ly")
+    private UUID idQuanLy;
+
+    @Column(name = "ten_quan_ly")
+    private String tenQuanLy;
+
+    @Column(name = "dang_hoat_dong")
+    private Boolean dangHoatDong;
 
     @Column(name = "ngay_tao")
     private LocalDateTime ngayTao;

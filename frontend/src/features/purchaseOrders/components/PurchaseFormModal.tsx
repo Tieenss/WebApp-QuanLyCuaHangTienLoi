@@ -1,4 +1,4 @@
-import { useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useState, type FC } from 'react';
 import {
   Alert,
   App as AntdApp,
@@ -19,10 +19,13 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   buildPurchaseOrder,
+  fetchPurchaseOrders,
   purchaseReceived,
   type PurchaseDraftLine,
 } from '@/store/slices/purchaseSlice';
 import { stockOf } from '@/store/slices/stockSlice';
+import { chiTietPhieuNhapApi } from '@/api/chiTietPhieuNhap';
+import { fetchKhoTong } from '@/store/slices/branchSlice';
 import { PRODUCT_UNIT_LABEL } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
@@ -78,6 +81,10 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
   const products = useAppSelector((state) => state.product.products);
   const branches = useAppSelector((state) => state.branch.branches);
 
+  useEffect(() => {
+    dispatch(fetchKhoTong());
+  }, [dispatch]);
+
   const sellableProducts = products.filter((p) => p.status === 'Active');
   const branchNameById = (id: string): string => {
     const branch = branches.find((b) => b.id === id);
@@ -85,6 +92,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
   };
 
   const [supplierId, setSupplierId] = useState<string | null>(null);
+  const [branchId, setBranchId] = useState<string | null>(null);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
 
   /**
@@ -98,6 +106,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
   const handleAfterClose = (): void => {
     form.resetFields();
     setSupplierId(null);
+    setBranchId(null);
     setRows([emptyRow()]);
   };
 
@@ -161,6 +170,61 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       }
 
       const supplierName = suppliers.find((s) => s.id === values.supplierId)?.name ?? '';
+      const subTotal = validRows.reduce((sum, r) => sum + r.quantity * r.unitCost, 0);
+      const vatTotal = Math.round(validRows.reduce((sum, r) => sum + (r.quantity * r.unitCost * 0.08), 0));
+      const grandTotal = subTotal + vatTotal;
+
+      // Gọi API backend để lưu
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/phieu-nhap`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
+        },
+        body: JSON.stringify({
+          maPhieu: '', // backend tự sinh
+          idChiNhanh: branchId, // Kho Tổng đã chọn
+          idNcc: values.supplierId,
+          idNguoiNhap: user?.id,
+          ngayDatHang: values.orderDate.format('YYYY-MM-DD'),
+          subTotal,
+          vatTotal,
+          giamGia: 0,
+          grandTotal,
+          daThanhToan: grandTotal, // mặc định thanh toán ngay
+          congNo: 0,
+          trangThai: 'COMPLETED',
+          ghiChu: values.note?.trim() ?? '',
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Lỗi lưu phiếu nhập');
+      }
+
+      const createdOrder = await response.json();
+
+      // Tạo chi tiết phiếu nhập
+      try {
+        await chiTietPhieuNhapApi.createBatch(
+          validRows.map((row, index) => ({
+            id: '',
+            idPhieuNhap: createdOrder.id,
+            idSanPham: row.productId,
+            soLuongDat: row.quantity,
+            soLuongNhan: row.quantity,
+            donGiaNhap: row.unitCost,
+            vatPhantram: 8,
+            thanhTien: row.quantity * row.unitCost,
+            thuTu: index,
+          })),
+        );
+      } catch (e) {
+        console.error('Lỗi tạo chi tiết phiếu nhập:', e);
+      }
+
+      // Vẫn dispatch để update Redux state với tên sản phẩm + NCC
       const order = buildPurchaseOrder({
         supplierId: values.supplierId,
         supplierName,
@@ -175,24 +239,26 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
           user === null ? 'Không xác định' : `${user.fullName} (${user.employeeCode})`,
         existingCount: orderCount,
       });
-      if (order === null) return;
-
-      dispatch(
-        purchaseReceived({
-          order,
-          performedBy:
-            user === null
-              ? 'Không xác định'
-              : `${user.fullName} (${user.employeeCode})`,
-        }),
-      );
-
-      message.success(
-        `Đã lưu phiếu ${order.code}: cộng tồn Kho Tổng, ghi thẻ kho và lập phiếu chi ${formatVND(order.grandTotal)}.`,
-      );
+      if (order !== null) {
+        dispatch(
+          purchaseReceived({
+            order,
+            performedBy:
+              user === null
+                ? 'Không xác định'
+                : `${user.fullName} (${user.employeeCode})`,
+          }),
+        );
+        message.success(
+          `Đã lưu phiếu ${order.code}: cộng tồn Kho Tổng, ghi thẻ kho và lập phiếu chi ${formatVND(order.grandTotal)}.`,
+        );
+      } else {
+        message.success('Đã lưu phiếu nhập.');
+      }
+      dispatch(fetchPurchaseOrders());
       onClose();
-    } catch {
-      // antd đã hiển thị lỗi tại từng field.
+    } catch (error: any) {
+      message.error(error?.message || 'Có lỗi xảy ra khi lưu phiếu nhập');
     }
   };
 
@@ -237,7 +303,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
           <Text type="secondary">—</Text>
         ) : (
           <span className="numeric-cell">
-            {stockOf(balances, DISTRIBUTION_CENTER_ID, row.productId)}
+            {stockOf(balances, branchId || DISTRIBUTION_CENTER_ID, row.productId)}
           </span>
         ),
     },
@@ -338,7 +404,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         type="info"
         showIcon
         className="purchase-alert"
-        message={`Hàng nhập vào ${branchNameById(DISTRIBUTION_CENTER_ID)}`}
+        message={`Hàng nhập vào ${branchNameById(branchId || DISTRIBUTION_CENTER_ID)}`}
         description="Khi lưu, hệ thống cộng tồn kho, ghi thẻ kho (NHAP_NCC) và lập phiếu chi sổ quỹ. Cửa hàng bán lẻ nhận hàng qua phiếu xuất kho nội bộ."
       />
 
@@ -367,6 +433,21 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
                   value: supplier.id,
                   label: `${supplier.code} — ${supplier.name}`,
                 }))}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Kho nhận (chỉ Kho Tổng)"
+            required
+          >
+            <Select
+              placeholder="Chọn kho tổng"
+              value={branchId}
+              onChange={setBranchId}
+              loading={branches.length === 0}
+              showSearch
+              optionFilterProp="label"
+              options={branches.map((b) => ({ value: b.id, label: `${b.code} - ${b.name}` }))}
             />
           </Form.Item>
 
