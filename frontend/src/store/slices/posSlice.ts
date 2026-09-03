@@ -115,7 +115,12 @@ export const buildSalesOrder = (input: {
 };
 
 export interface PosState {
-  /** Chi nhánh đang bán; quyết định tồn kho khả dụng. */
+  /**
+   * Chi nhánh đang bán; quyết định tồn kho khả dụng.
+   *
+   * Khởi tạo rỗng — `syncPosBranch` (AppBootstrap) sẽ tự gắn chi nhánh của
+   * nhân viên đang đăng nhập. Thu ngân không được tự chọn quầy khác.
+   */
   branchId: string;
   lines: CartLine[];
   /** Giảm giá trên toàn đơn (số tiền tuyệt đối). */
@@ -135,7 +140,7 @@ export interface PosState {
 }
 
 const initialState: PosState = {
-  branchId: 'br-0101',
+  branchId: '',
   lines: [],
   orderDiscount: 0,
   paymentMethod: PAYMENT_METHOD.Cash,
@@ -187,6 +192,21 @@ export const posSlice = createSlice({
   name: 'pos',
   initialState,
   reducers: {
+    /**
+     * Đồng bộ quầy bán theo nhân viên đang đăng nhập (chạy ở AppBootstrap).
+     *
+     * Nhân viên thuộc chi nhánh nào thì POS chỉ bán ở chi nhánh đó; vai trò
+     * trụ sở (ADMIN/KE_TOAN — branchId null) giữ nguyên giá trị hiện có.
+     */
+    syncPosBranch: (state, action: PayloadAction<string | null>) => {
+      const next = action.payload;
+      if (!next || state.branchId === next) return;
+      state.branchId = next;
+      state.lines = [];
+      state.orderDiscount = 0;
+      state.tenderedAmount = 0;
+    },
+
     /** Đổi chi nhánh bán hàng. Giỏ hàng bị xoá vì tồn kho khác nhau. */
     setPosBranch: (state, action: PayloadAction<string>) => {
       if (state.branchId === action.payload) return;
@@ -333,6 +353,7 @@ export const posSlice = createSlice({
 });
 
 export const {
+  syncPosBranch,
   setPosBranch,
   addToCart,
   updateLineQuantity,

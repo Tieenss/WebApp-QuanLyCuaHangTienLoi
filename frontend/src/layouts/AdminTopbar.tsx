@@ -140,11 +140,14 @@ export const AdminTopbar: FC = () => {
     }
   };
 
-  /** Đổi chi nhánh: đồng bộ luôn chi nhánh của quầy POS. */
+  /**
+   * Đổi chi nhánh: chỉ đồng bộ quầy POS khi người dùng được phép bán ở đó
+   * (vai trò trụ sở). Thu ngân / quản lý bị khoá theo chi nhánh của mình.
+   */
   const handleBranchChange = (value: string): void => {
     const branchId = value === ALL_BRANCHES ? null : value;
     dispatch(setActiveBranch(branchId));
-    if (branchId !== null) {
+    if (branchId !== null && (user?.branchId ?? null) === null) {
       dispatch(setPosBranch(branchId));
     }
   };

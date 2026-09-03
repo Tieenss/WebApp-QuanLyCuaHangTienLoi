@@ -7,6 +7,7 @@ import { fetchStock } from '@/store/slices/stockSlice';
 import { fetchEmployees } from '@/store/slices/employeeSlice';
 import { fetchProducts } from '@/store/slices/productSlice';
 import { fetchAttendance } from '@/store/slices/attendanceSlice';
+import { syncPosBranch } from '@/store/slices/posSlice';
 
 /**
  * Load dữ liệu dùng chung (master data) 1 lần khi app khởi động.
@@ -27,6 +28,8 @@ export const AppBootstrap: FC = () => {
     if (authUser) {
       dispatch(fetchStock());
       dispatch(fetchAttendance());
+      // POS chỉ bán tại chi nhánh của nhân viên đang đăng nhập.
+      dispatch(syncPosBranch(authUser.branchId));
     }
   }, [dispatch, authUser]);
 

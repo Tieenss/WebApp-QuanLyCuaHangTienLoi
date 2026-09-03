@@ -526,21 +526,57 @@ export const DashboardPage: FC = () => {
   );
 
   /**
-   * Hoá đơn mới nhất đọc trực tiếp từ slice `salesOrder.orders` thay vì từ
-   * `mockData.analytics` — nhờ vậy hoá đơn vừa bán ở POS (qua action
-   * `saleCompleted`) sẽ xuất hiện ngay trên dashboard mà không cần refresh.
-   * Lọc theo chi nhánh đang chọn (nếu có) và lấy 8 dòng đầu.
+   * Giao dịch POS gần nhất: hợp nhất hoá đơn từ DB (`invoices`) với đơn vừa
+   * bán trong session Redux (`salesOrder.orders`) — đơn chưa kịp load lại
+   * trang vẫn xuất hiện ngay. Lọc theo chi nhánh đang chọn, lấy 8 dòng đầu.
    */
-  const allOrders = useAppSelector((state) => state.salesOrder.orders);
-  const latestOrders = useMemo(
-    () =>
-      allOrders
-        .filter((order) =>
-          activeBranchId === null ? true : order.branchId === activeBranchId,
-        )
-        .slice(0, 8),
-    [allOrders, activeBranchId],
-  );
+  const sessionOrders = useAppSelector((state) => state.salesOrder.orders);
+  const latestOrders = useMemo<SalesOrder[]>(() => {
+    const fromApi: SalesOrder[] = invoices.map((hd) => ({
+      id: hd.id,
+      code: hd.maHoaDon ?? '',
+      branchId: hd.idChiNhanh,
+      branchName: hd.tenChiNhanh ?? '',
+      cashierId: hd.idThuNgan,
+      cashierName: hd.tenThuNgan ?? 'Thu ngân',
+      shiftCode: hd.caLamViec ?? 'MORNING',
+      soldAt: hd.ngayBan ?? '',
+      lines: (invoiceLines[hd.id] ?? []).map((line, index) => {
+        const product = productById(line.idSanPham);
+        return {
+          id: line.id ?? `db-line-${index}`,
+          productId: line.idSanPham,
+          sku: product?.sku ?? '',
+          productName: product?.name ?? line.tenSanPham ?? '',
+          unit: product?.unit ?? '',
+          unitPrice: line.donGia,
+          quantity: line.soLuong,
+          lineDiscount: line.giamGia ?? 0,
+          vatPercent: product?.vatPercent ?? 8,
+          lineTotal: line.thanhTien,
+          unitCost: product?.costPrice ?? 0,
+        };
+      }),
+      subTotal: hd.subTotal ?? 0,
+      discountTotal: hd.giamGia ?? 0,
+      vatTotal: hd.vatTotal ?? 0,
+      grandTotal: hd.grandTotal,
+      paymentMethod: (hd.hinhThucTt ?? 'CASH') as SalesOrder['paymentMethod'],
+      tenderedAmount: hd.tienKhachDua ?? 0,
+      changeAmount: hd.tienThoi ?? 0,
+      status: (hd.trangThai ?? 'COMPLETED') as SalesOrder['status'],
+      memberPhone: hd.sdtThanhVien ?? null,
+      note: hd.ghiChu ?? '',
+    }));
+    const seen = new Set(fromApi.map((o) => o.code));
+    return [...sessionOrders.filter((o) => !seen.has(o.code)), ...fromApi]
+      .filter((order) =>
+        activeBranchId === null ? true : order.branchId === activeBranchId,
+      )
+      .sort((a, b) => b.soldAt.localeCompare(a.soldAt))
+      .slice(0, 8);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, invoiceLines, sessionOrders, activeBranchId, products]);
 
   const topSellingColumns: ColumnsType<TopSellingRow> = [
     {
@@ -899,7 +935,7 @@ export const DashboardPage: FC = () => {
 
       <OrderDetailDrawer
         order={
-          allOrders.find(
+          [...latestOrders, ...sessionOrders].find(
             (order) => order.id === selectedOrderId,
           ) ?? null
         }

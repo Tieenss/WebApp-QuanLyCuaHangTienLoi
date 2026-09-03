@@ -27,6 +27,31 @@ const getHeaders = (): HeadersInit => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+/** Dòng hàng trong request /with-lines. */
+export interface PurchaseLineDTO {
+  idSanPham: string;
+  soLuong: number;
+  soLuongNhan?: number;
+  donGiaNhap: number;
+  vatPhantram?: number;
+  hanSuDung?: string | null;
+}
+
+/** Header + lines cho POST /with-lines — backend lưu 1 transaction. */
+export interface CreatePurchaseWithLinesDTO {
+  idChiNhanh?: string | null;
+  idNcc: string;
+  idNguoiNhap?: string | null;
+  ngayDatHang?: string;
+  ngayDuKienGiao?: string;
+  ngayNhanThucTe?: string;
+  giamGia?: number;
+  daThanhToan?: number;
+  trangThai?: string;
+  ghiChu?: string;
+  lines: PurchaseLineDTO[];
+}
+
 export const phieuNhapApi = {
   getAll: async (): Promise<PhieuNhapDTO[]> => {
     const response = await fetch(`${API_BASE_URL}/api/phieu-nhap`, {
@@ -44,6 +69,19 @@ export const phieuNhapApi = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || 'Failed to create');
+    }
+    return response.json();
+  },
+  /** Lưu phiếu nhập + dòng chi tiết trong 1 transaction (khuyến nghị cho form). */
+  createWithLines: async (data: CreatePurchaseWithLinesDTO): Promise<PhieuNhapDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-nhap/with-lines`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders() },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.message || error?.error || 'Failed to create');
     }
     return response.json();
   },

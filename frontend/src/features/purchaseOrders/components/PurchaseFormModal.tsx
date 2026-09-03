@@ -24,7 +24,7 @@ import {
   type PurchaseDraftLine,
 } from '@/store/slices/purchaseSlice';
 import { stockOf } from '@/store/slices/stockSlice';
-import { chiTietPhieuNhapApi } from '@/api/chiTietPhieuNhap';
+import { phieuNhapApi } from '@/api/phieuNhap';
 import { fetchKhoTong } from '@/store/slices/branchSlice';
 import { PRODUCT_UNIT_LABEL } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
@@ -170,59 +170,27 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       }
 
       const supplierName = suppliers.find((s) => s.id === values.supplierId)?.name ?? '';
-      const subTotal = validRows.reduce((sum, r) => sum + r.quantity * r.unitCost, 0);
-      const vatTotal = Math.round(validRows.reduce((sum, r) => sum + (r.quantity * r.unitCost * 0.08), 0));
-      const grandTotal = subTotal + vatTotal;
 
-      // Gọi API backend để lưu
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/phieu-nhap`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
-        },
-        body: JSON.stringify({
-          maPhieu: '', // backend tự sinh
-          idChiNhanh: branchId, // Kho Tổng đã chọn
-          idNcc: values.supplierId,
-          idNguoiNhap: user?.id,
-          ngayDatHang: values.orderDate.format('YYYY-MM-DD'),
-          subTotal,
-          vatTotal,
-          giamGia: 0,
-          grandTotal,
-          daThanhToan: grandTotal, // mặc định thanh toán ngay
-          congNo: 0,
-          trangThai: 'COMPLETED',
-          ghiChu: values.note?.trim() ?? '',
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || 'Lỗi lưu phiếu nhập');
-      }
-
-      const createdOrder = await response.json();
-
-      // Tạo chi tiết phiếu nhập
-      try {
-        await chiTietPhieuNhapApi.createBatch(
-          validRows.map((row, index) => ({
-            id: '',
-            idPhieuNhap: createdOrder.id,
+      // Lưu phiếu + dòng chi tiết trong 1 transaction (phieu_nhap +
+      // chi_tiet_phieu_nhap + the_kho + ton_kho qua trigger/hàm DB).
+      const createdOrder = await phieuNhapApi.createWithLines({
+        idChiNhanh: branchId,
+        idNcc: values.supplierId,
+        idNguoiNhap: user?.idNhanVien ?? null,
+        ngayDatHang: values.orderDate.format('YYYY-MM-DD'),
+        trangThai: 'COMPLETED',
+        ghiChu: values.note?.trim() ?? '',
+        lines: validRows.map((row) => {
+          const product = sellableProducts.find((item) => item.id === row.productId);
+          return {
             idSanPham: row.productId,
-            soLuongDat: row.quantity,
+            soLuong: row.quantity,
             soLuongNhan: row.quantity,
             donGiaNhap: row.unitCost,
-            vatPhantram: 8,
-            thanhTien: row.quantity * row.unitCost,
-            thuTu: index,
-          })),
-        );
-      } catch (e) {
-        console.error('Lỗi tạo chi tiết phiếu nhập:', e);
-      }
+            vatPhantram: product?.vatPercent ?? 8,
+          };
+        }),
+      });
 
       // Vẫn dispatch để update Redux state với tên sản phẩm + NCC
       const order = buildPurchaseOrder({
@@ -242,7 +210,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       if (order !== null) {
         dispatch(
           purchaseReceived({
-            order,
+            order: { ...order, id: createdOrder.id, code: createdOrder.maPhieu },
             performedBy:
               user === null
                 ? 'Không xác định'
@@ -250,10 +218,10 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
           }),
         );
         message.success(
-          `Đã lưu phiếu ${order.code}: cộng tồn Kho Tổng, ghi thẻ kho và lập phiếu chi ${formatVND(order.grandTotal)}.`,
+          `Đã lưu phiếu ${createdOrder.maPhieu}: cộng tồn Kho Tổng, ghi thẻ kho và lập phiếu chi ${formatVND(createdOrder.grandTotal ?? 0)}.`,
         );
       } else {
-        message.success('Đã lưu phiếu nhập.');
+        message.success(`Đã lưu phiếu nhập ${createdOrder.maPhieu}.`);
       }
       dispatch(fetchPurchaseOrders());
       onClose();
