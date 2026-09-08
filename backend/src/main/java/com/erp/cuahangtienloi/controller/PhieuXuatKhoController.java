@@ -1,17 +1,24 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.PhieuXuatKhoDTO;
-import com.erp.cuahangtienloi.entity.ChiNhanh;
+import com.erp.cuahangtienloi.entity.ChiTietPhieuXuat;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuXuatKho;
 import com.erp.cuahangtienloi.repository.*;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -24,6 +31,12 @@ public class PhieuXuatKhoController {
     @org.springframework.beans.factory.annotation.Autowired
     private com.erp.cuahangtienloi.repository.NhanVienRepository nhanVienRepository;
     private final ChiNhanhRepository chiNhanhRepository;
+    private final ChiTietPhieuXuatRepository chiTietPhieuXuatRepository;
+    private final TonKhoRepository tonKhoRepository;
+    private final JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @GetMapping
     public ResponseEntity<List<PhieuXuatKhoDTO>> getAll() {
@@ -67,7 +80,6 @@ public class PhieuXuatKhoController {
     @PostMapping
     public ResponseEntity<?> create(@RequestBody PhieuXuatKho request) {
         PhieuXuatKho pxk = new PhieuXuatKho();
-        pxk.setId(UUID.randomUUID());
         pxk.setMaPhieu(request.getMaPhieu());
         pxk.setIdChiNhanhXuat(request.getIdChiNhanhXuat());
         pxk.setIdChiNhanhNhan(request.getIdChiNhanhNhan());
@@ -98,8 +110,11 @@ public class PhieuXuatKhoController {
         pxk.setNgayTao(LocalDateTime.now());
         pxk.setNgayCapNhat(LocalDateTime.now());
 
-        phieuXuatKhoRepository.save(pxk);
-        return ResponseEntity.ok(toDTO(pxk));
+        PhieuXuatKho saved = phieuXuatKhoRepository.saveAndFlush(pxk);
+        // Đọc lại từ DB: trigger sinh ma_phieu thay đổi row ngay khi INSERT,
+        // entity trong persistence context vẫn giữ giá trị cũ (maPhieu null).
+        entityManager.clear();
+        return ResponseEntity.ok(toDTO(phieuXuatKhoRepository.findById(saved.getId()).orElseThrow()));
     }
 
     @PutMapping("/{id}")
@@ -200,6 +215,178 @@ public class PhieuXuatKhoController {
     record ApproveRequest(java.util.UUID idNguoiDuyet) {}
     record RejectRequest(java.util.UUID idNguoiDuyet, String lyDo) {}
     record ErrorResponse(String message) {}
+
+    /** Dòng gửi lên khi thủ kho xác nhận xuất / chi nhánh xác nhận nhận. */
+    public static class MoveLine {
+        private UUID idSanPham;
+        private Integer soLuong;
+        public UUID getIdSanPham() { return idSanPham; }
+        public void setIdSanPham(UUID v) { this.idSanPham = v; }
+        public Integer getSoLuong() { return soLuong; }
+        public void setSoLuong(Integer v) { this.soLuong = v; }
+    }
+
+    /** Body của /ship và /receive. */
+    public static class MoveRequest {
+        private UUID idNguoiThucHien;
+        private List<MoveLine> lines;
+        public UUID getIdNguoiThucHien() { return idNguoiThucHien; }
+        public void setIdNguoiThucHien(UUID v) { this.idNguoiThucHien = v; }
+        public List<MoveLine> getLines() { return lines; }
+        public void setLines(List<MoveLine> lines) { this.lines = lines; }
+    }
+
+    private UUID resolveStaffUuid(UUID candidate) {
+        if (candidate != null && nhanVienRepository.existsById(candidate)) {
+            return candidate;
+        }
+        return nhanVienRepository.findAll().stream().map(NhanVien::getId).findFirst().orElse(null);
+    }
+
+    /**
+     * Bước 2: Thủ kho xác nhận XUẤT KHO — PENDING → SHIPPED (chờ nhận hàng).
+     * Trừ tồn Kho Tổng + ghi thẻ kho TRANSFER_OUT cho từng dòng (qua hàm DB
+     * dùng chung), snapshot giá vốn bình quân vào dòng chi tiết.
+     */
+    @PutMapping("/{id}/ship")
+    @Transactional
+    public ResponseEntity<?> ship(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body) {
+        return phieuXuatKhoRepository.findById(id).<ResponseEntity<?>>map(pxk -> {
+            if (!"PENDING".equals(pxk.getTrangThai())) {
+                return ResponseEntity.badRequest().body(
+                        new ErrorResponse("Chỉ xác nhận xuất được phiếu ở trạng thái PENDING"));
+            }
+            List<ChiTietPhieuXuat> lines = chiTietPhieuXuatRepository.findByIdPhieuXuat(id);
+            if (lines.isEmpty()) {
+                return ResponseEntity.badRequest().body(
+                        new ErrorResponse("Phiếu không có dòng chi tiết — không thể xuất"));
+            }
+            UUID idNguoiDuyet = resolveStaffUuid(body != null ? body.getIdNguoiThucHien() : null);
+            if (idNguoiDuyet == null) {
+                return ResponseEntity.badRequest().body(new ErrorResponse("Không tìm thấy nhân viên duyệt"));
+            }
+
+            Map<UUID, Integer> overrides = new HashMap<>();
+            if (body != null && body.getLines() != null) {
+                for (MoveLine ml : body.getLines()) {
+                    if (ml.getIdSanPham() != null && ml.getSoLuong() != null) {
+                        overrides.put(ml.getIdSanPham(), ml.getSoLuong());
+                    }
+                }
+            }
+
+            LocalDate ngayXuat = LocalDate.now();
+            for (ChiTietPhieuXuat ct : lines) {
+                int xuat = overrides.containsKey(ct.getIdSanPham())
+                        ? overrides.get(ct.getIdSanPham())
+                        : (ct.getSoLuongXuat() != null && ct.getSoLuongXuat() > 0
+                                ? ct.getSoLuongXuat() : ct.getSoLuongYeuCau());
+                if (xuat < 0 || xuat > ct.getSoLuongYeuCau()) {
+                    return ResponseEntity.badRequest().body(new ErrorResponse(
+                            "Số lượng xuất phải từ 0 đến số lượng yêu cầu"));
+                }
+                int ton = tonKhoRepository
+                        .findByIdSanPhamAndIdChiNhanh(ct.getIdSanPham(), pxk.getIdChiNhanhXuat())
+                        .map(t -> t.getSoLuongTon() == null ? 0 : t.getSoLuongTon())
+                        .orElse(0);
+                if (xuat > ton) {
+                    return ResponseEntity.badRequest().body(new ErrorResponse(
+                            "Không đủ tồn kho tại kho xuất (tồn " + ton + ", cần " + xuat + ")"));
+                }
+                BigDecimal giaVon = tonKhoRepository
+                        .findByIdSanPhamAndIdChiNhanh(ct.getIdSanPham(), pxk.getIdChiNhanhXuat())
+                        .map(t -> t.getGiaVonTrungBinh() == null ? BigDecimal.ZERO : t.getGiaVonTrungBinh())
+                        .orElse(BigDecimal.ZERO);
+
+                ct.setSoLuongXuat(xuat);
+                ct.setSoLuongNhan(0); // chưa nhận — cập nhật ở bước /receive
+                ct.setDonGiaVon(giaVon);
+                ct.setThanhTien(giaVon.multiply(BigDecimal.valueOf(xuat)));
+                chiTietPhieuXuatRepository.save(ct);
+
+                if (xuat > 0) {
+                    jdbcTemplate.query(
+                            "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, ?::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, ?::date, ?::text, NOW()::timestamp)",
+                            rs -> { },
+                            ct.getIdSanPham(), pxk.getIdChiNhanhXuat(), "TRANSFER_OUT", -xuat, giaVon,
+                            pxk.getMaPhieu(), "Hệ thống", ct.getHanSuDung(),
+                            "Xuất luân chuyển sang cửa hàng: phiếu " + pxk.getMaPhieu());
+                }
+            }
+
+            pxk.setTrangThai("SHIPPED");
+            pxk.setIdNguoiDuyet(idNguoiDuyet);
+            pxk.setNgayXuatThucTe(ngayXuat);
+            pxk.setNgayCapNhat(LocalDateTime.now());
+            phieuXuatKhoRepository.save(pxk);
+            phieuXuatKhoRepository.flush();
+
+            // Người thực hiện hiển thị trên thẻ kho (chỉ mang tính ghi chú).
+            chiTietPhieuXuatRepository.flush();
+            entityManager.clear();
+            return ResponseEntity.ok(toDTO(phieuXuatKhoRepository.findById(id).orElseThrow()));
+        }).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Bước 3: Quản lý chi nhánh xác nhận ĐÃ NHẬN HÀNG — SHIPPED → COMPLETED.
+     * Cộng tồn chi nhánh nhận + ghi thẻ kho TRANSFER_IN.
+     */
+    @PutMapping("/{id}/receive")
+    @Transactional
+    public ResponseEntity<?> receive(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body) {
+        return phieuXuatKhoRepository.findById(id).<ResponseEntity<?>>map(pxk -> {
+            if (!"SHIPPED".equals(pxk.getTrangThai())) {
+                return ResponseEntity.badRequest().body(
+                        new ErrorResponse("Chỉ xác nhận nhận được phiếu ở trạng thái SHIPPED (chờ nhận hàng)"));
+            }
+            List<ChiTietPhieuXuat> lines = chiTietPhieuXuatRepository.findByIdPhieuXuat(id);
+            UUID idNguoiNhan = resolveStaffUuid(body != null ? body.getIdNguoiThucHien() : null);
+            if (idNguoiNhan == null) {
+                return ResponseEntity.badRequest().body(new ErrorResponse("Không tìm thấy nhân viên nhận"));
+            }
+
+            Map<UUID, Integer> overrides = new HashMap<>();
+            if (body != null && body.getLines() != null) {
+                for (MoveLine ml : body.getLines()) {
+                    if (ml.getIdSanPham() != null && ml.getSoLuong() != null) {
+                        overrides.put(ml.getIdSanPham(), ml.getSoLuong());
+                    }
+                }
+            }
+
+            for (ChiTietPhieuXuat ct : lines) {
+                int xuat = ct.getSoLuongXuat() == null ? 0 : ct.getSoLuongXuat();
+                int nhan = overrides.containsKey(ct.getIdSanPham())
+                        ? overrides.get(ct.getIdSanPham()) : xuat;
+                if (nhan < 0 || nhan > xuat) {
+                    return ResponseEntity.badRequest().body(new ErrorResponse(
+                            "Số lượng nhận phải từ 0 đến số lượng xuất"));
+                }
+                ct.setSoLuongNhan(nhan);
+                chiTietPhieuXuatRepository.save(ct);
+
+                if (nhan > 0) {
+                    jdbcTemplate.query(
+                            "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, ?::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, ?::date, ?::text, NOW()::timestamp)",
+                            rs -> { },
+                            ct.getIdSanPham(), pxk.getIdChiNhanhNhan(), "TRANSFER_IN", nhan,
+                            ct.getDonGiaVon() == null ? BigDecimal.ZERO : ct.getDonGiaVon(),
+                            pxk.getMaPhieu(), "Hệ thống", ct.getHanSuDung(),
+                            "Nhận hàng luân chuyển từ kho tổng: phiếu " + pxk.getMaPhieu());
+                }
+            }
+
+            pxk.setTrangThai("COMPLETED");
+            pxk.setIdNguoiNhan(idNguoiNhan);
+            pxk.setNgayNhanThucTe(LocalDate.now());
+            pxk.setNgayCapNhat(LocalDateTime.now());
+            phieuXuatKhoRepository.save(pxk);
+            phieuXuatKhoRepository.flush();
+            entityManager.clear();
+            return ResponseEntity.ok(toDTO(phieuXuatKhoRepository.findById(id).orElseThrow()));
+        }).orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
     private PhieuXuatKhoDTO toDTO(PhieuXuatKho pxk) {
         PhieuXuatKhoDTO dto = new PhieuXuatKhoDTO();

@@ -259,6 +259,16 @@ public class PhieuNhapController {
         chiTietPhieuNhapRepository.saveAll(lines);
         chiTietPhieuNhapRepository.flush();
 
+        // Trạng thái "chờ thanh toán": Thủ kho mới lập phiếu, hàng CHƯA được
+        // cộng tồn và tiền CHƯA trả NCC — Kế toán bấm Thanh toán (/pay) sẽ chạy
+        // các bước đó.
+        boolean awaitingPayment = "PENDING_PAYMENT".equalsIgnoreCase(saved.getTrangThai())
+                || "PENDING".equalsIgnoreCase(saved.getTrangThai());
+        if (awaitingPayment) {
+            entityManager.clear();
+            return ResponseEntity.ok(toDTO(phieuNhapRepository.findById(saved.getId()).orElseThrow()));
+        }
+
         // Thanh toán ngay = toàn bộ giá trị phiếu (đọc grand_total mới nhất).
         BigDecimal paid = request.getDaThanhToan() != null
                 ? request.getDaThanhToan()
@@ -287,6 +297,70 @@ public class PhieuNhapController {
 
         entityManager.clear();
         return ResponseEntity.ok(toDTO(phieuNhapRepository.findById(saved.getId()).orElseThrow()));
+    }
+
+    /**
+     * Kế toán bấm "Thanh toán" trên phiếu đang chờ thanh toán:
+     *   1. Trả NCC toàn bộ grand_total (da_thanh_toan, cong_no = 0).
+     *   2. Cộng tồn Kho Tổng + ghi thẻ kho PURCHASE_IN cho từng dòng
+     *      (qua hàm DB dùng chung) — "quản lý sản phẩm trong kho tăng tương ứng".
+     *   3. PENDING_PAYMENT → COMPLETED.
+     * Toàn bộ trong MỘT transaction.
+     */
+    @PutMapping("/{id}/pay")
+    @Transactional
+    public ResponseEntity<?> pay(@PathVariable UUID id,
+                                 @RequestBody(required = false) PayRequest request) {
+        java.util.Optional<PhieuNhap> found = phieuNhapRepository.findById(id);
+        if (found.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        PhieuNhap pn = found.get();
+        if (!"PENDING_PAYMENT".equalsIgnoreCase(pn.getTrangThai())
+                && !"PENDING".equalsIgnoreCase(pn.getTrangThai())) {
+            return ResponseEntity.badRequest()
+                    .body(new SuccessResponse("Chỉ thanh toán được phiếu ở trạng thái chờ thanh toán"));
+        }
+
+        List<ChiTietPhieuNhap> lines = chiTietPhieuNhapRepository.findByIdPhieuNhap(id);
+        if (lines.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(new SuccessResponse("Phiếu không có dòng chi tiết — không thể thanh toán"));
+        }
+
+        BigDecimal grand = jdbcTemplate.queryForObject(
+                "SELECT grand_total FROM phieu_nhap WHERE id = ?", BigDecimal.class, id);
+        BigDecimal paid = request != null && request.getDaThanhToan() != null
+                ? request.getDaThanhToan() : grand;
+        if (paid.compareTo(grand) > 0) {
+            return ResponseEntity.badRequest()
+                    .body(new SuccessResponse("Số tiền trả vượt giá trị phiếu"));
+        }
+
+        for (ChiTietPhieuNhap ct : lines) {
+            if (ct.getSoLuongNhan() != null && ct.getSoLuongNhan() > 0) {
+                jdbcTemplate.query(
+                        "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, ?::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, ?::date, ?::text, NOW()::timestamp)",
+                        rs -> { },
+                        ct.getIdSanPham(), pn.getIdChiNhanh(), "PURCHASE_IN", ct.getSoLuongNhan(),
+                        ct.getDonGiaNhap(), pn.getMaPhieu(), "Kế toán", ct.getHanSuDung(),
+                        "Nhập hàng từ NCC (đã thanh toán): phiếu " + pn.getMaPhieu());
+            }
+        }
+
+        jdbcTemplate.update(
+                "UPDATE phieu_nhap SET trang_thai = 'COMPLETED', da_thanh_toan = ?, ngay_cap_nhat = NOW() WHERE id = ?",
+                paid, id);
+
+        entityManager.clear();
+        return ResponseEntity.ok(toDTO(phieuNhapRepository.findById(id).orElseThrow()));
+    }
+
+    /** Body của /pay. */
+    public static class PayRequest {
+        private BigDecimal daThanhToan;
+        public BigDecimal getDaThanhToan() { return daThanhToan; }
+        public void setDaThanhToan(BigDecimal v) { this.daThanhToan = v; }
     }
 
     /** Request body cho /with-lines: header + danh sách dòng hàng. */
