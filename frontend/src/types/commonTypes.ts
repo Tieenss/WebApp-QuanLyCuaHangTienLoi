@@ -24,6 +24,10 @@ export const DOCUMENT_STATUS = {
   Draft: 'DRAFT',
   Pending: 'PENDING',
   Approved: 'APPROVED',
+  /** Phiếu nhập đã Thủ kho lập, chờ Kế toán bấm "Thanh toán". */
+  PendingPayment: 'PENDING_PAYMENT',
+  /** Phiếu xuất đã Thủ kho xác nhận xuất, chờ chi nhánh bấm "Đã nhận hàng". */
+  Shipped: 'SHIPPED',
   Completed: 'COMPLETED',
   Cancelled: 'CANCELLED',
   Balanced: 'BALANCED',
@@ -35,6 +39,8 @@ export const DOCUMENT_STATUS_LABEL: Record<DocumentStatus, string> = {
   DRAFT: 'Nháp',
   PENDING: 'Chờ duyệt',
   APPROVED: 'Đã duyệt',
+  PENDING_PAYMENT: 'Chờ thanh toán',
+  SHIPPED: 'Chờ nhận hàng',
   COMPLETED: 'Hoàn tất',
   CANCELLED: 'Đã huỷ',
   BALANCED: 'Đã cân bằng',
@@ -45,6 +51,8 @@ export const DOCUMENT_STATUS_COLOR: Record<DocumentStatus, string> = {
   DRAFT: 'default',
   PENDING: 'gold',
   APPROVED: 'blue',
+  PENDING_PAYMENT: 'volcano',
+  SHIPPED: 'orange',
   COMPLETED: 'green',
   CANCELLED: 'red',
   BALANCED: 'purple',

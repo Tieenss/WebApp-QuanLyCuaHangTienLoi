@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
-import { API_BASE_URL } from '@/config/api';
 import {
   Alert,
   App as AntdApp,
@@ -21,12 +20,13 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchStock, resolveStockLevel, stockOf } from '@/store/slices/stockSlice';
 import {
   buildTransfer,
-  transferShipped,
+  fetchTransfers,
   type TransferDraftLine,
   DISTRIBUTION_CENTER_ID,
 } from '@/store/slices/transferSlice';
 import { chiNhanhApi, type ChiNhanhDTO } from '@/api/chiNhanh';
-import { chiTietPhieuXuatApi } from '@/api/phieuXuatKho';
+import { API_BASE_URL } from '@/config/api';
+import { chiTietPhieuXuatApi, phieuXuatKhoApi } from '@/api/phieuXuatKho';
 import { DOCUMENT_STATUS, STOCK_LEVEL, USER_ROLE, type DocumentStatus, type StockLevel } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
@@ -235,7 +235,8 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       });
       if (transfer === null) return;
 
-      // Gọi API backend để lưu DB
+      // 1) Tạo header PENDING + dòng chi tiết xuống DB. Việc trừ/cộng tồn do
+      //    backend làm qua /ship và /receive (fun the_kho + ton_kho).
       try {
         const response = await fetch(`${API_BASE_URL}/api/phieu-xuat-kho`, {
           method: 'POST',
@@ -244,12 +245,12 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
             ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
           },
           body: JSON.stringify({
-            maPhieu: '', // backend tự sinh
+            maPhieu: '', // trigger DB tự sinh PX-YYYYMMDD-NNN
             idChiNhanhXuat: fromBranchId,
             idChiNhanhNhan: values.toBranchId,
-            idNguoiTao: user?.id,
+            idNguoiTao: user?.idNhanVien ?? null,
             ngayYeuCau: values.requestDate.format('YYYY-MM-DD'),
-            trangThai: initialStatus,
+            trangThai: 'PENDING', // luôn tạo PENDING — bước tiếp theo qua API ship/receive
             ghiChu: values.note?.trim() ?? '',
           }),
         });
@@ -257,32 +258,39 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
           const err = await response.json();
           throw new Error(err.message || 'Lỗi lưu phiếu xuất');
         }
-
-        // Tạo chi tiết
         const created = await response.json();
-        try {
-          await chiTietPhieuXuatApi.createBatch(
-            validRows.map((row, index) => ({
-              id: '',
-              idPhieuXuat: created.id,
-              idSanPham: row.productId,
-              soLuongYeuCau: row.quantity,
-              soLuongXuat: row.quantity,
-              soLuongNhan: row.quantity,
-              donGiaVon: 0,
-              thanhTien: 0,
-              thuTu: index,
-            })),
-          );
-        } catch (e) {
-          console.error('Lỗi tạo chi tiết phiếu xuất:', e);
+
+        await chiTietPhieuXuatApi.createBatch(
+          validRows.map((row, index) => ({
+            id: '',
+            idPhieuXuat: created.id,
+            idSanPham: row.productId,
+            soLuongYeuCau: row.quantity,
+            soLuongXuat: 0,
+            soLuongNhan: 0,
+            donGiaVon: 0,
+            thanhTien: 0,
+            thuTu: index,
+          })),
+        );
+
+        // 2) Thủ kho/Admin lập phiếu trực tiếp: tự chạy luôn bước xuất + nhận
+        //    để DB trừ tồn kho xuất, cộng tồn kho nhận, đủ 2 dòng thẻ kho.
+        if (initialStatus === DOCUMENT_STATUS.Completed) {
+          const idNhanVien = user?.idNhanVien ?? '';
+          await phieuXuatKhoApi.ship(created.id, {
+            idNguoiThucHien: idNhanVien,
+            lines: validRows.map((row) => ({ idSanPham: row.productId, soLuong: row.quantity })),
+          });
+          await phieuXuatKhoApi.receive(created.id, { idNguoiThucHien: idNhanVien });
         }
       } catch (e: any) {
         message.error(e?.message || 'Có lỗi khi lưu phiếu xuất');
         return;
       }
 
-      dispatch(transferShipped({ transfer, performedBy }));
+      dispatch(fetchTransfers());
+      dispatch(fetchStock());
 
       if (isRequest) {
         message.success(

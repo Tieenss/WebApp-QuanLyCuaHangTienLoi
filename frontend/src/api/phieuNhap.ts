@@ -85,4 +85,17 @@ export const phieuNhapApi = {
     }
     return response.json();
   },
+  /** Kế toán xác nhận trả NCC: PENDING_PAYMENT → COMPLETED + cộng tồn Kho Tổng. */
+  pay: async (id: string, daThanhToan?: number): Promise<PhieuNhapDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-nhap/${id}/pay`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders() },
+      body: JSON.stringify(daThanhToan !== undefined ? { daThanhToan } : {}),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.message || 'Lỗi thanh toán phiếu nhập');
+    }
+    return response.json();
+  },
 };

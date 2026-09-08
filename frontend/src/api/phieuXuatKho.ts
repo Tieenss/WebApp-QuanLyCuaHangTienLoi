@@ -62,6 +62,38 @@ export const phieuXuatKhoApi = {
     }
     return response.json();
   },
+  /** Thủ kho xác nhận xuất: PENDING → SHIPPED, trừ tồn kho xuất + thẻ kho. */
+  ship: async (
+    id: string,
+    body: { idNguoiThucHien: string; lines: { idSanPham: string; soLuong: number }[] },
+  ): Promise<PhieuXuatKhoDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${id}/ship`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.message || "Lỗi xác nhận xuất kho");
+    }
+    return response.json();
+  },
+  /** Chi nhánh xác nhận đã nhận: SHIPPED → COMPLETED, cộng tồn chi nhánh. */
+  receive: async (
+    id: string,
+    body: { idNguoiThucHien: string; lines?: { idSanPham: string; soLuong: number }[] },
+  ): Promise<PhieuXuatKhoDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${id}/receive`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.message || "Lỗi xác nhận nhận hàng");
+    }
+    return response.json();
+  },
 };
 
 export const chiTietPhieuXuatApi = {

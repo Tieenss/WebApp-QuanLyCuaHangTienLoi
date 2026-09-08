@@ -14,16 +14,14 @@ import { phieuXuatKhoApi, type PhieuXuatKhoDTO } from '@/api/phieuXuatKho';
  * BR-06: chỉ đi từ Kho Tổng ra cửa hàng bán lẻ. Không có điều chuyển ngang
  * giữa các cửa hàng trong MVP.
  *
- * Vòng đời phiếu (mở rộng để Quản lý chi nhánh cùng tham gia):
- *   1. Quản lý chi nhánh (hoặc Thủ kho/Admin) tạo yêu cầu với `status = PENDING`
- *      — chỉ ghi vào `transferSlice`, CHƯA đụng tồn kho.
- *   2. Thủ kho/Admin duyệt (`approveTransfer`): chuyển `PENDING → COMPLETED`
- *      và dispatch `transferShipped` để:
- *        - Trừ tồn kho tại Kho Tổng            → `stockSlice`
- *        - Cộng tồn kho tại cửa hàng nhận      → `stockSlice`
- *        - Ghi 2 dòng thẻ kho TransferOut/In   → `stockSlice`
- *   3. Thủ kho/Admin từ chối (`rejectTransfer`): chuyển `PENDING → CANCELLED`,
- *      tồn kho hai đầu giữ nguyên.
+ * Vòng đời phiếu (luồng 3 bước):
+ *   1. Quản lý chi nhánh tạo yêu cầu với `status = PENDING` (chờ duyệt).
+ *   2. Thủ kho bấm Duyệt → form xác nhận xuất (điền SL thực xuất) → API
+ *      `/ship`: trừ tồn Kho Tổng + ghi thẻ kho TRANSFER_OUT, phiếu thành
+ *      `SHIPPED` (chờ nhận hàng).
+ *   3. Quản lý chi nhánh bấm "Đã nhận hàng" → API `/receive`: cộng tồn chi
+ *      nhánh + thẻ kho TRANSFER_IN, phiếu thành `COMPLETED`.
+ *   Từ chối ở bước 1: PENDING → CANCELLED, tồn kho giữ nguyên.
  *
  * Khác hai transaction kia: KHÔNG sinh phiếu sổ quỹ, vì luân chuyển nội bộ
  * không phát sinh dòng tiền — hàng chỉ đổi chỗ trong cùng một hệ thống.
@@ -44,9 +42,11 @@ export interface TransferDraftLine {
 }
 
 /**
- * Action dùng chung cho transaction xuất kho — chỉ dispatch khi phiếu được
- * DUYỆT (PENDING → COMPLETED). Cửa hàng nhận hàng ngay khi Thủ kho duyệt,
- * không có bước xác nhận riêng.
+ * Action dùng chung cho transaction xuất kho — dispatch khi Thủ kho xác nhận
+ * XUẤT (PENDING → SHIPPED) hoặc khi Admin/Thủ kho lập phiếu xuất trực tiếp
+ * (COMPLETED). Tồn kho thật do backend ghi qua `fn_ghi_the_kho_va_dieu_chinh_ton`;
+ * UI refresh `fetchStock()` sau mỗi bước nên action này chỉ còn tác dụng cập
+ * nhật danh sách phiếu trong session.
  */
 export const transferShipped = createAction<{
   transfer: StockTransfer;
@@ -171,24 +171,35 @@ export const transferSlice = createSlice({
     },
 
     /**
-     * Duyệt yêu cầu xuất kho: chuyển PENDING → COMPLETED, set ngày xuất/nhận
-     * và người duyệt. KHÔNG đụng tồn kho ở đây — caller phải dispatch
-     * `transferShipped` để stockSlice xử lý transaction trừ/cộng tồn.
+     * Thủ kho xác nhận xuất kho: PENDING → SHIPPED (chờ chi nhánh nhận hàng).
+     * Tồn kho do backend cập nhật; UI refetch sau khi API thành công.
      */
-    approveTransfer: (
+    shipTransfer: (
       state,
       action: PayloadAction<{
         id: string;
         approvedBy: string;
-        approvedDate: string;
+        shippedDate: string;
       }>,
     ) => {
       const transfer = state.transfers.find((item) => item.id === action.payload.id);
       if (!transfer || transfer.status !== DOCUMENT_STATUS.Pending) return;
-      transfer.status = DOCUMENT_STATUS.Completed;
-      transfer.shippedDate = action.payload.approvedDate;
-      transfer.receivedDate = action.payload.approvedDate;
+      transfer.status = DOCUMENT_STATUS.Shipped;
+      transfer.shippedDate = action.payload.shippedDate;
       transfer.approvedBy = action.payload.approvedBy;
+    },
+
+    /**
+     * Chi nhánh xác nhận đã nhận: SHIPPED → COMPLETED.
+     */
+    receiveTransfer: (
+      state,
+      action: PayloadAction<{ id: string; receivedDate: string }>,
+    ) => {
+      const transfer = state.transfers.find((item) => item.id === action.payload.id);
+      if (!transfer || transfer.status !== DOCUMENT_STATUS.Shipped) return;
+      transfer.status = DOCUMENT_STATUS.Completed;
+      transfer.receivedDate = action.payload.receivedDate;
     },
 
     /**
@@ -222,7 +233,8 @@ export const transferSlice = createSlice({
 
 export const {
   updateTransferNote,
-  approveTransfer,
+  shipTransfer,
+  receiveTransfer,
   rejectTransfer,
 } = transferSlice.actions;
 
