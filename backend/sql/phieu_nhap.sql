@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS phieu_nhap (
     --   PENDING:     đang chờ NCC giao
     --   CANCELLED:   huỷ đơn (NCC hết hàng, ...)
     trang_thai      VARCHAR(20)  NOT NULL DEFAULT 'PENDING'
-                   CHECK (trang_thai IN ('DRAFT', 'PENDING', 'COMPLETED', 'CANCELLED')),
+                   CHECK (trang_thai IN ('DRAFT', 'PENDING', 'PENDING_PAYMENT', 'COMPLETED', 'CANCELLED')),
 
     -- CHECK nếu status = COMPLETED thì PHẢI có ngay_nhan_thuc_te
     CONSTRAINT chk_completed_co_ngay_nhan CHECK (

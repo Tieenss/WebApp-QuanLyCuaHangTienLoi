@@ -78,17 +78,21 @@ CREATE TABLE IF NOT EXISTS phieu_xuat_kho (
     ),
 
     -- ===== TRẠNG THÁI =====
-    -- 3 trạng thái (frontend `transferSlice.ts:180-188`):
-    --   PENDING:   mới tạo yêu cầu, chờ Thủ kho duyệt
-    --   COMPLETED: đã duyệt + xuất + nhận, tồn kho đã thay đổi
-    --   CANCELLED: bị huỷ (hết hàng / chi nhánh đóng)
-    -- Spec backend chỉ có HOAN_THANH nhưng frontend + nghiệp vụ cần đủ 3.
+    -- 4 trạng thái (luồng 3 bước module 9):
+    --   PENDING:   QL chi nhánh tạo yêu cầu, chờ Thủ kho duyệt
+    --   SHIPPED:   Thủ kho đã xuất kho (trừ tồn Kho Tổng), chờ chi nhánh nhận
+    --   COMPLETED: chi nhánh xác nhận đã nhận (cộng tồn chi nhánh)
+    --   CANCELLED: bị từ chối / huỷ
     trang_thai      VARCHAR(20)  NOT NULL DEFAULT 'PENDING'
-                   CHECK (trang_thai IN ('PENDING', 'COMPLETED', 'CANCELLED')),
+                   CHECK (trang_thai IN ('PENDING', 'SHIPPED', 'COMPLETED', 'CANCELLED')),
 
     -- CHECK ngày xuất phải có khi status = COMPLETED.
     CONSTRAINT chk_completed_co_ngay_xuat CHECK (
         trang_thai != 'COMPLETED' OR ngay_xuat_thuc_te IS NOT NULL
+    ),
+    -- CHECK ngày xuất phải có khi status = SHIPPED.
+    CONSTRAINT chk_shipped_co_ngay_xuat CHECK (
+        trang_thai != 'SHIPPED' OR ngay_xuat_thuc_te IS NOT NULL
     ),
     -- CHECK ngày nhận phải có khi status = COMPLETED.
     CONSTRAINT chk_completed_co_ngay_nhan CHECK (
