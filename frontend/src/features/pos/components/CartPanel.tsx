@@ -1,4 +1,5 @@
 import { useMemo, type FC } from 'react';
+import { API_BASE_URL } from '@/config/api';
 import {
   App as AntdApp,
   Button,
@@ -174,7 +175,7 @@ const sale = buildSalesOrder({
     void (async () => {
       try {
         const created = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/hoa-don/with-lines`,
+          `${API_BASE_URL}/api/hoa-don/with-lines`,
           {
             method: 'POST',
             headers: {

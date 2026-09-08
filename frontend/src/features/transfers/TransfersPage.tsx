@@ -9,6 +9,7 @@ import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { DocumentStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
+import { API_BASE_URL } from '@/config/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   approveTransfer,
@@ -149,7 +150,7 @@ export const TransfersPage: FC = () => {
 
   const handleApprove = (transfer: StockTransfer): void => {
     if (user === null) return;
-    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/phieu-xuat-kho/${transfer.id}/approve`, {
+    fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${transfer.id}/approve`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -168,7 +169,7 @@ export const TransfersPage: FC = () => {
 
   const handleReject = (transfer: StockTransfer): void => {
     if (user === null) return;
-    fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/phieu-xuat-kho/${transfer.id}/reject`, {
+    fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${transfer.id}/reject`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
