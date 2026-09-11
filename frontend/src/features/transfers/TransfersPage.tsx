@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FC, type ReactElement } from 'react';
+import { API_BASE_URL } from '@/config/api';
 import { chiTietPhieuXuatApi, type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
 import { nhanVienApi, type NhanVienDTO } from '@/api/nhanVien';
 import { App as AntdApp, Button, Card, Descriptions, Popconfirm, Space, Table, Tag, Typography } from 'antd';
@@ -9,14 +10,13 @@ import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { DocumentStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
-import { API_BASE_URL } from '@/config/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  approveTransfer,
   fetchTransfers,
   rejectTransfer,
-  transferShipped,
 } from '@/store/slices/transferSlice';
+import { fetchStock } from '@/store/slices/stockSlice';
+import { phieuXuatKhoApi } from '@/api/phieuXuatKho';
 import {
   DOCUMENT_STATUS,
   USER_ROLE,
@@ -24,9 +24,10 @@ import {
   type StockTransfer,
   type TransferLine,
 } from '@/types';
-import { formatDate, today } from '@/utils/dateUtils';
+import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
+import { ShipModal } from './components/ShipModal';
 import { TransferFormModal } from './components/TransferFormModal';
 import './TransfersPage.css';
 
@@ -148,23 +149,11 @@ export const TransfersPage: FC = () => {
     ];
   }, [scoped, filtered, pendingCount]);
 
+  /** Bước 2 của luồng: Thủ kho bấm Duyệt → mở form xác nhận xuất kho. */
+  const [shipTarget, setShipTarget] = useState<StockTransfer | null>(null);
+
   const handleApprove = (transfer: StockTransfer): void => {
-    if (user === null) return;
-    fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${transfer.id}/approve`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
-      },
-      body: JSON.stringify({ idNguoiDuyet: user.id }),
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error('Lỗi duyệt');
-        message.success('Đã duyệt phiếu xuất kho');
-        dispatch(fetchTransfers());
-        dispatch(approveTransfer({ id: transfer.id, approvedBy: `${user.fullName} (${user.employeeCode})`, approvedDate: today() }));
-      })
-      .catch((e) => message.error(e.message || 'Lỗi duyệt phiếu'));
+    setShipTarget(transfer);
   };
 
   const handleReject = (transfer: StockTransfer): void => {
@@ -175,7 +164,7 @@ export const TransfersPage: FC = () => {
         'Content-Type': 'application/json',
         ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
       },
-      body: JSON.stringify({ idNguoiDuyet: user.id }),
+      body: JSON.stringify({ idNguoiDuyet: user.idNhanVien, lyDo: `Từ chối bởi ${user.fullName}` }),
     })
       .then((r) => {
         if (!r.ok) throw new Error('Lỗi từ chối');
@@ -185,6 +174,29 @@ export const TransfersPage: FC = () => {
       })
       .catch((e) => message.error(e.message || 'Lỗi từ chối phiếu'));
   };
+
+  /** Bước 3 của luồng: chi nhánh xác nhận đã nhận → SHIPPED thành COMPLETED. */
+  const handleReceive = async (transfer: StockTransfer): Promise<void> => {
+    if (user === null) return;
+    try {
+      await phieuXuatKhoApi.receive(transfer.id, {
+        idNguoiThucHien: user.idNhanVien ?? '',
+      });
+      message.success(
+        `Đã nhận hàng phiếu ${transfer.code}. Tồn kho chi nhánh đã tăng theo số thực nhận.`,
+      );
+      dispatch(fetchTransfers());
+      dispatch(fetchStock());
+    } catch (e) {
+      message.error((e as Error).message || 'Lỗi xác nhận nhận hàng');
+    }
+  };
+
+  /** Quyền bấm "Đã nhận hàng": QL đúng chi nhánh nhận, hoặc Admin. */
+  const canReceive = (row: StockTransfer): boolean =>
+    row.status === DOCUMENT_STATUS.Shipped &&
+    (user?.role === USER_ROLE.Admin ||
+      (isStoreManager && row.toBranchId === user?.branchId));
 
   const columns: ColumnsType<StockTransfer> = [
     {
@@ -267,7 +279,10 @@ export const TransfersPage: FC = () => {
     },
   ];
 
-  if (isApprover) {
+  // Cột thao tác: Thủ kho/Admin thấy nút Duyệt+Từ chối (PENDING);
+  // QL chi nhánh thấy nút "Đã nhận hàng" (SHIPPED).
+  const canSeeActions = isApprover || isStoreManager;
+  if (canSeeActions) {
     columns.push({
       title: 'Thao tác',
       key: 'actions',
@@ -275,24 +290,43 @@ export const TransfersPage: FC = () => {
       width: 170,
       fixed: 'right',
       render: (_, row) => {
-        if (row.status !== DOCUMENT_STATUS.Pending) return null;
+        const approving = isApprover && row.status === DOCUMENT_STATUS.Pending;
+        const receiving = canReceive(row);
+        if (!approving && !receiving) return null;
         return (
           <Space size={4}>
-            <Button type="primary" size="small" onClick={() => handleApprove(row)}>
-              Duyệt
-            </Button>
-            <Popconfirm
-              title="Từ chối yêu cầu xuất kho?"
-              description={`Phiếu ${row.code} sẽ chuyển sang trạng thái "Đã huỷ".`}
-              okText="Từ chối"
-              cancelText="Đóng"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => handleReject(row)}
-            >
-              <Button danger size="small">
-                Từ chối
+            {approving && (
+              <Button type="primary" size="small" onClick={() => handleApprove(row)}>
+                Duyệt
               </Button>
-            </Popconfirm>
+            )}
+            {approving && (
+              <Popconfirm
+                title="Từ chối yêu cầu xuất kho?"
+                description={`Phiếu ${row.code} sẽ chuyển sang trạng thái "Đã huỷ".`}
+                okText="Từ chối"
+                cancelText="Đóng"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => handleReject(row)}
+              >
+                <Button danger size="small">
+                  Từ chối
+                </Button>
+              </Popconfirm>
+            )}
+            {receiving && (
+              <Popconfirm
+                title="Xác nhận đã nhận đủ hàng?"
+                description={`Phiếu ${row.code} sẽ chuyển sang "Hoàn tất" và tồn kho ${row.toBranchName} tăng theo số thực nhận.`}
+                okText="Đã nhận hàng"
+                cancelText="Đóng"
+                onConfirm={() => void handleReceive(row)}
+              >
+                <Button type="primary" size="small">
+                  Đã nhận hàng
+                </Button>
+              </Popconfirm>
+            )}
           </Space>
         );
       },
@@ -420,7 +454,7 @@ export const TransfersPage: FC = () => {
           rowKey="id"
           size="middle"
           loading={loading}
-          scroll={{ x: isApprover ? 2200 : 2050 }}
+          scroll={{ x: canSeeActions ? 2200 : 2050 }}
           expandable={{ expandedRowRender: renderDetail, columnWidth: 44 }}
           pagination={{
             pageSize: 10,
@@ -434,6 +468,11 @@ export const TransfersPage: FC = () => {
         onClose={() => setFormOpen(false)}
         initialStatus={isStoreManager ? DOCUMENT_STATUS.Pending : DOCUMENT_STATUS.Completed}
       />
+      <ShipModal
+        open={shipTarget !== null}
+        transfer={shipTarget}
+        onClose={() => setShipTarget(null)}
+      />
     </>
   );
 };
@@ -446,6 +485,8 @@ function labelOfStatus(status: DocumentStatus): string {
       return 'Chờ duyệt';
     case DOCUMENT_STATUS.Approved:
       return 'Đã duyệt';
+    case DOCUMENT_STATUS.Shipped:
+      return 'Chờ nhận hàng';
     case DOCUMENT_STATUS.Completed:
       return 'Hoàn tất';
     case DOCUMENT_STATUS.Cancelled:

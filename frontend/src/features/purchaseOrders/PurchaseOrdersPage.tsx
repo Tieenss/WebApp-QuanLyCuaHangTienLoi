@@ -1,5 +1,15 @@
 import { useMemo, useState, type FC, type ReactElement } from 'react';
-import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd';
+import {
+  App as AntdApp,
+  Button,
+  Card,
+  Descriptions,
+  Popconfirm,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
@@ -9,7 +19,12 @@ import { DocumentStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchPurchaseOrders } from '@/store/slices/purchaseSlice';
+import {
+  fetchPurchaseOrders,
+  purchaseReceived,
+} from '@/store/slices/purchaseSlice';
+import { fetchStock } from '@/store/slices/stockSlice';
+import { phieuNhapApi } from '@/api/phieuNhap';
 import { chiTietPhieuNhapApi, type ChiTietPhieuNhapDTO } from '@/api/chiTietPhieuNhap';
 import {
   DOCUMENT_STATUS,
@@ -19,7 +34,7 @@ import {
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '@/types';
-import { formatDate } from '@/utils/dateUtils';
+import { formatDate, today } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { PurchaseFormModal } from './components/PurchaseFormModal';
@@ -33,10 +48,12 @@ const { Text } = Typography;
  * Mỗi dòng là một phiếu nhập; mở rộng dòng để xem chi tiết mặt hàng và hạn dùng
  * từng lô. Hàng luôn nhập vào Kho Tổng (BR-05) nên không có cột chọn chi nhánh.
  *
- * MVP thanh toán ngay khi nhập, không theo dõi công nợ nhà cung cấp.
+ * Luồng 2 bước: Thủ kho lập phiếu → "Chờ thanh toán" (chưa cộng tồn);
+ * Kế toán kiểm tra và bấm "Thanh toán" → trả NCC + cộng tồn Kho Tổng → "Hoàn tất".
  */
 export const PurchaseOrdersPage: FC = () => {
   const dispatch = useAppDispatch();
+  const { message } = AntdApp.useApp();
   const user = useAppSelector((state) => state.auth.user);
   const { orders, loading } = useAppSelector((state) => state.purchase);
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
@@ -96,6 +113,62 @@ export const PurchaseOrdersPage: FC = () => {
     user?.role === USER_ROLE.Admin || user?.role === USER_ROLE.WarehouseKeeper;
   const [isFormOpen, setFormOpen] = useState(false);
 
+  /** Chỉ Kế toán (và Admin) được bấm "Thanh toán" trả NCC. */
+  const isPayer =
+    user?.role === USER_ROLE.Accountant || user?.role === USER_ROLE.Admin;
+
+  const isAwaitingPayment = (status: DocumentStatus): boolean =>
+    status === DOCUMENT_STATUS.PendingPayment || status === DOCUMENT_STATUS.Pending;
+
+  /**
+   * Bước 2 của luồng nhập kho: Kế toán kiểm tra phiếu (mở rộng dòng xem chi
+   * tiết) rồi bấm Thanh toán. Backend (`/pay`) trong MỘT transaction: trả
+   * NCC đủ grand_total, cộng tồn Kho Tổng + ghi thẻ kho PURCHASE_IN, đổi
+   * PENDING_PAYMENT → COMPLETED. Frontend sau đó refetch phiếu + tồn kho từ
+   * DB và dispatch `purchaseReceived` để cashbookPersistence lập phiếu chi
+   * "Trả NCC" trong sổ quỹ.
+   */
+  const handlePay = async (order: PurchaseOrder): Promise<void> => {
+    if (user === null) return;
+    try {
+      const updated = await phieuNhapApi.pay(order.id);
+      const details = detailsCache[order.id] ?? [];
+      const withLines: PurchaseOrder = {
+        ...order,
+        status: DOCUMENT_STATUS.Completed,
+        receivedDate: updated.ngayNhanThucTe ?? today(),
+        paidAmount: updated.daThanhToan ?? order.grandTotal,
+        lines: details.map((d) => {
+          const product = products.find((p) => p.id === d.idSanPham);
+          return {
+            id: d.id,
+            productId: d.idSanPham,
+            sku: product?.sku ?? '',
+            productName: product?.name ?? '',
+            unit: product?.unit ?? '',
+            orderedQuantity: d.soLuongDat,
+            receivedQuantity: d.soLuongNhan,
+            unitCost: d.donGiaNhap,
+            vatPercent: d.vatPhantram,
+            lineTotal: d.thanhTien,
+            expiryDate: d.hanSuDung ?? null,
+          } as PurchaseOrderLine;
+        }),
+      };
+      // Local + sổ quỹ (listener cashbookPersistence) — tồn kho DB đã cập nhật
+      // xong nên fetchStock bên dưới sẽ ghi đè số đúng của server.
+      dispatch(purchaseReceived({ order: withLines, performedBy: user.fullName }));
+      message.success(
+        `Đã trả NCC ${formatVND(order.grandTotal)} cho phiếu ${order.code}. ` +
+          'Tồn kho Kho Tổng đã tăng theo số thực nhận.',
+      );
+      dispatch(fetchPurchaseOrders());
+      dispatch(fetchStock());
+    } catch (e) {
+      message.error((e as Error).message || 'Lỗi thanh toán phiếu nhập');
+    }
+  };
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [supplierFilter, setSupplierFilter] = useState<string | null>(null);
@@ -123,6 +196,7 @@ export const PurchaseOrdersPage: FC = () => {
     const pending = orders.filter(
       (order) =>
         order.status === DOCUMENT_STATUS.Pending ||
+        order.status === DOCUMENT_STATUS.PendingPayment ||
         order.status === DOCUMENT_STATUS.Draft,
     );
     const totalValue = completed.reduce((sum, order) => sum + order.grandTotal, 0);
@@ -284,10 +358,42 @@ export const PurchaseOrdersPage: FC = () => {
       title: 'Trạng thái',
       dataIndex: 'status',
       align: 'center',
-      width: 120,
-      fixed: 'right',
+      width: 150,
       render: (status: DocumentStatus) => <DocumentStatusTag status={status} />,
     },
+    ...(isPayer
+      ? [
+          {
+            title: 'Thao tác',
+            key: 'actions',
+            align: 'center' as const,
+            width: 160,
+            fixed: 'right' as const,
+            render: (_: unknown, row: PurchaseOrder) => {
+              if (!isAwaitingPayment(row.status)) return null;
+              return (
+                <Popconfirm
+                  title="Thanh toán phiếu nhập cho NCC?"
+                  description={
+                    <span>
+                      Trả <strong>{formatVND(row.grandTotal)}</strong>. Hệ thống
+                      sẽ cộng tồn Kho Tổng theo số thực nhận và lập phiếu chi sổ
+                      quỹ trả NCC.
+                    </span>
+                  }
+                  okText="Xác nhận thanh toán"
+                  cancelText="Đóng"
+                  onConfirm={() => void handlePay(row)}
+                >
+                  <Button type="primary" size="small">
+                    Thanh toán
+                  </Button>
+                </Popconfirm>
+              );
+            },
+          } as ColumnsType<PurchaseOrder>[number],
+        ]
+      : []),
   ];
 
   /** Bảng chi tiết mặt hàng khi mở rộng một phiếu nhập. */
@@ -446,7 +552,7 @@ export const PurchaseOrdersPage: FC = () => {
       <PageHeader
         eyebrow="QUẢN TRỊ KHO / MODULE 8"
         title="Nhập kho từ nhà cung cấp"
-        description="Lập phiếu nhập hàng vào Kho Tổng. Khi lưu, hệ thống cộng tồn kho, ghi thẻ kho và lập phiếu chi sổ quỹ."
+        description="Lập phiếu nhập hàng vào Kho Tổng — lưu ở trạng thái “Chờ thanh toán”. Kế toán bấm Thanh toán thì hệ thống cộng tồn kho, ghi thẻ kho và lập phiếu chi sổ quỹ."
         extra={
           <Space wrap>
             <Tag color="red" className="tag-no-margin">

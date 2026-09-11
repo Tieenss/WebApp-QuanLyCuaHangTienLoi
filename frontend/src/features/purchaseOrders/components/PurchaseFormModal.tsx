@@ -17,12 +17,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import {
-  buildPurchaseOrder,
-  fetchPurchaseOrders,
-  purchaseReceived,
-  type PurchaseDraftLine,
-} from '@/store/slices/purchaseSlice';
+import { fetchPurchaseOrders, type PurchaseDraftLine } from '@/store/slices/purchaseSlice';
 import { stockOf } from '@/store/slices/stockSlice';
 import { phieuNhapApi } from '@/api/phieuNhap';
 import { fetchKhoTong } from '@/store/slices/branchSlice';
@@ -76,7 +71,6 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
 
   const user = useAppSelector((state) => state.auth.user);
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
-  const orderCount = useAppSelector((state) => state.purchase.orders.length);
   const balances = useAppSelector((state) => state.stock.balances);
   const products = useAppSelector((state) => state.product.products);
   const branches = useAppSelector((state) => state.branch.branches);
@@ -169,16 +163,15 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         return;
       }
 
-      const supplierName = suppliers.find((s) => s.id === values.supplierId)?.name ?? '';
-
-      // Lưu phiếu + dòng chi tiết trong 1 transaction (phieu_nhap +
-      // chi_tiet_phieu_nhap + the_kho + ton_kho qua trigger/hàm DB).
+      // Bước 1 của luồng mới: Thủ kho lập phiếu ở trạng thái "Chờ thanh toán".
+      // Chưa cộng tồn Kho Tổng — Kế toán bấm "Thanh toán" (/pay) hàng mới vào
+      // kho và phiếu chi trả NCC mới được lập.
       const createdOrder = await phieuNhapApi.createWithLines({
         idChiNhanh: branchId,
         idNcc: values.supplierId,
         idNguoiNhap: user?.idNhanVien ?? null,
         ngayDatHang: values.orderDate.format('YYYY-MM-DD'),
-        trangThai: 'COMPLETED',
+        trangThai: 'PENDING_PAYMENT',
         ghiChu: values.note?.trim() ?? '',
         lines: validRows.map((row) => {
           const product = sellableProducts.find((item) => item.id === row.productId);
@@ -192,37 +185,10 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         }),
       });
 
-      // Vẫn dispatch để update Redux state với tên sản phẩm + NCC
-      const order = buildPurchaseOrder({
-        supplierId: values.supplierId,
-        supplierName,
-        lines: validRows.map(({ productId, quantity, unitCost }) => ({
-          productId,
-          quantity,
-          unitCost,
-        })),
-        orderDate: values.orderDate.format('YYYY-MM-DD'),
-        note: values.note?.trim() ?? '',
-        createdBy:
-          user === null ? 'Không xác định' : `${user.fullName} (${user.employeeCode})`,
-        existingCount: orderCount,
-      });
-      if (order !== null) {
-        dispatch(
-          purchaseReceived({
-            order: { ...order, id: createdOrder.id, code: createdOrder.maPhieu },
-            performedBy:
-              user === null
-                ? 'Không xác định'
-                : `${user.fullName} (${user.employeeCode})`,
-          }),
-        );
-        message.success(
-          `Đã lưu phiếu ${createdOrder.maPhieu}: cộng tồn Kho Tổng, ghi thẻ kho và lập phiếu chi ${formatVND(createdOrder.grandTotal ?? 0)}.`,
-        );
-      } else {
-        message.success(`Đã lưu phiếu nhập ${createdOrder.maPhieu}.`);
-      }
+      message.success(
+        `Đã lưu phiếu nhập ${createdOrder.maPhieu} — trạng thái "Chờ thanh toán". ` +
+          'Kế toán kiểm tra và bấm Thanh toán thì tồn Kho Tổng mới tăng theo số thực nhận.',
+      );
       dispatch(fetchPurchaseOrders());
       onClose();
     } catch (error: any) {
@@ -373,7 +339,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         showIcon
         className="purchase-alert"
         message={`Hàng nhập vào ${branchNameById(branchId || DISTRIBUTION_CENTER_ID)}`}
-        description="Khi lưu, hệ thống cộng tồn kho, ghi thẻ kho (NHAP_NCC) và lập phiếu chi sổ quỹ. Cửa hàng bán lẻ nhận hàng qua phiếu xuất kho nội bộ."
+        description="Lưu phiếu xong ở trạng thái “Chờ thanh toán” — Kế toán kiểm tra và bấm Thanh toán thì hệ thống mới cộng tồn Kho Tổng, ghi thẻ kho và lập phiếu chi sổ quỹ. Cửa hàng bán lẻ nhận hàng qua phiếu xuất kho nội bộ."
       />
 
       <Form<PurchaseFormValues>
