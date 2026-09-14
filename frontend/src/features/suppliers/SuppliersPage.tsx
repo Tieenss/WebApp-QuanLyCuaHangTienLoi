@@ -163,9 +163,13 @@ export const SuppliersPage: FC = () => {
     dispatch(setModalOpen(true));
   };
 
-  const handleDelete = (supplier: Supplier): void => {
-    dispatch(deleteSupplierThunk(supplier.id));
-    message.success(`Đã xoá nhà cung cấp "${supplier.name}".`);
+  const handleDelete = async (supplier: Supplier): Promise<void> => {
+    try {
+      await dispatch(deleteSupplierThunk(supplier.id)).unwrap();
+      message.success(`Đã xoá nhà cung cấp "${supplier.name}".`);
+    } catch (error: any) {
+      message.error(error?.message || 'Xoá nhà cung cấp thất bại.');
+    }
   };
 
   const columns: ColumnsType<Supplier> = [

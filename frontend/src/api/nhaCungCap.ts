@@ -11,6 +11,13 @@ export interface NhaCungCapDTO {
   nguoiLienHe?: string;
   chucDanhLienHe?: string;
   sdtLienHe?: string;
+  categoryIds?: string[];
+  categories?: Array<{
+    id: string;
+    tenDanhMuc: string;
+    iconEmoji?: string;
+    mauHex?: string;
+  }>;
   dieuKhoanThanhToan?: string;
   soNgayDuocNo?: number;
   tongCongNo?: number;
@@ -22,6 +29,15 @@ export interface NhaCungCapDTO {
 const getHeaders = (): HeadersInit => {
   const token = localStorage.getItem('auth_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const parseError = async (response: Response, fallback: string): Promise<Error> => {
+  try {
+    const body = await response.json();
+    return new Error(body?.message || fallback);
+  } catch {
+    return new Error(fallback);
+  }
 };
 
 export const nhaCungCapApi = {
@@ -60,7 +76,7 @@ export const nhaCungCapApi = {
       headers: { 'Content-Type': 'application/json', ...getHeaders() },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update');
+    if (!response.ok) throw await parseError(response, 'Failed to update');
     return response.json();
   },
 
@@ -69,6 +85,6 @@ export const nhaCungCapApi = {
       method: 'DELETE',
       headers: getHeaders(),
     });
-    if (!response.ok) throw new Error('Failed to delete');
+    if (!response.ok) throw await parseError(response, 'Failed to delete');
   },
 };

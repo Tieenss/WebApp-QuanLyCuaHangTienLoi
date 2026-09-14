@@ -37,12 +37,13 @@ const mapDtoToSupplier = (dto: NhaCungCapDTO): Supplier => ({
   contactName: dto.nguoiLienHe || '',
   contactTitle: dto.chucDanhLienHe || '',
   contactPhone: dto.sdtLienHe || '',
+  categoryIds: (dto as any).categories?.map((c: any) => c.id) ?? dto.categoryIds ?? [],
   paymentTerms: (dto.dieuKhoanThanhToan || 'Thanh toán ngay') as Supplier['paymentTerms'],
   creditDays: dto.soNgayDuocNo || 0,
   totalDebt: dto.tongCongNo || 0,
   totalOrders: dto.tongDonHang || 0,
   status: dto.dangHoatDong === false ? ('Inactive' as const) : ('Active' as const),
-  categories: [],
+  categories: (dto as any).categories?.map((c: any) => c.tenDanhMuc) ?? [],
   createdAt: today(),
   note: dto.ghiChu || '',
 });
@@ -57,7 +58,7 @@ export const createSupplier = createAsyncThunk(
   async (values: SupplierFormValues) => {
     const dto: NhaCungCapDTO = {
       id: '',
-      maNcc: values.code,
+      maNcc: '',
       tenNcc: values.name,
       maSoThue: values.taxCode,
       soDienThoai: values.phone,
@@ -66,6 +67,7 @@ export const createSupplier = createAsyncThunk(
       nguoiLienHe: values.contactName,
       chucDanhLienHe: values.contactTitle,
       sdtLienHe: values.contactPhone,
+      categoryIds: values.categoryIds ?? [],
       dieuKhoanThanhToan: values.paymentTerms,
       soNgayDuocNo: values.creditDays,
       dangHoatDong: values.status === 'Active',
@@ -80,7 +82,7 @@ export const updateSupplierThunk = createAsyncThunk(
   'supplier/update',
   async ({ id, values }: { id: string; values: SupplierFormValues }) => {
     const dto: Partial<NhaCungCapDTO> = {
-      maNcc: values.code,
+      // maNcc: values.code,
       tenNcc: values.name,
       maSoThue: values.taxCode,
       soDienThoai: values.phone,
@@ -89,6 +91,7 @@ export const updateSupplierThunk = createAsyncThunk(
       nguoiLienHe: values.contactName,
       chucDanhLienHe: values.contactTitle,
       sdtLienHe: values.contactPhone,
+      categoryIds: values.categoryIds ?? [],
       dieuKhoanThanhToan: values.paymentTerms,
       soNgayDuocNo: values.creditDays,
       dangHoatDong: values.status === 'Active',

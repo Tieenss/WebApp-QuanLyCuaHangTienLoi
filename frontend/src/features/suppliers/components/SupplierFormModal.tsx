@@ -16,22 +16,23 @@ import {
 } from '@/store/slices/supplierSlice';
 import type { SupplierFormValues } from '@/types';
 import './SupplierFormModal.css';
+import { fetchCategories } from '@/store/slices/categorySlice';
 
 /** Nhóm hàng mà nhà cung cấp có thể cung ứng. */
-const SUPPLY_CATEGORIES: readonly string[] = [
-  'Nước giải khát',
-  'Snack & Bánh kẹo',
-  'Sữa & Chế phẩm',
-  'Đồ ăn nhanh',
-  'Mì ăn liền',
-  'Thực phẩm tươi sống',
-  'Cà phê & Cacao',
-  'Bánh kẹo',
-  'Kem & Đông lạnh',
-  'Mỹ phẩm & Tiện ích',
-  'Thức uống bổ dưỡng',
-  'Vật tư & Bao bì',
-];
+// const SUPPLY_CATEGORIES: readonly string[] = [
+//   'Nước giải khát',
+//   'Snack & Bánh kẹo',
+//   'Sữa & Chế phẩm',
+//   'Đồ ăn nhanh',
+//   'Mì ăn liền',
+//   'Thực phẩm tươi sống',
+//   'Cà phê & Cacao',
+//   'Bánh kẹo',
+//   'Kem & Đông lạnh',
+//   'Mỹ phẩm & Tiện ích',
+//   'Thức uống bổ dưỡng',
+//   'Vật tư & Bao bì',
+// ];
 
 /** Điều khoản công nợ — khớp union type trong `supplierTypes.ts`. */
 const PAYMENT_TERMS: readonly SupplierFormValues['paymentTerms'][] = [
@@ -54,13 +55,18 @@ export const SupplierFormModal: FC = () => {
 
   const { isModalOpen, selectedSupplier } = useAppSelector((state) => state.supplier);
   const isEditing = selectedSupplier !== null;
+  const allCategories = useAppSelector((state) => state.category.categories);
 
   // Nạp dữ liệu mỗi lần mở modal để không dùng lại giá trị của lần trước.
   useEffect(() => {
     if (!isModalOpen) return;
+    dispatch(fetchCategories());
 
     if (selectedSupplier !== null) {
-      form.setFieldsValue(selectedSupplier);
+      form.setFieldsValue({
+        ...selectedSupplier,
+        categories: selectedSupplier.categoryIds ?? [],// dùng UUID array
+      });
       return;
     }
 
@@ -68,7 +74,7 @@ export const SupplierFormModal: FC = () => {
     form.setFieldsValue({
       paymentTerms: 'Công nợ 30 ngày',
       status: 'Active',
-      categories: [],
+      categoryIds: [],
     });
   }, [isModalOpen, selectedSupplier, form]);
 
@@ -123,8 +129,8 @@ export const SupplierFormModal: FC = () => {
               rules={[
                 { required: true, message: 'Vui lòng nhập mã số thuế.' },
                 {
-                  pattern: /^\d{10}(\d{3})?$/,
-                  message: 'Mã số thuế gồm 10 hoặc 13 chữ số.',
+                  pattern: /^\d{10}(-\d{3})?$/,
+                  message: 'Mã số thuế gồm 10 chữ số hoặc 10 + "-" + 3 chữ số.',
                 },
               ]}
             >
@@ -168,17 +174,19 @@ export const SupplierFormModal: FC = () => {
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-              name="categories"
+              name="categoryIds"
               label="Nhóm hàng cung ứng"
               rules={[{ required: true, message: 'Chọn ít nhất một nhóm hàng.' }]}
             >
               <Select
                 mode="multiple"
                 placeholder="Chọn nhóm hàng"
-                options={SUPPLY_CATEGORIES.map((item) => ({
-                  value: item,
-                  label: item,
-                }))}
+                options={allCategories
+                    .filter(c => c.status === 'Active')
+                    .map((c) => ({
+                      value: c.id,
+                      label: `${c.icon ?? ''} ${c.name}`.trim(),
+                    }))}
               />
             </Form.Item>
           </Col>
