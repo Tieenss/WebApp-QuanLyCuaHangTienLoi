@@ -29,10 +29,14 @@ import { phieuXuatKhoApi, type PhieuXuatKhoDTO } from '@/api/phieuXuatKho';
 
 export interface TransferState {
   transfers: StockTransfer[];
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: TransferState = {
   transfers: [],
+  loading: false,
+  error: null,
 };
 
 /** Một dòng hàng người dùng nhập trên form. */
@@ -63,16 +67,15 @@ const mapDtoToTransfer = (dto: PhieuXuatKhoDTO): StockTransfer => ({
   toBranchName: '',
   createdById: dto.idNguoiTao || '',
   createdByName: '',
-  approverId: dto.idNguoiDuyet || null,
-  approverName: '',
-  receiverId: dto.idNguoiNhan || null,
-  receiverName: '',
   requestDate: dto.ngayYeuCau || '',
   shippedDate: dto.ngayXuatThucTe || null,
   receivedDate: dto.ngayNhanThucTe || null,
   status: (dto.trangThai as any) || 'PENDING',
   note: dto.ghiChu || '',
   lines: [],
+  totalValue: 0,
+  requestedBy: '',
+  approvedBy: dto.idNguoiDuyet || null,
 });
 
 export const fetchTransfers = createAsyncThunk('transfer/fetchAll', async () => {
@@ -219,9 +222,19 @@ export const transferSlice = createSlice({
 
   extraReducers: (builder) => {
     builder
-      .addCase(fetchTransfers.fulfilled, (state, action) => {
-        state.transfers = action.payload;
-      });
+        .addCase(fetchTransfers.pending, (state) => {
+          state.loading = true;
+          state.error = null;
+        })
+        .addCase(fetchTransfers.fulfilled, (state, action) => {
+          state.loading = false;
+          state.transfers = action.payload;
+        })
+        .addCase(fetchTransfers.rejected, (state, action) => {
+          state.loading = false;
+          state.error = action.error.message || 'Lỗi tải phiếu xuất';
+        });
+
     // Bước 1: lưu phiếu xuất (áp dụng cho cả PENDING và COMPLETED), mới nhất
     // lên đầu. Khi status = PENDING, tồn kho chưa bị đụng — stockSlice không
     // lắng nghe action này (xem extraReducers bên dưới).

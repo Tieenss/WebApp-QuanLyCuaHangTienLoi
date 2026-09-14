@@ -20,14 +20,18 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchPurchaseOrders, type PurchaseDraftLine } from '@/store/slices/purchaseSlice';
 import { stockOf } from '@/store/slices/stockSlice';
 import { phieuNhapApi } from '@/api/phieuNhap';
-import { fetchKhoTong } from '@/store/slices/branchSlice';
+import { fetchBranches  } from '@/store/slices/branchSlice';
+import { fetchProducts } from '@/store/slices/productSlice';
+import { fetchSuppliers } from '@/store/slices/supplierSlice';
 import { PRODUCT_UNIT_LABEL } from '@/types';
+import { BRANCH_KIND } from '@/types/branchTypes';
 import { dayjs, today } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 import type { Dayjs } from 'dayjs';
 import './PurchaseFormModal.css';
 
-const DISTRIBUTION_CENTER_ID = 'br-dc-001';
+// const DISTRIBUTION_CENTER_ID = 'br-dc-001';
+const DISTRIBUTION_CENTER_ID = 'a1b2c3d4-0001-0000-0000-000000000001';
 
 const { Text, Paragraph } = Typography;
 
@@ -74,10 +78,20 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
   const balances = useAppSelector((state) => state.stock.balances);
   const products = useAppSelector((state) => state.product.products);
   const branches = useAppSelector((state) => state.branch.branches);
+  const branchLoading = useAppSelector((state) => state.branch.loading);
 
   useEffect(() => {
-    dispatch(fetchKhoTong());
-  }, [dispatch]);
+    if (open) {
+      dispatch(fetchProducts());
+      dispatch(fetchSuppliers());
+
+      // Phòng thủ: nếu branch chưa load
+      // (ví dụ mở form trước khi AppBootstrap hoàn tất)
+      if (branches.length === 0) {
+        dispatch(fetchBranches());
+      }
+    }
+  }, [open, dispatch, branches.length]);
 
   const sellableProducts = products.filter((p) => p.status === 'Active');
   const branchNameById = (id: string): string => {
@@ -104,14 +118,28 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
     setRows([emptyRow()]);
   };
 
-  /** Chỉ sản phẩm của NCC đang chọn — tránh nhập sai nguồn hàng. */
-  const supplierProducts = useMemo(
-    () =>
-      supplierId === null
-        ? []
-        : sellableProducts.filter((product) => product.supplierId === supplierId),
-    [supplierId],
+  /** Kho nhận chỉ được phép chọn Kho Tổng (BR-05) — loại DISTRIBUTION_CENTER. */
+  const khoTongBranches = useMemo(
+      () => branches.filter((b) => b.kind === BRANCH_KIND.DistributionCenter),
+      [branches],
   );
+  useEffect(() => {
+    if (open && branchId === null && khoTongBranches.length > 0) {
+      setBranchId(khoTongBranches[0].id);
+    }
+  }, [open, branchId, khoTongBranches]);
+
+  /** Sản phẩm NCC đang chọn cung ứng: được gán trực tiếp. */
+  const supplierProducts = useMemo(() => {
+    if (supplierId === null) return [];
+    // const supplier = suppliers.find((item) => item.id === supplierId);
+    // const supplyCategories = new Set(supplier?.categoryIds ?? []);
+    return products.filter(
+        (product) =>
+            product.status === 'Active' &&
+            (product.supplierId === supplierId ),
+    );
+  }, [supplierId, suppliers, products]);
 
   /** Sản phẩm đã có trên form, để không cho chọn trùng. */
   const usedProductIds = useMemo(
@@ -370,18 +398,19 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
             />
           </Form.Item>
 
-          <Form.Item
-            label="Kho nhận (chỉ Kho Tổng)"
-            required
-          >
+          <Form.Item label="Kho nhận (chỉ Kho Tổng)">
             <Select
-              placeholder="Chọn kho tổng"
-              value={branchId}
-              onChange={setBranchId}
-              loading={branches.length === 0}
-              showSearch
-              optionFilterProp="label"
-              options={branches.map((b) => ({ value: b.id, label: `${b.code} - ${b.name}` }))}
+                placeholder="Chọn Kho Tổng"
+                value={branchId}
+                onChange={setBranchId}
+                loading={branchLoading}
+                showSearch
+                optionFilterProp="label"
+                notFoundContent="Không có Kho Tổng nào"
+                options={khoTongBranches.map((b) => ({
+                  value: b.id,
+                  label: `${b.code} - ${b.name}`,
+                }))}
             />
           </Form.Item>
 
@@ -409,8 +438,8 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
           type="warning"
           showIcon
           className="purchase-alert"
-          message="Nhà cung cấp này chưa có sản phẩm nào trong danh mục."
-          description="Cần gán sản phẩm cho nhà cung cấp ở module Danh mục & Sản phẩm trước khi lập phiếu."
+          message= "Nhà cung cấp này chưa có sản phẩm nào để nhập."
+          description= "Không có sản phẩm đang kinh doanh (Active) thuộc nhóm hàng cung ứng của nhà cung cấp, hoặc sản phẩm chưa được gán nhà cung cấp."
         />
       )}
 

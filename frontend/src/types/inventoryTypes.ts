@@ -162,7 +162,7 @@ export interface PurchaseOrder {
     branchId: ID;
     branchName: string;
     orderDate: string;
-    expectedDate: string;
+    expectedDate: string | null;
     receivedDate: string | null;
     status: DocumentStatus;
     lines: PurchaseOrderLine[];
@@ -208,6 +208,11 @@ export interface StockTransfer {
   lines: TransferLine[];
   totalValue: VND;
   requestedBy: string;
+  /** Người tạo phiếu (ID nhân viên), từ DTO `idNguoiTao`. */
+  createdById?: string;
+
+  /** Tên người tạo phiếu, fill từ cache khi render. */
+  createdByName?: string;
   approvedBy: string | null;
   note: string;
 }

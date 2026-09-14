@@ -7,6 +7,12 @@ export interface Supplier {
     email: string;
     address: string;
     categories: string[]; // e.g., ['Nước giải khát', 'Snack & Bánh kẹo']
+    categoryIds: string[];    // UUID[] — cho form edit và gửi backend
+    contactName: string;
+    contactTitle: string;
+    contactPhone: string;
+    creditDays: number;
+    note: string;
     paymentTerms: 'Công nợ 15 ngày' | 'Công nợ 30 ngày' | 'Thanh toán ngay' | 'Công nợ 45 ngày';
     totalDebt: number; // Công nợ hiện tại (VND)
     totalOrders: number;

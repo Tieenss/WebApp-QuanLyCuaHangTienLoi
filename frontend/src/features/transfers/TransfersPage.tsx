@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FC, type ReactElement } from 'react';
 import { API_BASE_URL } from '@/config/api';
 import { chiTietPhieuXuatApi, type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
-import { nhanVienApi, type NhanVienDTO } from '@/api/nhanVien';
+import { nhanVienApi} from '@/api/nhanVien';
 import { App as AntdApp, Button, Card, Descriptions, Popconfirm, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { ArrowRightOutlined, PlusOutlined } from '@ant-design/icons';
@@ -22,7 +22,7 @@ import {
   USER_ROLE,
   type DocumentStatus,
   type StockTransfer,
-  type TransferLine,
+  // type TransferLine,
 } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
@@ -36,7 +36,7 @@ const { Text } = Typography;
 export const TransfersPage: FC = () => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
-  const { user, activeBranchId } = useAppSelector((state) => state.auth);
+  const { user} = useAppSelector((state) => state.auth);
   const { transfers, loading } = useAppSelector((state) => state.transfer);
   const branches = useAppSelector((state) => state.branch.branches);
 
@@ -50,7 +50,7 @@ export const TransfersPage: FC = () => {
 
   const isStoreManager = user?.role === USER_ROLE.StoreManager;
   const isApprover = user?.role === USER_ROLE.Admin || user?.role === USER_ROLE.WarehouseKeeper;
-  const branchScope = isStoreManager ? user?.branchId ?? null : null;
+  // const branchScope = isStoreManager ? user?.branchId ?? null : null;
 
   useEffect(() => {
     dispatch(fetchTransfers());
@@ -62,7 +62,7 @@ export const TransfersPage: FC = () => {
         ...t,
         fromBranchName: t.fromBranchName || branches.find((b) => b.id === t.fromBranchId)?.name || '',
         toBranchName: t.toBranchName || branches.find((b) => b.id === t.toBranchId)?.name || '',
-        createdByName: usersCache[t.createdById] || '',
+        createdByName: t.createdById ? usersCache[t.createdById] : '',
       })),
     [transfers, branches, usersCache],
   );
@@ -71,13 +71,14 @@ export const TransfersPage: FC = () => {
     transfers.forEach((t) => {
       if (detailsCache[t.id] === undefined) {
         chiTietPhieuXuatApi.getByPhieuXuat(t.id)
-          .then((data) => setDetailsCache((prev) => ({ ...prev, [t.id]: data })))
-          .catch(() => setDetailsCache((prev) => ({ ...prev, [t.id]: [] })));
+            .then((data) => setDetailsCache((prev) => ({ ...prev, [t.id]: data })))
+            .catch(() => setDetailsCache((prev) => ({ ...prev, [t.id]: [] })));
       }
-      if (t.createdById && !usersCache[t.createdById]) {
-        nhanVienApi.getById(t.createdById)
-          .then((nv) => setUsersCache((prev) => ({ ...prev, [t.createdById]: nv.hoTen })))
-          .catch(() => setUsersCache((prev) => ({ ...prev, [t.createdById]: '' })));
+      const createdById = t.createdById;
+      if (createdById && !usersCache[createdById]) {
+        nhanVienApi.getById(createdById)
+            .then((nv) => setUsersCache((prev) => ({ ...prev, [createdById]: nv.hoTen })))
+            .catch(() => setUsersCache((prev) => ({ ...prev, [createdById]: '' })));
       }
     });
   }, [transfers.length]);
@@ -118,7 +119,7 @@ export const TransfersPage: FC = () => {
     const pendingAmount = scoped
       .filter((t) => t.status === DOCUMENT_STATUS.Pending)
       .reduce((sum, t) => sum + (t.totalValue || 0), 0);
-    const servedBranches = new Set(scoped.map((t) => t.toBranchId));
+    // const servedBranches = new Set(scoped.map((t) => t.toBranchId));
     return [
       {
         key: 'orders',
@@ -335,21 +336,21 @@ export const TransfersPage: FC = () => {
 
   const renderDetail = (transfer: StockTransfer): ReactElement => {
     const details = detailsCache[transfer.id] || [];
-    const lineColumns: ColumnsType<TransferLine> = [
-      {
-        title: 'Sản phẩm',
-        dataIndex: 'productId',
-        render: (value: string) => {
-          const product = products.find((p) => p.id === value);
-          return product ? product.name : value;
-        },
-      },
-      { title: 'Số lượng yêu cầu', dataIndex: 'requestedQuantity' },
-      { title: 'Số lượng xuất', dataIndex: 'shippedQuantity' },
-      { title: 'Số lượng nhận', dataIndex: 'receivedQuantity' },
-      { title: 'Đơn giá vốn', dataIndex: 'unitCost', render: (v: number) => formatVND(v) },
-      { title: 'Thành tiền', dataIndex: 'lineTotal', render: (v: number) => formatVND(v) },
-    ];
+    // const lineColumns: ColumnsType<TransferLine> = [
+    //   {
+    //     title: 'Sản phẩm',
+    //     dataIndex: 'productId',
+    //     render: (value: string) => {
+    //       const product = products.find((p) => p.id === value);
+    //       return product ? product.name : value;
+    //     },
+    //   },
+    //   { title: 'Số lượng yêu cầu', dataIndex: 'requestedQuantity' },
+    //   { title: 'Số lượng xuất', dataIndex: 'shippedQuantity' },
+    //   { title: 'Số lượng nhận', dataIndex: 'receivedQuantity' },
+    //   { title: 'Đơn giá vốn', dataIndex: 'unitCost', render: (v: number) => formatVND(v) },
+    //   { title: 'Thành tiền', dataIndex: 'lineTotal', render: (v: number) => formatVND(v) },
+    // ];
     return (
       <Descriptions bordered size="small" column={3}>
         <Descriptions.Item label="Kho xuất">{transfer.fromBranchName}</Descriptions.Item>
@@ -362,7 +363,7 @@ export const TransfersPage: FC = () => {
     );
   };
 
-  const products = useAppSelector((state) => state.product.products);
+  // const products = useAppSelector((state) => state.product.products);
 
   const filters: ToolbarFilter[] = [
     {

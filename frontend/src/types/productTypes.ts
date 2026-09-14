@@ -45,7 +45,16 @@ export interface Category {
   status: RecordStatus;
 }
 
-export type CategoryFormValues = Omit<Category, 'id' | 'code' | 'productCount'>;
+export type CategoryFormValues = Omit<Category, 'id' | 'productCount'> & {
+  /** URL ảnh đại diện (form dùng name="imageUrl"). */
+  imageUrl?: string;
+
+  /** Field DB DTO — iconEmoji. */
+  iconEmoji?: string;
+
+  /** Field DB DTO — colorHex. */
+  colorHex?: string;
+};
 
 export interface Product {
   id: ID;

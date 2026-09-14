@@ -1,4 +1,4 @@
-import { useEffect, type FC } from 'react';
+import { useEffect,useMemo, type FC } from 'react';
 import {
   App as AntdApp,
   Col,
@@ -46,8 +46,27 @@ export const ProductFormModal: FC = () => {
   const categories = useAppSelector((state) => state.category.categories);
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
   const categoryOptions = categories.map((c) => ({ value: c.id, label: `${c.code} - ${c.name}` }));
-  const supplierOptions = suppliers.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }));
+  // const supplierOptions = suppliers.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }));
   const isEditing = selectedProduct !== null;
+  const selectedCategoryId = Form.useWatch('categoryId', form);
+  const selectedSupplierId = Form.useWatch('supplierId', form);
+
+  /** NCC cung ứng danh mục đang chọn. Ưu tiên lọc theo `categoryIds` của NCC. */
+  const supplierOptions = useMemo(() => {
+    if (!selectedCategoryId) {
+      return suppliers.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }));
+    }
+    const matched = suppliers.filter(
+        (s) => s.status === 'Active' && s.categoryIds?.includes(selectedCategoryId),
+    );
+    // Sửa sản phẩm cũ: NCC đã lưu có thể không khớp danh mục (dữ liệu legacy) —
+    // vẫn giữ trong danh sách để Select không hiển thị value rỗng.
+    if (selectedSupplierId && !matched.some((s) => s.id === selectedSupplierId)) {
+      const current = suppliers.find((s) => s.id === selectedSupplierId);
+      if (current) matched.push(current);
+    }
+    return matched.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }));
+  }, [suppliers, selectedCategoryId, selectedSupplierId]);
 
   useEffect(() => {
     if (!isModalOpen) return;
