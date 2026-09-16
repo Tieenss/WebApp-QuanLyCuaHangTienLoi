@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from 'antd';
 import type { MenuProps } from 'antd';
+import { canAccessPath } from '@/config/modules';
 import {
   BellOutlined,
   IdcardOutlined,
@@ -23,9 +24,9 @@ import {
   SwapOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getLandingPath } from '@/config/modules';
+// import { getLandingPath } from '@/config/modules';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { logout, setActiveBranch, switchRole } from '@/store/slices/authSlice';
+import { logout, setActiveBranch } from '@/store/slices/authSlice';
 import {
   clearNotifications,
   setGlobalSearch,
@@ -132,12 +133,12 @@ export const AdminTopbar: FC = () => {
       return;
     }
 
-    if (key.startsWith('role-')) {
-      const nextRole = key.replace('role-', '') as UserRole;
-      dispatch(switchRole(nextRole));
-      // Mỗi vai trò có trang chính khác nhau; Dashboard chỉ mở cho Admin/Kế toán.
-      navigate(getLandingPath(nextRole));
-    }
+    // if (key.startsWith('role-')) {
+    //   const nextRole = key.replace('role-', '') as UserRole;
+    //   dispatch(switchRole(nextRole));
+    //   // Mỗi vai trò có trang chính khác nhau; Dashboard chỉ mở cho Admin/Kế toán.
+    //   navigate(getLandingPath(nextRole));
+    // }
   };
 
   /**
@@ -185,14 +186,16 @@ export const AdminTopbar: FC = () => {
           onChange={(event) => dispatch(setGlobalSearch(event.target.value))}
         />
 
-        <Button
-          type="primary"
-          className="pos-quick-btn"
-          icon={<ShoppingCartOutlined />}
-          onClick={() => navigate('/pos')}
-        >
-          <span>Màn hình POS</span>
-        </Button>
+        {canAccessPath(role, '/pos') && (
+          <Button
+            type="primary"
+            className="pos-quick-btn"
+            icon={<ShoppingCartOutlined />}
+            onClick={() => navigate('/pos')}
+          >
+            <span>Màn hình POS</span>
+          </Button>
+        )}
 
         <Tooltip title={`${alertCount} mặt hàng dưới ngưỡng tồn tối thiểu`}>
           <Badge count={alertCount} overflowCount={99}>

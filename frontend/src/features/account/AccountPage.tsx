@@ -95,10 +95,22 @@ export const AccountPage: FC = () => {
     message.success('Đã cập nhật hồ sơ cá nhân.');
   };
 
-  const handlePasswordSubmit = (values: ChangePasswordFormValues): void => {
-    dispatch(changePassword(values));
-    passwordForm.resetFields();
-    message.success('Đã đổi mật khẩu. Lần đăng nhập sau hãy dùng mật khẩu mới.');
+  const handlePasswordSubmit = async (
+      values: ChangePasswordFormValues
+  ) => {
+    try {
+      await dispatch(changePassword(values)).unwrap();
+
+      passwordForm.resetFields();
+
+      message.success('Đổi mật khẩu thành công');
+    } catch (e) {
+      message.error(
+          e instanceof Error
+              ? e.message
+              : String(e)
+      );
+    }
   };
 
   const handleLogout = (): void => {
@@ -302,17 +314,17 @@ export const AccountPage: FC = () => {
                                   required: true,
                                   message: 'Vui lòng nhập mật khẩu hiện tại.',
                                 },
-                                {
-                                  // Xác thực ngay tại field để lỗi hiện đúng
-                                  // chỗ người dùng cần sửa.
-                                  validator: (_rule, value: string) =>
-                                    value === undefined ||
-                                    value === ''
-                                      ? Promise.resolve()
-                                      : Promise.reject(
-                                          new Error('Mật khẩu hiện tại không đúng.'),
-                                        ),
-                                },
+                                // {
+                                //   // Xác thực ngay tại field để lỗi hiện đúng
+                                //   // chỗ người dùng cần sửa.
+                                //   validator: (_rule, value: string) =>
+                                //     value === undefined ||
+                                //     value === ''
+                                //       ? Promise.resolve()
+                                //       : Promise.reject(
+                                //           new Error('Mật khẩu hiện tại không đúng.'),
+                                //         ),
+                                // },
                               ]}
                             >
                               <Input.Password

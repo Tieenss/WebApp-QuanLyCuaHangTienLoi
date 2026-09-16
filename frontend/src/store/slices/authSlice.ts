@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import { taiKhoanApi } from '@/api/taiKhoan';
 import {
   AUTH_STORAGE_KEY,
 } from '@/config/brand';
@@ -9,7 +10,7 @@ import {
   type ChangePasswordFormValues,
   type LoginFormValues,
   type ProfileFormValues,
-  type UserRole,
+  // type UserRole,
 } from '@/types';
 import { authApi } from '@/api/auth';
 import { initialsOf } from '@/utils/formatters';
@@ -91,8 +92,8 @@ export const authSlice = createSlice({
       state.isSubmitting = false;
       state.error = null;
     },
-    switchRole: (_state, _action: PayloadAction<UserRole>) => {
-    },
+    // switchRole: (_state, _action: PayloadAction<UserRole>) => {
+    // },
     setActiveBranch: (state, action: PayloadAction<string | null>) => {
       state.activeBranchId = action.payload;
       if (state.user) {
@@ -116,8 +117,8 @@ export const authSlice = createSlice({
         writePersistedSession({ user: state.user, activeBranchId: state.activeBranchId, token: state.token || '' });
       }
     },
-    changePassword: (_state, _action: PayloadAction<ChangePasswordFormValues>) => {
-    },
+    // changePassword: (_state, _action: PayloadAction<ChangePasswordFormValues>) => {
+    // },
     logout: (state) => {
       state.user = null;
       state.isAuthenticated = false;
@@ -126,6 +127,7 @@ export const authSlice = createSlice({
       state.error = null;
       state.token = null;
       writePersistedSession(null);
+      localStorage.removeItem('auth_token');
     },
   },
   extraReducers: (builder) => {
@@ -158,14 +160,41 @@ export const authSlice = createSlice({
   },
 });
 
+export const changePassword = createAsyncThunk(
+    'auth/changePassword',
+    async (
+        values: ChangePasswordFormValues,
+        { rejectWithValue, getState }
+    ) => {
+      const id = (getState() as { auth: AuthState }).auth.user?.id;
+
+      if (!id) {
+        return rejectWithValue('Chưa đăng nhập');
+      }
+
+      try {
+        await taiKhoanApi.changePassword(id, {
+          currentPassword: values.currentPassword,
+          newPassword: values.newPassword,
+        });
+
+        return true;
+      } catch (e) {
+        return rejectWithValue(
+            e instanceof Error ? e.message : 'Đổi mật khẩu thất bại'
+        );
+      }
+    }
+);
+
 export const {
   loginStarted,
   loginSucceeded,
-  switchRole,
+  // switchRole,
   setActiveBranch,
   clearAuthError,
   updateProfile,
-  changePassword,
+  // changePassword,
   logout,
 } = authSlice.actions;
 
