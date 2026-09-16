@@ -4,10 +4,11 @@ server:
 spring:
   application:
     name: cuahangtienloi
-  security:
-    user:
-      name: admin
-      password: admin
+#  security:
+#    user:
+#      name: admin
+#      password: admin
+
   config:
     import: optional:file:.env[.properties], optional:file:backend/.env[.properties]
   datasource:

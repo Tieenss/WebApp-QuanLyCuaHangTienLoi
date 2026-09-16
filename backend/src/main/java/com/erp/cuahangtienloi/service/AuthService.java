@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.service;
 
+import com.erp.cuahangtienloi.config.JwtService;
 import com.erp.cuahangtienloi.dto.LoginRequest;
 import com.erp.cuahangtienloi.dto.LoginResponse;
 import com.erp.cuahangtienloi.dto.TaiKhoanDTO;
@@ -8,9 +9,11 @@ import com.erp.cuahangtienloi.entity.TaiKhoan;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import com.erp.cuahangtienloi.repository.TaiKhoanRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -21,6 +24,9 @@ public class AuthService {
     private final TaiKhoanRepository taiKhoanRepository;
     private final NhanVienRepository nhanVienRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    @Value("${jwt.expiration-ms}")
+    private long expirationMs;
 
     public LoginResponse login(LoginRequest request) {
         TaiKhoan taiKhoan = taiKhoanRepository.findByTenDangNhap(request.getUsername())
@@ -39,10 +45,27 @@ public class AuthService {
             nhanVien = nhanVienRepository.findById(taiKhoan.getIdNhanVien()).orElse(null);
         }
 
-        String token = UUID.randomUUID().toString();
+        String token = jwtService.generateToken(
+                taiKhoan.getId(),
+                nhanVien != null
+                        ? nhanVien.getVaiTro()
+                        : "THU_NGAN",
+                nhanVien != null
+                        ? nhanVien.getId()
+                        : null,
+                nhanVien != null
+                        ? nhanVien.getIdChiNhanh()
+                        : null
+        );
         String expiresAt = LocalDateTime.now().plusHours(24).toString();
 
-        return new LoginResponse(token, toDTO(taiKhoan, nhanVien), expiresAt);
+        return new LoginResponse(
+                token,
+                toDTO(taiKhoan, nhanVien),
+                Instant.now()
+                        .plusMillis(expirationMs)
+                        .toString()
+        );
     }
 
     public TaiKhoanDTO toDTO(TaiKhoan taiKhoan, NhanVien nhanVien) {

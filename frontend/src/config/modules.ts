@@ -91,8 +91,8 @@ const ADMIN_ONLY = [USER_ROLE.Admin] as const;
 /** Admin + Kế toán — nhóm nhìn số liệu tài chính toàn hệ thống. */
 const FINANCE_VIEW = [USER_ROLE.Admin, USER_ROLE.Accountant] as const;
 
-/** Admin + Thủ kho — nghiệp vụ nhập/xuất tại Kho Tổng. */
-const WAREHOUSE_OPS = [USER_ROLE.Admin, USER_ROLE.WarehouseKeeper] as const;
+/** "Thủ kho lập phiếu → chờ thanh toán, Kế toán kiểm tra và thanh toán (duyệt trả NCC), Admin làm cả hai." */
+const WAREHOUSE_OPS = [USER_ROLE.Admin, USER_ROLE.WarehouseKeeper, USER_ROLE.Accountant] as const;
 
 /** Nhóm xem được tồn kho: Admin toàn bộ, Thủ kho Kho Tổng, Quản lý chi nhánh mình. */
 const STOCK_VIEW = [

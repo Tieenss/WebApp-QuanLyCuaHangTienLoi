@@ -18,17 +18,14 @@ export const AppBootstrap: FC = () => {
   const authUser = useAppSelector((state) => state.auth.user);
 
   useEffect(() => {
-    // Master data
-    dispatch(fetchCategories());
-    dispatch(fetchSuppliers());
-    dispatch(fetchBranches());
-    dispatch(fetchEmployees());
-    dispatch(fetchProducts());
-    // Chỉ load data nhạy cảm khi đã đăng nhập
     if (authUser) {
+      dispatch(fetchCategories());
+      dispatch(fetchSuppliers());
+      dispatch(fetchBranches());
+      dispatch(fetchEmployees());
+      dispatch(fetchProducts());
       dispatch(fetchStock());
       dispatch(fetchAttendance());
-      // POS chỉ bán tại chi nhánh của nhân viên đang đăng nhập.
       dispatch(syncPosBranch(authUser.branchId));
     }
   }, [dispatch, authUser]);
