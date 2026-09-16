@@ -5,6 +5,7 @@ import com.erp.cuahangtienloi.entity.TheKho;
 import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -25,6 +26,7 @@ public class TheKhoController {
     private final ChiNhanhRepository chiNhanhRepository;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TheKhoDTO>> getAll() {
         List<TheKhoDTO> list = theKhoRepository.findAll().stream()
                 .map(this::toDTO)
@@ -33,6 +35,7 @@ public class TheKhoController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return theKhoRepository.findById(id)
                 .map(tk -> ResponseEntity.ok(toDTO(tk)))
@@ -40,6 +43,7 @@ public class TheKhoController {
     }
 
     @GetMapping("/by-product/{idSanPham}/branch/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TheKhoDTO>> getByProductAndBranch(
             @PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh) {
         List<TheKhoDTO> list = theKhoRepository
@@ -50,6 +54,7 @@ public class TheKhoController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TheKhoDTO>> getByBranch(@PathVariable UUID idChiNhanh) {
         List<TheKhoDTO> list = theKhoRepository.findAll().stream()
                 .filter(tk -> idChiNhanh.equals(tk.getIdChiNhanh()))
@@ -59,6 +64,7 @@ public class TheKhoController {
     }
 
     @GetMapping("/by-type/{loaiGiaoDich}/branch/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TheKhoDTO>> getByTypeAndBranch(
             @PathVariable String loaiGiaoDich, @PathVariable UUID idChiNhanh) {
         List<TheKhoDTO> list = theKhoRepository
@@ -69,6 +75,7 @@ public class TheKhoController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}/from/{from}/to/{to}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TheKhoDTO>> getByBranchAndDateRange(
             @PathVariable UUID idChiNhanh,
             @PathVariable LocalDateTime from,
@@ -81,6 +88,7 @@ public class TheKhoController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody TheKho request) {
         TheKho tk = new TheKho();
         tk.setId(UUID.randomUUID());
@@ -104,6 +112,7 @@ public class TheKhoController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (theKhoRepository.existsById(id)) {
             theKhoRepository.deleteById(id);

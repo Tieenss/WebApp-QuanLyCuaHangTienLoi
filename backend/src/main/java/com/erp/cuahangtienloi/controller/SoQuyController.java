@@ -5,6 +5,7 @@ import com.erp.cuahangtienloi.entity.SoQuy;
 import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -25,6 +26,7 @@ public class SoQuyController {
     private final NhanVienRepository nhanVienRepository;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getAll() {
         List<SoQuyDTO> list = soQuyRepository.findAll().stream()
                 .map(this::toDTO)
@@ -33,6 +35,7 @@ public class SoQuyController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return soQuyRepository.findById(id)
                 .map(sq -> ResponseEntity.ok(toDTO(sq)))
@@ -40,6 +43,7 @@ public class SoQuyController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
         List<SoQuyDTO> list = soQuyRepository.findByIdChiNhanh(idChiNhanh).stream()
                 .map(this::toDTO)
@@ -48,6 +52,7 @@ public class SoQuyController {
     }
 
     @GetMapping("/by-direction/{direction}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getByDirection(@PathVariable String direction) {
         List<SoQuyDTO> list = soQuyRepository.findByDirection(direction).stream()
                 .map(this::toDTO)
@@ -56,6 +61,7 @@ public class SoQuyController {
     }
 
     @GetMapping("/by-hang-muc/{hangMuc}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getByHangMuc(@PathVariable String hangMuc) {
         List<SoQuyDTO> list = soQuyRepository.findByHangMuc(hangMuc).stream()
                 .map(this::toDTO)
@@ -64,6 +70,7 @@ public class SoQuyController {
     }
 
     @GetMapping("/by-date-range")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getByDateRange(
             @RequestParam LocalDate from, @RequestParam LocalDate to) {
         List<SoQuyDTO> list = soQuyRepository.findByEntryDateBetween(from, to).stream()
@@ -73,6 +80,7 @@ public class SoQuyController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     public ResponseEntity<?> create(@RequestBody SoQuy request) {
         SoQuy sq = new SoQuy();
         sq.setId(UUID.randomUUID());
@@ -106,6 +114,7 @@ public class SoQuyController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody SoQuy request) {
         return soQuyRepository.findById(id)
                 .map(sq -> {
@@ -126,6 +135,7 @@ public class SoQuyController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (soQuyRepository.existsById(id)) {
             soQuyRepository.deleteById(id);

@@ -8,6 +8,7 @@ import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +39,7 @@ public class PhieuNhapController {
     private static final java.util.UUID DEFAULT_DISTRIBUTION_CENTER_ID = java.util.UUID.fromString("a1b2c3d4-0001-0000-0000-000000000001");
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
     public ResponseEntity<List<PhieuNhapDTO>> getAll() {
         List<PhieuNhapDTO> list = phieuNhapRepository.findAll().stream()
                 .map(this::toDTO)
@@ -46,6 +48,7 @@ public class PhieuNhapController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return phieuNhapRepository.findById(id)
                 .map(hd -> ResponseEntity.ok(toDTO(hd)))
@@ -53,6 +56,7 @@ public class PhieuNhapController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
     public ResponseEntity<List<PhieuNhapDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
         List<PhieuNhapDTO> list = phieuNhapRepository.findByIdChiNhanh(idChiNhanh).stream()
                 .map(this::toDTO)
@@ -61,6 +65,7 @@ public class PhieuNhapController {
     }
 
     @GetMapping("/by-ncc/{idNcc}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
     public ResponseEntity<List<PhieuNhapDTO>> getByNcc(@PathVariable UUID idNcc) {
         List<PhieuNhapDTO> list = phieuNhapRepository.findByIdNcc(idNcc).stream()
                 .map(this::toDTO)
@@ -69,6 +74,7 @@ public class PhieuNhapController {
     }
 
     @GetMapping("/by-status/{trangThai}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
     public ResponseEntity<List<PhieuNhapDTO>> getByStatus(@PathVariable String trangThai) {
         List<PhieuNhapDTO> list = phieuNhapRepository.findByTrangThai(trangThai).stream()
                 .map(this::toDTO)
@@ -77,6 +83,7 @@ public class PhieuNhapController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     @Transactional
     public ResponseEntity<?> create(@RequestBody PhieuNhap request) {
         PhieuNhap pn = new PhieuNhap();
@@ -183,6 +190,7 @@ public class PhieuNhapController {
      * hiển thị gì.
      */
     @PostMapping("/with-lines")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     @Transactional
     public ResponseEntity<?> createWithLines(@RequestBody CreatePurchaseRequest request) {
         if (request.getIdNcc() == null) {
@@ -308,6 +316,7 @@ public class PhieuNhapController {
      * Toàn bộ trong MỘT transaction.
      */
     @PutMapping("/{id}/pay")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     @Transactional
     public ResponseEntity<?> pay(@PathVariable UUID id,
                                  @RequestBody(required = false) PayRequest request) {
@@ -425,6 +434,7 @@ public class PhieuNhapController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuNhap request) {
         return phieuNhapRepository.findById(id)
                 .map(pn -> {
@@ -448,6 +458,7 @@ public class PhieuNhapController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (phieuNhapRepository.existsById(id)) {
             phieuNhapRepository.deleteById(id);

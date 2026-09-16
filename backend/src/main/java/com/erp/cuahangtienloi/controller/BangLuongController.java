@@ -7,6 +7,7 @@ import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,6 +38,7 @@ public class BangLuongController {
      * @param thangNam định dạng MM-YYYY, ví dụ "09-2026"
      */
     @PostMapping("/generate/{thangNam}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     @Transactional
     public ResponseEntity<?> generateForMonth(@PathVariable String thangNam) {
         try {
@@ -135,6 +137,7 @@ public class BangLuongController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<BangLuongDTO>> getAll() {
         List<BangLuongDTO> list = bangLuongRepository.findAll().stream()
                 .map(this::toDTO)
@@ -143,6 +146,7 @@ public class BangLuongController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return bangLuongRepository.findById(id)
                 .map(bl -> ResponseEntity.ok(toDTO(bl)))
@@ -150,6 +154,7 @@ public class BangLuongController {
     }
 
     @GetMapping("/by-employee/{idNhanVien}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<BangLuongDTO>> getByNhanVien(@PathVariable UUID idNhanVien) {
         List<BangLuongDTO> list = bangLuongRepository.findByIdNhanVien(idNhanVien).stream()
                 .map(this::toDTO)
@@ -158,6 +163,7 @@ public class BangLuongController {
     }
 
     @GetMapping("/by-month/{thangNam}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<BangLuongDTO>> getByThangNam(@PathVariable String thangNam) {
         List<BangLuongDTO> list = bangLuongRepository.findByThangNam(thangNam).stream()
                 .map(this::toDTO)
@@ -166,6 +172,7 @@ public class BangLuongController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}/month/{thangNam}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<BangLuongDTO>> getByChiNhanhAndThangNam(
             @PathVariable UUID idChiNhanh, @PathVariable String thangNam) {
         List<BangLuongDTO> list = bangLuongRepository
@@ -176,6 +183,7 @@ public class BangLuongController {
     }
 
     @GetMapping("/by-status/{trangThai}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<BangLuongDTO>> getByStatus(@PathVariable String trangThai) {
         List<BangLuongDTO> list = bangLuongRepository.findByTrangThai(trangThai).stream()
                 .map(this::toDTO)
@@ -184,6 +192,7 @@ public class BangLuongController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     public ResponseEntity<?> create(@RequestBody BangLuong request) {
         BangLuong bl = new BangLuong();
         bl.setId(UUID.randomUUID());
@@ -213,6 +222,7 @@ public class BangLuongController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody BangLuong request) {
         return bangLuongRepository.findById(id)
                 .map(bl -> {
@@ -247,6 +257,7 @@ public class BangLuongController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (bangLuongRepository.existsById(id)) {
             bangLuongRepository.deleteById(id);

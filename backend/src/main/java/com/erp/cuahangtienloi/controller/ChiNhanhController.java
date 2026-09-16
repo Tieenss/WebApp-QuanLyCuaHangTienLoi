@@ -6,6 +6,7 @@ import com.erp.cuahangtienloi.repository.ChiNhanhRepository;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -27,6 +28,7 @@ public class ChiNhanhController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return chiNhanhRepository.findById(id)
                 .map(ResponseEntity::ok)
@@ -34,6 +36,7 @@ public class ChiNhanhController {
     }
 
     @GetMapping("/active")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChiNhanh>> getActive() {
         List<ChiNhanh> list = chiNhanhRepository.findAll().stream()
                 .filter(cn -> cn.getDangHoatDong() != null && cn.getDangHoatDong())
@@ -42,6 +45,7 @@ public class ChiNhanhController {
     }
 
     @GetMapping("/by-loai/{loai}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChiNhanh>> getByLoai(@PathVariable String loai) {
         List<ChiNhanh> list = chiNhanhRepository.findAll().stream()
                 .filter(cn -> loai.equals(cn.getLoaiChiNhanh()))
@@ -50,6 +54,7 @@ public class ChiNhanhController {
     }
 
     @GetMapping("/kho-tong")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChiNhanh>> getKhoTong() {
         List<ChiNhanh> list = chiNhanhRepository.findAll().stream()
                 .filter(cn -> "KHO_TONG".equals(cn.getLoai()))
@@ -58,6 +63,7 @@ public class ChiNhanhController {
     }
 
     @GetMapping("/cua-hang")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChiNhanh>> getCuaHang() {
         List<ChiNhanh> list = chiNhanhRepository.findAll().stream()
                 .filter(cn -> "CUA_HANG_BAN_LE".equals(cn.getLoai()))
@@ -66,6 +72,7 @@ public class ChiNhanhController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody ChiNhanh request) {
         if (chiNhanhRepository.findByMaChiNhanh(request.getMaChiNhanh()).isPresent()) {
             return ResponseEntity.badRequest().body(new ErrorResponse("Mã chi nhánh đã tồn tại"));
@@ -101,6 +108,7 @@ cn.setLoai(request.getLoaiChiNhanh() != null ? request.getLoaiChiNhanh() : "CUA_
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody ChiNhanh request) {
         return chiNhanhRepository.findById(id)
                 .map(cn -> {
@@ -133,6 +141,7 @@ cn.setLoai(request.getLoaiChiNhanh() != null ? request.getLoaiChiNhanh() : "CUA_
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (chiNhanhRepository.existsById(id)) {
             chiNhanhRepository.deleteById(id);
@@ -142,6 +151,7 @@ cn.setLoai(request.getLoaiChiNhanh() != null ? request.getLoaiChiNhanh() : "CUA_
     }
 
     @PutMapping("/{id}/quan-ly/{idQuanLy}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> assignQuanLy(@PathVariable UUID id, @PathVariable UUID idQuanLy) {
         return chiNhanhRepository.findById(id)
                 .map(cn -> {

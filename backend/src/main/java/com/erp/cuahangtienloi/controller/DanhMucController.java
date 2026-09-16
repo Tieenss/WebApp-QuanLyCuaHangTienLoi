@@ -4,6 +4,7 @@ import com.erp.cuahangtienloi.entity.DanhMuc;
 import com.erp.cuahangtienloi.repository.DanhMucRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ public class DanhMucController {
     private final DanhMucRepository danhMucRepository;
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<DanhMuc>> getAll() {
         return ResponseEntity.ok(danhMucRepository.findAll());
     }
@@ -31,6 +33,7 @@ public class DanhMucController {
     }
 
     @GetMapping("/active")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<DanhMuc>> getActive() {
         List<DanhMuc> list = danhMucRepository.findAll().stream()
                 .filter(dm -> dm.getDangHoatDong() != null && dm.getDangHoatDong())
@@ -39,6 +42,7 @@ public class DanhMucController {
     }
 
     @GetMapping("/parent/{parentId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<DanhMuc>> getByParent(@PathVariable UUID parentId) {
         List<DanhMuc> list = danhMucRepository.findAll().stream()
                 .filter(dm -> parentId == null ? dm.getParentId() == null : parentId.equals(dm.getParentId()))
@@ -47,6 +51,7 @@ public class DanhMucController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody DanhMuc request) {
         if (danhMucRepository.existsByMaDanhMuc(request.getMaDanhMuc())) {
             return ResponseEntity.badRequest().body(new ErrorResponse("Mã danh mục đã tồn tại"));
@@ -77,6 +82,7 @@ public class DanhMucController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody DanhMuc request) {
         return danhMucRepository.findById(id)
                 .map(dm -> {
@@ -97,6 +103,7 @@ public class DanhMucController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (danhMucRepository.existsById(id)) {
             danhMucRepository.deleteById(id);

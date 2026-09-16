@@ -6,6 +6,7 @@ import com.erp.cuahangtienloi.entity.TonKho;
 import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -26,6 +27,7 @@ public class TonKhoController {
     private final ChiNhanhRepository chiNhanhRepository;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TonKhoDTO>> getAll() {
         List<TonKhoDTO> list = tonKhoRepository.findAll().stream()
                 .map(this::toDTO)
@@ -34,6 +36,7 @@ public class TonKhoController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TonKhoDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
         List<TonKhoDTO> list = tonKhoRepository.findByIdChiNhanh(idChiNhanh).stream()
                 .map(this::toDTO)
@@ -42,6 +45,7 @@ public class TonKhoController {
     }
 
     @GetMapping("/by-product/{idSanPham}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TonKhoDTO>> getBySanPham(@PathVariable UUID idSanPham) {
         List<TonKhoDTO> list = tonKhoRepository.findAll().stream()
                 .filter(tk -> idSanPham.equals(tk.getIdSanPham()))
@@ -51,6 +55,7 @@ public class TonKhoController {
     }
 
     @GetMapping("/detail/{idSanPham}/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> getDetail(@PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh) {
         return tonKhoRepository.findByIdSanPhamAndIdChiNhanh(idSanPham, idChiNhanh)
                 .map(tk -> ResponseEntity.ok(toDTO(tk)))
@@ -58,6 +63,7 @@ public class TonKhoController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody TonKho request) {
         if (tonKhoRepository.findByIdSanPhamAndIdChiNhanh(request.getIdSanPham(), request.getIdChiNhanh()).isPresent()) {
             return ResponseEntity.badRequest().body(new ErrorResponse("Tồn kho đã tồn tại"));
@@ -81,6 +87,7 @@ public class TonKhoController {
     }
 
     @PutMapping("/{idSanPham}/{idChiNhanh}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> update(@PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh, @RequestBody TonKho request) {
         return tonKhoRepository.findByIdSanPhamAndIdChiNhanh(idSanPham, idChiNhanh)
                 .map(tk -> {
@@ -99,6 +106,7 @@ public class TonKhoController {
     }
 
     @DeleteMapping("/{idSanPham}/{idChiNhanh}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh) {
         tonKhoRepository.findByIdSanPhamAndIdChiNhanh(idSanPham, idChiNhanh)
                 .ifPresent(tk -> tonKhoRepository.delete(tk));

@@ -4,6 +4,7 @@ import com.erp.cuahangtienloi.entity.ChiTietPhieuXuat;
 import com.erp.cuahangtienloi.repository.ChiTietPhieuXuatRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -21,16 +22,19 @@ public class ChiTietPhieuXuatController {
     private final ChiTietPhieuXuatRepository chiTietPhieuXuatRepository;
 
     @GetMapping("/by-phieu/{idPhieuXuat}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<ChiTietPhieuXuat>> getByPhieuXuat(@PathVariable UUID idPhieuXuat) {
         return ResponseEntity.ok(chiTietPhieuXuatRepository.findByIdPhieuXuat(idPhieuXuat));
     }
 
     @GetMapping("/by-san-pham/{idSanPham}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<ChiTietPhieuXuat>> getBySanPham(@PathVariable UUID idSanPham) {
         return ResponseEntity.ok(chiTietPhieuXuatRepository.findByIdSanPham(idSanPham));
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody ChiTietPhieuXuat request) {
         ChiTietPhieuXuat ct = new ChiTietPhieuXuat();
         ct.setId(UUID.randomUUID());
@@ -50,6 +54,7 @@ public class ChiTietPhieuXuatController {
     }
 
     @PostMapping("/batch")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> createBatch(@RequestBody List<ChiTietPhieuXuat> requests) {
         for (ChiTietPhieuXuat request : requests) {
             ChiTietPhieuXuat ct = new ChiTietPhieuXuat();
@@ -70,6 +75,7 @@ public class ChiTietPhieuXuatController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (chiTietPhieuXuatRepository.existsById(id)) {
             chiTietPhieuXuatRepository.deleteById(id);
@@ -79,6 +85,7 @@ public class ChiTietPhieuXuatController {
     }
 
     @DeleteMapping("/by-phieu/{idPhieuXuat}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> deleteByPhieuXuat(@PathVariable UUID idPhieuXuat) {
         List<ChiTietPhieuXuat> list = chiTietPhieuXuatRepository.findByIdPhieuXuat(idPhieuXuat);
         chiTietPhieuXuatRepository.deleteAll(list);

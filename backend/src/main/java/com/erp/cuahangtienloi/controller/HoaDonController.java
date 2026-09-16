@@ -11,6 +11,7 @@ import com.erp.cuahangtienloi.repository.HoaDonRepository;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,6 +35,7 @@ public class HoaDonController {
     private final ChiTietHoaDonRepository chiTietHoaDonRepository;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<List<HoaDonDTO>> getAll() {
         List<HoaDonDTO> list = hoaDonRepository.findAll().stream()
                 .map(this::toDTO)
@@ -42,6 +44,7 @@ public class HoaDonController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return hoaDonRepository.findById(id)
                 .map(hd -> ResponseEntity.ok(toDTO(hd)))
@@ -49,6 +52,7 @@ public class HoaDonController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<List<HoaDonDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
         List<HoaDonDTO> list = hoaDonRepository.findByIdChiNhanh(idChiNhanh).stream()
                 .map(this::toDTO)
@@ -57,6 +61,7 @@ public class HoaDonController {
     }
 
     @GetMapping("/by-cashier/{idThuNgan}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<List<HoaDonDTO>> getByThuNgan(@PathVariable UUID idThuNgan) {
         List<HoaDonDTO> list = hoaDonRepository.findByIdThuNgan(idThuNgan).stream()
                 .map(this::toDTO)
@@ -65,6 +70,7 @@ public class HoaDonController {
     }
 
     @GetMapping("/by-status/{trangThai}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<List<HoaDonDTO>> getByStatus(@PathVariable String trangThai) {
         List<HoaDonDTO> list = hoaDonRepository.findByTrangThai(trangThai).stream()
                 .map(this::toDTO)
@@ -73,6 +79,7 @@ public class HoaDonController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<?> create(@RequestBody HoaDon request) {
         HoaDon hd = new HoaDon();
         hd.setId(UUID.randomUUID());
@@ -103,6 +110,7 @@ public class HoaDonController {
      * phụ thuộc trigger DB.
      */
     @PostMapping("/with-lines")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
     @Transactional
     public ResponseEntity<?> createWithLines(@RequestBody CreateSaleRequest request) {
         if (request.getIdChiNhanh() == null) {
@@ -242,6 +250,7 @@ public class HoaDonController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody HoaDon request) {
         return hoaDonRepository.findById(id)
                 .map(hd -> {
@@ -270,6 +279,7 @@ public class HoaDonController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (hoaDonRepository.existsById(id)) {
             hoaDonRepository.deleteById(id);

@@ -7,6 +7,7 @@ import com.erp.cuahangtienloi.repository.ChamCongRepository;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -53,6 +54,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
 }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChamCongDTO>> getAll() {
         List<ChamCongDTO> list = chamCongRepository.findAll().stream()
                 .map(this::toDTO)
@@ -61,6 +63,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return chamCongRepository.findById(id)
                 .map(cc -> ResponseEntity.ok(toDTO(cc)))
@@ -68,6 +71,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     }
 
     @GetMapping("/by-employee/{idNhanVien}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChamCongDTO>> getByNhanVien(@PathVariable UUID idNhanVien) {
         List<ChamCongDTO> list = chamCongRepository.findByIdNhanVien(idNhanVien).stream()
                 .map(this::toDTO)
@@ -76,6 +80,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     }
 
     @GetMapping("/by-date/{workDate}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChamCongDTO>> getByDate(@PathVariable LocalDate workDate) {
         List<ChamCongDTO> list = chamCongRepository.findByWorkDate(workDate).stream()
                 .map(this::toDTO)
@@ -84,6 +89,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     }
 
     @GetMapping("/by-employee/{idNhanVien}/from/{from}/to/{to}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChamCongDTO>> getByNhanVienAndDateRange(
             @PathVariable UUID idNhanVien,
             @PathVariable LocalDate from,
@@ -100,6 +106,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
      * Endpoint frontend dùng cho bảng chấm công theo filter ngày.
      */
     @GetMapping("/by-date-range")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChamCongDTO>> getByDateRange(
             @RequestParam("start") LocalDate start,
             @RequestParam("end") LocalDate end) {
@@ -111,6 +118,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     }
 
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> create(@RequestBody ChamCong request) {
         ChamCong cc = new ChamCong();
         cc.setId(UUID.randomUUID());
@@ -136,6 +144,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody ChamCong request) {
         return chamCongRepository.findById(id)
                 .map(cc -> {
@@ -160,6 +169,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (chamCongRepository.existsById(id)) {
             chamCongRepository.deleteById(id);
@@ -174,6 +184,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
      * Trả về danh sách các record được tạo.
      */
     @PostMapping("/schedule/{idNhanVien}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     @Transactional
     public ResponseEntity<?> scheduleForEmployee(
             @PathVariable UUID idNhanVien,
@@ -218,6 +229,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
      * Tự tính `diTrePhut` nếu vào muộn so với `checkInAt` planned.
      */
     @PostMapping("/{id}/clock-in")
+    @PreAuthorize("isAuthenticated()")
     @Transactional
     public ResponseEntity<?> clockIn(@PathVariable UUID id) {
         Optional<ChamCong> opt = chamCongRepository.findById(id);
@@ -243,6 +255,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
      * Check-out: ghi `clockOutAt = now`, tính `tongGioLam`.
      */
     @PostMapping("/{id}/clock-out")
+    @PreAuthorize("isAuthenticated()")
     @Transactional
     public ResponseEntity<?> clockOut(@PathVariable UUID id) {
         Optional<ChamCong> opt = chamCongRepository.findById(id);
@@ -274,6 +287,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
      * Nếu chưa có record cho ca hôm nay → tự động sinh lịch.
      */
     @PostMapping("/schedule-range/{idNhanVien}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     @Transactional
     public ResponseEntity<?> scheduleRange(
             @PathVariable UUID idNhanVien,

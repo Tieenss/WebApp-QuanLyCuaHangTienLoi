@@ -9,6 +9,7 @@ import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import com.erp.cuahangtienloi.repository.TaiKhoanRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +21,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/tai-khoan")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class TaiKhoanController {
 
     private final TaiKhoanRepository taiKhoanRepository;
@@ -28,6 +29,7 @@ public class TaiKhoanController {
     private final PasswordEncoder passwordEncoder;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TaiKhoanDTO>> getAllTaiKhoan() {
         List<TaiKhoanDTO> list = taiKhoanRepository.findAll().stream()
                 .map(tk -> {
@@ -51,6 +53,7 @@ public class TaiKhoanController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getTaiKhoanById(@PathVariable UUID id) {
         return taiKhoanRepository.findById(id)
                 .map(tk -> {
@@ -73,6 +76,7 @@ public class TaiKhoanController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createTaiKhoan(@RequestBody CreateTaiKhoanRequest request) {
         if (taiKhoanRepository.findByTenDangNhap(request.getTenDangNhap()).isPresent()) {
             return ResponseEntity.badRequest().body(new ErrorResponse("Tên đăng nhập đã tồn tại"));
@@ -141,6 +145,7 @@ public class TaiKhoanController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateTaiKhoan(@PathVariable UUID id, @RequestBody UpdateTaiKhoanRequest request) {
         return taiKhoanRepository.findById(id)
                 .map(tk -> {
@@ -169,6 +174,7 @@ public class TaiKhoanController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteTaiKhoan(@PathVariable UUID id) {
         if (taiKhoanRepository.existsById(id)) {
             taiKhoanRepository.deleteById(id);
@@ -178,6 +184,7 @@ public class TaiKhoanController {
     }
 
     @GetMapping("/nhan-vien")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<NhanVienOption>> getNhanVienChuaCoTaiKhoan() {
         List<TaiKhoan> allTaiKhoan = taiKhoanRepository.findAll();
         List<UUID> usedNhanVienIds = allTaiKhoan.stream()
@@ -191,6 +198,51 @@ public class TaiKhoanController {
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(options);
+    }
+
+    public record ChangePasswordRequest(
+            String currentPassword,
+            String newPassword
+    ) {}
+
+    @PutMapping("/{id}/change-password")
+    @PreAuthorize("hasRole('ADMIN') or authentication.name == #id.toString()")
+    public ResponseEntity<?> changePassword(
+            @PathVariable UUID id,
+            @RequestBody ChangePasswordRequest request) {
+
+        if (request.newPassword() == null || request.newPassword().length() < 8) {
+            return ResponseEntity.badRequest()
+                    .body(new ErrorResponse("Mật khẩu mới tối thiểu 8 ký tự"));
+        }
+
+        if (request.currentPassword() == null || request.currentPassword().isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(new ErrorResponse("Vui lòng nhập mật khẩu hiện tại"));
+        }
+
+        return taiKhoanRepository.findById(id)
+                .map(tk -> {
+
+                    if (!passwordEncoder.matches(
+                            request.currentPassword(),
+                            tk.getMatKhauHash())) {
+
+                        return ResponseEntity.badRequest()
+                                .body(new ErrorResponse("Mật khẩu hiện tại không đúng"));
+                    }
+
+                    tk.setMatKhauHash(
+                            passwordEncoder.encode(request.newPassword())
+                    );
+
+                    taiKhoanRepository.save(tk);
+
+                    return ResponseEntity.ok(
+                            new SuccessResponse("Đổi mật khẩu thành công")
+                    );
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     record ErrorResponse(String message) {}

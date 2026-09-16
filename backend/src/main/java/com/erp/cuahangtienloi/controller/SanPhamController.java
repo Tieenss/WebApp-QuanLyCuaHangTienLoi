@@ -11,6 +11,7 @@ import com.erp.cuahangtienloi.repository.NhaCungCapRepository;
 import com.erp.cuahangtienloi.repository.SanPhamRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -30,6 +31,7 @@ public class SanPhamController {
     private final NhaCungCapRepository nhaCungCapRepository;
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<SanPhamDTO>> getAll() {
         List<SanPhamDTO> list = sanPhamRepository.findAll().stream()
                 .map(this::toDTO)
@@ -38,6 +40,7 @@ public class SanPhamController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return sanPhamRepository.findById(id)
                 .map(sp -> ResponseEntity.ok(toDTO(sp)))
@@ -45,6 +48,7 @@ public class SanPhamController {
     }
 
     @GetMapping("/by-danh-muc/{idDanhMuc}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<SanPhamDTO>> getByDanhMuc(@PathVariable UUID idDanhMuc) {
         List<SanPhamDTO> list = sanPhamRepository.findByIdDanhMuc(idDanhMuc).stream()
                 .map(this::toDTO)
@@ -53,6 +57,7 @@ public class SanPhamController {
     }
 
     @GetMapping("/by-ma-vach/{maVach}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getByMaVach(@PathVariable String maVach) {
         return sanPhamRepository.findByMaVach(maVach)
                 .map(sp -> ResponseEntity.ok(toDTO(sp)))
@@ -60,6 +65,7 @@ public class SanPhamController {
     }
 
     @GetMapping("/active")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<SanPhamDTO>> getActive() {
         List<SanPhamDTO> list = sanPhamRepository.findByDangHoatDong(true).stream()
                 .map(this::toDTO)
@@ -68,6 +74,7 @@ public class SanPhamController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody CreateSanPhamRequest request) {
         if (sanPhamRepository.existsBySku(request.getSku())) {
             return ResponseEntity.badRequest().body(new ErrorResponse("SKU đã tồn tại"));
@@ -102,6 +109,7 @@ public class SanPhamController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody UpdateSanPhamRequest request) {
         return sanPhamRepository.findById(id)
                 .map(sp -> {
@@ -130,6 +138,7 @@ public class SanPhamController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (sanPhamRepository.existsById(id)) {
             sanPhamRepository.deleteById(id);

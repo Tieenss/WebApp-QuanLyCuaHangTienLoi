@@ -8,6 +8,7 @@ import com.erp.cuahangtienloi.repository.NhaCungCapDanhMucRepository;
 import com.erp.cuahangtienloi.repository.NhaCungCapRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +29,7 @@ public class NhaCungCapController {
     private final DanhMucRepository danhMucRepository;
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<NhaCungCapDTO>> getAll() {
         List<NhaCungCapDTO> list = nhaCungCapRepository.findAll().stream()
                 .map(this::toDTO)
@@ -35,6 +37,7 @@ public class NhaCungCapController {
         return ResponseEntity.ok(list);
     }
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return nhaCungCapRepository.findById(id)
                 .map(ncc -> ResponseEntity.ok(toDTO(ncc)))
@@ -42,6 +45,7 @@ public class NhaCungCapController {
     }
 
     @GetMapping("/active")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<NhaCungCapDTO>> getActive() {
         List<NhaCungCapDTO> list = nhaCungCapRepository.findAll().stream()
                 .filter(ncc -> ncc.getDangHoatDong() != null && ncc.getDangHoatDong())
@@ -53,6 +57,7 @@ public class NhaCungCapController {
 
     @Transactional
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody NhaCungCapDTO request) {
 
         if (nhaCungCapRepository.existsByMaNcc(request.getMaNcc())) {
@@ -130,6 +135,7 @@ public class NhaCungCapController {
 
     @Transactional
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> update(
             @PathVariable UUID id,
             @RequestBody NhaCungCapDTO request
@@ -219,6 +225,7 @@ public class NhaCungCapController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (nhaCungCapRepository.existsById(id)) {
             nhaCungCapRepository.deleteById(id);

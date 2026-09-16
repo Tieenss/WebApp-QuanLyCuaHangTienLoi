@@ -10,6 +10,7 @@ import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,6 +40,7 @@ public class PhieuXuatKhoController {
     private EntityManager entityManager;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<PhieuXuatKhoDTO>> getAll() {
         List<PhieuXuatKhoDTO> list = phieuXuatKhoRepository.findAll().stream()
                 .map(this::toDTO)
@@ -47,6 +49,7 @@ public class PhieuXuatKhoController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return phieuXuatKhoRepository.findById(id)
                 .map(hd -> ResponseEntity.ok(toDTO(hd)))
@@ -54,6 +57,7 @@ public class PhieuXuatKhoController {
     }
 
     @GetMapping("/by-branch-xuat/{idChiNhanhXuat}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<PhieuXuatKhoDTO>> getByBranchXuat(@PathVariable UUID idChiNhanhXuat) {
         List<PhieuXuatKhoDTO> list = phieuXuatKhoRepository.findByIdChiNhanhXuat(idChiNhanhXuat).stream()
                 .map(this::toDTO)
@@ -62,6 +66,7 @@ public class PhieuXuatKhoController {
     }
 
     @GetMapping("/by-branch-nhan/{idChiNhanhNhan}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<PhieuXuatKhoDTO>> getByBranchNhan(@PathVariable UUID idChiNhanhNhan) {
         List<PhieuXuatKhoDTO> list = phieuXuatKhoRepository.findByIdChiNhanhNhan(idChiNhanhNhan).stream()
                 .map(this::toDTO)
@@ -70,6 +75,7 @@ public class PhieuXuatKhoController {
     }
 
     @GetMapping("/by-status/{trangThai}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<PhieuXuatKhoDTO>> getByStatus(@PathVariable String trangThai) {
         List<PhieuXuatKhoDTO> list = phieuXuatKhoRepository.findByTrangThai(trangThai).stream()
                 .map(this::toDTO)
@@ -78,6 +84,7 @@ public class PhieuXuatKhoController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody PhieuXuatKho request) {
         PhieuXuatKho pxk = new PhieuXuatKho();
         pxk.setMaPhieu(request.getMaPhieu());
@@ -118,6 +125,7 @@ public class PhieuXuatKhoController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuXuatKho request) {
         return phieuXuatKhoRepository.findById(id)
                 .map(pxk -> {
@@ -138,6 +146,7 @@ public class PhieuXuatKhoController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (phieuXuatKhoRepository.existsById(id)) {
             phieuXuatKhoRepository.deleteById(id);
@@ -151,6 +160,7 @@ public class PhieuXuatKhoController {
      * Tự set ngayXuatThucTe, ngayNhanThucTe, idNguoiDuyet.
      */
     @PutMapping("/{id}/approve")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> approve(@PathVariable UUID id, @RequestBody(required = false) ApproveRequest body) {
         return phieuXuatKhoRepository.findById(id)
                 .map(pxk -> {
@@ -189,6 +199,7 @@ public class PhieuXuatKhoController {
 
     /** Từ chối yêu cầu xuất: PENDING → CANCELLED. */
     @PutMapping("/{id}/reject")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> reject(@PathVariable UUID id, @RequestBody(required = false) RejectRequest body) {
         return phieuXuatKhoRepository.findById(id)
                 .map(pxk -> {
@@ -249,6 +260,7 @@ public class PhieuXuatKhoController {
      * dùng chung), snapshot giá vốn bình quân vào dòng chi tiết.
      */
     @PutMapping("/{id}/ship")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     @Transactional
     public ResponseEntity<?> ship(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body) {
         return phieuXuatKhoRepository.findById(id).<ResponseEntity<?>>map(pxk -> {
@@ -333,6 +345,7 @@ public class PhieuXuatKhoController {
      * Cộng tồn chi nhánh nhận + ghi thẻ kho TRANSFER_IN.
      */
     @PutMapping("/{id}/receive")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     @Transactional
     public ResponseEntity<?> receive(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body) {
         return phieuXuatKhoRepository.findById(id).<ResponseEntity<?>>map(pxk -> {

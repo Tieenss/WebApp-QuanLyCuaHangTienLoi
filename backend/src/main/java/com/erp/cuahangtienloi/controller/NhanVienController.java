@@ -7,6 +7,7 @@ import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import com.erp.cuahangtienloi.repository.TaiKhoanRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -24,11 +25,13 @@ public class NhanVienController {
     private final TaiKhoanRepository taiKhoanRepository;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<List<NhanVien>> getAll() {
         return ResponseEntity.ok(nhanVienRepository.findAll());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return nhanVienRepository.findById(id)
                 .map(ResponseEntity::ok)
@@ -36,6 +39,7 @@ public class NhanVienController {
     }
 
     @GetMapping("/by-chi-nhanh/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<List<NhanVien>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
         List<NhanVien> list = nhanVienRepository.findAll().stream()
                 .filter(nv -> idChiNhanh.equals(nv.getIdChiNhanh()))
@@ -44,6 +48,7 @@ public class NhanVienController {
     }
 
     @GetMapping("/active")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<List<NhanVien>> getActive() {
         List<NhanVien> list = nhanVienRepository.findAll().stream()
                 .filter(nv -> nv.getTrangThai() != null && !"INACTIVE".equals(nv.getTrangThai()))
@@ -52,6 +57,7 @@ public class NhanVienController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody NhanVien request) {
         if (request.getEmail() != null && nhanVienRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.badRequest().body(new ErrorResponse("Email đã tồn tại"));
@@ -104,6 +110,7 @@ public class NhanVienController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody NhanVien request) {
         return nhanVienRepository.findById(id)
                 .map(nv -> {
@@ -140,6 +147,7 @@ public class NhanVienController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (nhanVienRepository.existsById(id)) {
             nhanVienRepository.deleteById(id);

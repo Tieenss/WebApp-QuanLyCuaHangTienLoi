@@ -6,6 +6,7 @@ import com.erp.cuahangtienloi.entity.PhieuKiemKe;
 import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,7 +19,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/phieu-kiem-ke")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
 public class PhieuKiemKeController {
 
     private final PhieuKiemKeRepository phieuKiemKeRepository;
