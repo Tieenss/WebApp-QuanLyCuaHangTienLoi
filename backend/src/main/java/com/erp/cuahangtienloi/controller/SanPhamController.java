@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.CreateSanPhamRequest;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.SanPhamDTO;
 import com.erp.cuahangtienloi.dto.UpdateSanPhamRequest;
 import com.erp.cuahangtienloi.entity.DanhMuc;
@@ -23,7 +24,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/san-pham")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class SanPhamController {
 
     private final SanPhamRepository sanPhamRepository;
@@ -77,10 +78,10 @@ public class SanPhamController {
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody CreateSanPhamRequest request) {
         if (sanPhamRepository.existsBySku(request.getSku())) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("SKU đã tồn tại"));
+            return ResponseEntity.badRequest().body( ApiResponse.err("SKU đã tồn tại"));
         }
         if (sanPhamRepository.existsByMaVach(request.getMaVach())) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Mã vạch đã tồn tại"));
+            return ResponseEntity.badRequest().body( ApiResponse.err("Mã vạch đã tồn tại"));
         }
 
         SanPham sp = new SanPham();
@@ -142,7 +143,7 @@ public class SanPhamController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (sanPhamRepository.existsById(id)) {
             sanPhamRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa sản phẩm thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa sản phẩm thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -179,6 +180,6 @@ public class SanPhamController {
         return dto;
     }
 
-    record ErrorResponse(String message) {}
-    record SuccessResponse(String message) {}
+//    record ErrorResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

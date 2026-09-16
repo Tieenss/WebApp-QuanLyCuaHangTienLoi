@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.TheKhoDTO;
 import com.erp.cuahangtienloi.entity.TheKho;
 import com.erp.cuahangtienloi.repository.*;
@@ -18,7 +19,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/the-kho")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class TheKhoController {
 
     private final TheKhoRepository theKhoRepository;
@@ -116,7 +117,7 @@ public class TheKhoController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (theKhoRepository.existsById(id)) {
             theKhoRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa thẻ kho thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa thẻ kho thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -153,5 +154,5 @@ public class TheKhoController {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

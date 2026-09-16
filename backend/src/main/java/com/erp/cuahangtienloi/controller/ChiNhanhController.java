@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiNhanh;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.repository.ChiNhanhRepository;
@@ -16,7 +17,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/chi-nhanh")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class ChiNhanhController {
 
     private final ChiNhanhRepository chiNhanhRepository;
@@ -75,7 +76,7 @@ public class ChiNhanhController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody ChiNhanh request) {
         if (chiNhanhRepository.findByMaChiNhanh(request.getMaChiNhanh()).isPresent()) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Mã chi nhánh đã tồn tại"));
+            return ResponseEntity.badRequest().body( ApiResponse.err("Mã chi nhánh đã tồn tại"));
         }
 
         ChiNhanh cn = new ChiNhanh();
@@ -145,7 +146,7 @@ cn.setLoai(request.getLoaiChiNhanh() != null ? request.getLoaiChiNhanh() : "CUA_
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (chiNhanhRepository.existsById(id)) {
             chiNhanhRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa chi nhánh thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa chi nhánh thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -157,7 +158,7 @@ cn.setLoai(request.getLoaiChiNhanh() != null ? request.getLoaiChiNhanh() : "CUA_
                 .map(cn -> {
                     NhanVien nv = nhanVienRepository.findById(idQuanLy).orElse(null);
                     if (nv == null) {
-                        return ResponseEntity.badRequest().body(new ErrorResponse("Nhân viên không tồn tại"));
+                        return ResponseEntity.badRequest().body( ApiResponse.err("Nhân viên không tồn tại"));
                     }
                     cn.setIdQuanLy(idQuanLy);
                     cn.setTenQuanLy(nv.getHoTen());
@@ -169,6 +170,6 @@ cn.setLoai(request.getLoaiChiNhanh() != null ? request.getLoaiChiNhanh() : "CUA_
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    record ErrorResponse(String message) {}
-    record SuccessResponse(String message) {}
+//    record ErrorResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

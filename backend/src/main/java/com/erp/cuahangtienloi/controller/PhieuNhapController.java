@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.PhieuNhapDTO;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuNhap;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuNhap;
@@ -22,7 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/phieu-nhap")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class PhieuNhapController {
 
     private final PhieuNhapRepository phieuNhapRepository;
@@ -204,10 +205,10 @@ public class PhieuNhapController {
     @Transactional
     public ResponseEntity<?> createWithLines(@RequestBody CreatePurchaseRequest request, HttpServletRequest httpRequest) {
         if (request.getIdNcc() == null) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Thiếu nhà cung cấp"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Thiếu nhà cung cấp"));
         }
         if (request.getLines() == null || request.getLines().isEmpty()) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Phiếu không có dòng hàng"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Phiếu không có dòng hàng"));
         }
 
         // Kho nhận: ưu tiên request, mặc định = Kho Tổng (BR-05).
@@ -344,13 +345,13 @@ public class PhieuNhapController {
         if (!"PENDING_PAYMENT".equalsIgnoreCase(pn.getTrangThai())
                 && !"PENDING".equalsIgnoreCase(pn.getTrangThai())) {
             return ResponseEntity.badRequest()
-                    .body(new SuccessResponse("Chỉ thanh toán được phiếu ở trạng thái chờ thanh toán"));
+                    .body( ApiResponse.ok("Chỉ thanh toán được phiếu ở trạng thái chờ thanh toán"));
         }
 
         List<ChiTietPhieuNhap> lines = chiTietPhieuNhapRepository.findByIdPhieuNhap(id);
         if (lines.isEmpty()) {
             return ResponseEntity.badRequest()
-                    .body(new SuccessResponse("Phiếu không có dòng chi tiết — không thể thanh toán"));
+                    .body( ApiResponse.ok("Phiếu không có dòng chi tiết — không thể thanh toán"));
         }
 
         BigDecimal grand = jdbcTemplate.queryForObject(
@@ -359,7 +360,7 @@ public class PhieuNhapController {
                 ? request.getDaThanhToan() : grand;
         if (paid.compareTo(grand) > 0) {
             return ResponseEntity.badRequest()
-                    .body(new SuccessResponse("Số tiền trả vượt giá trị phiếu"));
+                    .body( ApiResponse.ok("Số tiền trả vượt giá trị phiếu"));
         }
 
         for (ChiTietPhieuNhap ct : lines) {
@@ -478,7 +479,7 @@ public class PhieuNhapController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (phieuNhapRepository.existsById(id)) {
             phieuNhapRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa phiếu nhập thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa phiếu nhập thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -518,5 +519,5 @@ public class PhieuNhapController {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

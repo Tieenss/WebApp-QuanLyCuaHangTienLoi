@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietKiemKe;
 import com.erp.cuahangtienloi.repository.ChiTietKiemKeRepository;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +56,7 @@ public class ChiTietKiemKeController {
     @Transactional
     public ResponseEntity<?> createBatch(@RequestBody List<ChiTietKiemKe> requests) {
         if (requests == null || requests.isEmpty()) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Danh sách chi tiết rỗng"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Danh sách chi tiết rỗng"));
         }
         List<ChiTietKiemKe> saved = new ArrayList<>();
         for (ChiTietKiemKe request : requests) {
@@ -80,7 +81,7 @@ public class ChiTietKiemKeController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (chiTietKiemKeRepository.existsById(id)) {
             chiTietKiemKeRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa chi tiết thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa chi tiết thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -89,8 +90,8 @@ public class ChiTietKiemKeController {
     public ResponseEntity<?> deleteByPhieuKiemKe(@PathVariable UUID idPhieuKiemKe) {
         List<ChiTietKiemKe> list = chiTietKiemKeRepository.findByIdPhieuKiemKe(idPhieuKiemKe);
         chiTietKiemKeRepository.deleteAll(list);
-        return ResponseEntity.ok(new SuccessResponse("Xóa tất cả chi tiết kiểm kê"));
+        return ResponseEntity.ok( ApiResponse.ok("Xóa tất cả chi tiết kiểm kê"));
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

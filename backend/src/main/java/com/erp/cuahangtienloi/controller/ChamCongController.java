@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.ChamCongDTO;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChamCong;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.repository.ChamCongRepository;
@@ -24,7 +25,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/cham-cong")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class ChamCongController {
 
     private final ChamCongRepository chamCongRepository;
@@ -173,7 +174,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (chamCongRepository.existsById(id)) {
             chamCongRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa chấm công thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa chấm công thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -197,7 +198,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         LocalDate date = (workDate != null && !workDate.isBlank()) ? LocalDate.parse(workDate) : LocalDate.now();
         String ca = nv.getCaMacDinh();
         if (ca == null || ca.isBlank()) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Nhân viên chưa có ca mặc định"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Nhân viên chưa có ca mặc định"));
         }
 
         // Bỏ qua nếu đã có record cho (nv, date, ca)
@@ -236,7 +237,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ChamCong cc = opt.get();
         if (cc.getClockInAt() != null) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Đã check-in trước đó"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Đã check-in trước đó"));
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -262,10 +263,10 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ChamCong cc = opt.get();
         if (cc.getClockInAt() == null) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Chưa check-in"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Chưa check-in"));
         }
         if (cc.getClockOutAt() != null) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Đã check-out trước đó"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Đã check-out trước đó"));
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -298,7 +299,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         NhanVien nv = optNv.get();
         String ca = nv.getCaMacDinh();
         if (ca == null || ca.isBlank()) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Nhân viên chưa có ca mặc định"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Nhân viên chưa có ca mặc định"));
         }
 
         LocalDate from = LocalDate.parse(fromDate);
@@ -355,5 +356,5 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

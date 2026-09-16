@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.SoQuyDTO;
 import com.erp.cuahangtienloi.entity.SoQuy;
 import com.erp.cuahangtienloi.repository.*;
@@ -21,7 +22,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/so-quy")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class SoQuyController {
 
     private final SoQuyRepository soQuyRepository;
@@ -177,7 +178,7 @@ public class SoQuyController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (soQuyRepository.existsById(id)) {
             soQuyRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa sổ quỹ thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa sổ quỹ thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -211,5 +212,5 @@ public class SoQuyController {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

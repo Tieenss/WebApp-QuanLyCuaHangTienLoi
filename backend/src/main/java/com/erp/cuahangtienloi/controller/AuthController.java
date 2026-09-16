@@ -2,6 +2,7 @@ package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.LoginRequest;
 import com.erp.cuahangtienloi.dto.LoginResponse;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +22,7 @@ public class AuthController {
             LoginResponse response = authService.login(request);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
+            return ResponseEntity.badRequest().body( ApiResponse.err(e.getMessage()));
         }
     }
 

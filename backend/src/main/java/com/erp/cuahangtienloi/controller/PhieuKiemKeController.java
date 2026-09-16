@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.PhieuKiemKeDTO;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietKiemKe;
 import com.erp.cuahangtienloi.entity.PhieuKiemKe;
 import com.erp.cuahangtienloi.repository.*;
@@ -113,10 +114,10 @@ public class PhieuKiemKeController {
     @Transactional
     public ResponseEntity<?> createWithLines(@RequestBody CreateStocktakeRequest request, HttpServletRequest httpRequest) {
         if (request.getIdChiNhanh() == null) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Thiếu chi nhánh"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Thiếu chi nhánh"));
         }
         if (request.getLines() == null || request.getLines().isEmpty()) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Thiếu danh sách sản phẩm kiểm kê"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Thiếu danh sách sản phẩm kiểm kê"));
         }
 
         // 1. Tạo header
@@ -202,7 +203,7 @@ public class PhieuKiemKeController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (phieuKiemKeRepository.existsById(id)) {
             phieuKiemKeRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa phiếu kiểm kê thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa phiếu kiểm kê thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -253,5 +254,5 @@ public class PhieuKiemKeController {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

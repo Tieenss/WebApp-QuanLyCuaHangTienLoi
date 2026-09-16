@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietHoaDon;
 import com.erp.cuahangtienloi.repository.ChiTietHoaDonRepository;
 import com.erp.cuahangtienloi.repository.SanPhamRepository;
@@ -16,7 +17,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/chi-tiet-hoa-don")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class ChiTietHoaDonController {
 
     private final ChiTietHoaDonRepository chiTietHoaDonRepository;
@@ -72,7 +73,7 @@ public class ChiTietHoaDonController {
             ct.setNgayTao(LocalDateTime.now());
             chiTietHoaDonRepository.save(ct);
         }
-        return ResponseEntity.ok(new SuccessResponse("Tạo chi tiết thành công"));
+        return ResponseEntity.ok( ApiResponse.ok("Tạo chi tiết thành công"));
     }
 
     @DeleteMapping("/{id}")
@@ -80,7 +81,7 @@ public class ChiTietHoaDonController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (chiTietHoaDonRepository.existsById(id)) {
             chiTietHoaDonRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa chi tiết thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa chi tiết thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -90,8 +91,8 @@ public class ChiTietHoaDonController {
     public ResponseEntity<?> deleteByHoaDon(@PathVariable UUID idHoaDon) {
         List<ChiTietHoaDon> list = chiTietHoaDonRepository.findByIdHoaDon(idHoaDon);
         chiTietHoaDonRepository.deleteAll(list);
-        return ResponseEntity.ok(new SuccessResponse("Xóa tất cả chi tiết của hóa đơn"));
+        return ResponseEntity.ok( ApiResponse.ok("Xóa tất cả chi tiết của hóa đơn"));
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

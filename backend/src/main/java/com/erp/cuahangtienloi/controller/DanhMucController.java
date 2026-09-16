@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.DanhMuc;
 import com.erp.cuahangtienloi.repository.DanhMucRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +15,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/danh-muc")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class DanhMucController {
 
     private final DanhMucRepository danhMucRepository;
@@ -54,7 +55,7 @@ public class DanhMucController {
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody DanhMuc request) {
         if (danhMucRepository.existsByMaDanhMuc(request.getMaDanhMuc())) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Mã danh mục đã tồn tại"));
+            return ResponseEntity.badRequest().body( ApiResponse.err("Mã danh mục đã tồn tại"));
         }
 
         DanhMuc dm = new DanhMuc();
@@ -107,11 +108,11 @@ public class DanhMucController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (danhMucRepository.existsById(id)) {
             danhMucRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa danh mục thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa danh mục thành công"));
         }
         return ResponseEntity.notFound().build();
     }
 
-    record ErrorResponse(String message) {}
-    record SuccessResponse(String message) {}
+//    record ErrorResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

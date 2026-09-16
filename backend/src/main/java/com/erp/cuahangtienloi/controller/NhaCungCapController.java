@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.NhaCungCapDTO;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.NhaCungCap;
 import com.erp.cuahangtienloi.entity.NhaCungCapDanhMuc;
 import com.erp.cuahangtienloi.repository.DanhMucRepository;
@@ -21,7 +22,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/nha-cung-cap")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class NhaCungCapController {
 
     private final NhaCungCapRepository nhaCungCapRepository;
@@ -62,7 +63,7 @@ public class NhaCungCapController {
 
         if (nhaCungCapRepository.existsByMaNcc(request.getMaNcc())) {
             return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("Mã NCC đã tồn tại"));
+                    .body( ApiResponse.err("Mã NCC đã tồn tại"));
         }
 
         NhaCungCap ncc = new NhaCungCap();
@@ -229,7 +230,7 @@ public class NhaCungCapController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (nhaCungCapRepository.existsById(id)) {
             nhaCungCapRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa NCC thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa NCC thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -311,6 +312,6 @@ public class NhaCungCapController {
         return dto;
     }
 
-    record ErrorResponse(String message) {}
-    record SuccessResponse(String message) {}
+//    record ErrorResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

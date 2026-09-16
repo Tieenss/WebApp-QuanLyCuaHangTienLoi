@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.PhieuXuatKhoDTO;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuXuat;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuXuatKho;
@@ -26,7 +27,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/phieu-xuat-kho")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class PhieuXuatKhoController {
 
     private final PhieuXuatKhoRepository phieuXuatKhoRepository;
@@ -149,7 +150,7 @@ public class PhieuXuatKhoController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (phieuXuatKhoRepository.existsById(id)) {
             phieuXuatKhoRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa phiếu xuất kho thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa phiếu xuất kho thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -165,7 +166,7 @@ public class PhieuXuatKhoController {
                 .map(pxk -> {
                     if (!"PENDING".equals(pxk.getTrangThai())) {
                         return ResponseEntity.badRequest().body(
-                                new ErrorResponse("Chỉ duyệt phiếu ở trạng thái PENDING"));
+                                 ApiResponse.err("Chỉ duyệt phiếu ở trạng thái PENDING"));
                     }
                     // Tìm NV theo idNguoiDuyet hoặc fallback NV đầu tiên có vai trò THỦ KHO/ADMIN
                     UUID idNguoiDuyet = null;
@@ -181,7 +182,7 @@ public class PhieuXuatKhoController {
                     }
                     if (idNguoiDuyet == null) {
                         return ResponseEntity.badRequest().body(
-                                new ErrorResponse("Không tìm thấy nhân viên để duyệt"));
+                                 ApiResponse.err("Không tìm thấy nhân viên để duyệt"));
                     }
                     pxk.setTrangThai("COMPLETED");
                     pxk.setIdNguoiDuyet(idNguoiDuyet);
@@ -202,7 +203,7 @@ public class PhieuXuatKhoController {
                 .map(pxk -> {
                     if (!"PENDING".equals(pxk.getTrangThai())) {
                         return ResponseEntity.badRequest().body(
-                                new ErrorResponse("Chỉ từ chối phiếu ở trạng thái PENDING"));
+                                 ApiResponse.err("Chỉ từ chối phiếu ở trạng thái PENDING"));
                     }
                     UUID idNguoiDuyet = null;
                     if (body != null && body.idNguoiDuyet() != null && nhanVienRepository.existsById(body.idNguoiDuyet())) {
@@ -222,7 +223,7 @@ public class PhieuXuatKhoController {
 
     record ApproveRequest(java.util.UUID idNguoiDuyet) {}
     record RejectRequest(java.util.UUID idNguoiDuyet, String lyDo) {}
-    record ErrorResponse(String message) {}
+//    record ErrorResponse(String message) {}
 
     /** Dòng gửi lên khi thủ kho xác nhận xuất / chi nhánh xác nhận nhận. */
     public static class MoveLine {
@@ -267,12 +268,12 @@ public class PhieuXuatKhoController {
         return phieuXuatKhoRepository.findById(id).<ResponseEntity<?>>map(pxk -> {
             if (!"PENDING".equals(pxk.getTrangThai())) {
                 return ResponseEntity.badRequest().body(
-                        new ErrorResponse("Chỉ xác nhận xuất được phiếu ở trạng thái PENDING"));
+                         ApiResponse.err("Chỉ xác nhận xuất được phiếu ở trạng thái PENDING"));
             }
             List<ChiTietPhieuXuat> lines = chiTietPhieuXuatRepository.findByIdPhieuXuat(id);
             if (lines.isEmpty()) {
                 return ResponseEntity.badRequest().body(
-                        new ErrorResponse("Phiếu không có dòng chi tiết — không thể xuất"));
+                         ApiResponse.err("Phiếu không có dòng chi tiết — không thể xuất"));
             }
             UUID idNguoiDuyet =
                     resolveStaffUuid(
@@ -280,7 +281,7 @@ public class PhieuXuatKhoController {
                             httpRequest
                     );
             if (idNguoiDuyet == null) {
-                return ResponseEntity.badRequest().body(new ErrorResponse("Không tìm thấy nhân viên duyệt"));
+                return ResponseEntity.badRequest().body( ApiResponse.err("Không tìm thấy nhân viên duyệt"));
             }
 
             Map<UUID, Integer> overrides = new HashMap<>();
@@ -299,7 +300,7 @@ public class PhieuXuatKhoController {
                         : (ct.getSoLuongXuat() != null && ct.getSoLuongXuat() > 0
                                 ? ct.getSoLuongXuat() : ct.getSoLuongYeuCau());
                 if (xuat < 0 || xuat > ct.getSoLuongYeuCau()) {
-                    return ResponseEntity.badRequest().body(new ErrorResponse(
+                    return ResponseEntity.badRequest().body( ApiResponse.err(
                             "Số lượng xuất phải từ 0 đến số lượng yêu cầu"));
                 }
                 int ton = tonKhoRepository
@@ -307,7 +308,7 @@ public class PhieuXuatKhoController {
                         .map(t -> t.getSoLuongTon() == null ? 0 : t.getSoLuongTon())
                         .orElse(0);
                 if (xuat > ton) {
-                    return ResponseEntity.badRequest().body(new ErrorResponse(
+                    return ResponseEntity.badRequest().body( ApiResponse.err(
                             "Không đủ tồn kho tại kho xuất (tồn " + ton + ", cần " + xuat + ")"));
                 }
                 BigDecimal giaVon = tonKhoRepository
@@ -356,7 +357,7 @@ public class PhieuXuatKhoController {
         return phieuXuatKhoRepository.findById(id).<ResponseEntity<?>>map(pxk -> {
             if (!"SHIPPED".equals(pxk.getTrangThai())) {
                 return ResponseEntity.badRequest().body(
-                        new ErrorResponse("Chỉ xác nhận nhận được phiếu ở trạng thái SHIPPED (chờ nhận hàng)"));
+                         ApiResponse.err("Chỉ xác nhận nhận được phiếu ở trạng thái SHIPPED (chờ nhận hàng)"));
             }
             List<ChiTietPhieuXuat> lines = chiTietPhieuXuatRepository.findByIdPhieuXuat(id);
             UUID idNguoiNhan =
@@ -365,7 +366,7 @@ public class PhieuXuatKhoController {
                             httpRequest
                     );
             if (idNguoiNhan == null) {
-                return ResponseEntity.badRequest().body(new ErrorResponse("Không tìm thấy nhân viên nhận"));
+                return ResponseEntity.badRequest().body( ApiResponse.err("Không tìm thấy nhân viên nhận"));
             }
 
             Map<UUID, Integer> overrides = new HashMap<>();
@@ -382,7 +383,7 @@ public class PhieuXuatKhoController {
                 int nhan = overrides.containsKey(ct.getIdSanPham())
                         ? overrides.get(ct.getIdSanPham()) : xuat;
                 if (nhan < 0 || nhan > xuat) {
-                    return ResponseEntity.badRequest().body(new ErrorResponse(
+                    return ResponseEntity.badRequest().body( ApiResponse.err(
                             "Số lượng nhận phải từ 0 đến số lượng xuất"));
                 }
                 ct.setSoLuongNhan(nhan);
@@ -467,5 +468,5 @@ public class PhieuXuatKhoController {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

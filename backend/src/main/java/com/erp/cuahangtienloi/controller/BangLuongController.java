@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.BangLuongDTO;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.BangLuong;
 import com.erp.cuahangtienloi.entity.ChamCong;
 import com.erp.cuahangtienloi.entity.NhanVien;
@@ -25,7 +26,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/bang-luong")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class BangLuongController {
 
     private final BangLuongRepository bangLuongRepository;
@@ -46,7 +47,7 @@ public class BangLuongController {
         try {
             YearMonth ym = YearMonth.parse(thangNam, DateTimeFormatter.ofPattern("MM-yyyy"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Tháng không hợp lệ, dùng MM-YYYY"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Tháng không hợp lệ, dùng MM-YYYY"));
         }
 
         LocalDate firstDay = YearMonth.parse(thangNam, DateTimeFormatter.ofPattern("MM-yyyy")).atDay(1);
@@ -135,7 +136,7 @@ public class BangLuongController {
             created++;
         }
 
-        return ResponseEntity.ok(new SuccessResponse("Đã tạo " + created + " bảng lương cho tháng " + thangNam));
+        return ResponseEntity.ok( ApiResponse.ok("Đã tạo " + created + " bảng lương cho tháng " + thangNam));
     }
 
     @GetMapping
@@ -255,7 +256,7 @@ public class BangLuongController {
 
                             if (!isKeToanOrAdmin) {
                                 return ResponseEntity.badRequest()
-                                        .body(new SuccessResponse(
+                                        .body( ApiResponse.ok(
                                                 "Chỉ Kế toán/Admin mới được duyệt chi lương"
                                         ));
                             }
@@ -275,7 +276,7 @@ public class BangLuongController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (bangLuongRepository.existsById(id)) {
             bangLuongRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa bảng lương thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa bảng lương thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -333,5 +334,5 @@ public class BangLuongController {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

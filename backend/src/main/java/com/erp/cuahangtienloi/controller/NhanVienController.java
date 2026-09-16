@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.TaiKhoan;
 import com.erp.cuahangtienloi.repository.ChiNhanhRepository;
@@ -17,7 +18,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/nhan-vien")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class NhanVienController {
 
     private final NhanVienRepository nhanVienRepository;
@@ -60,10 +61,10 @@ public class NhanVienController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody NhanVien request) {
         if (request.getEmail() != null && nhanVienRepository.existsByEmail(request.getEmail())) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Email đã tồn tại"));
+            return ResponseEntity.badRequest().body( ApiResponse.err("Email đã tồn tại"));
         }
         if (request.getMaNhanVien() != null && nhanVienRepository.existsByMaNhanVien(request.getMaNhanVien())) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Mã nhân viên đã tồn tại"));
+            return ResponseEntity.badRequest().body( ApiResponse.err("Mã nhân viên đã tồn tại"));
         }
 
         NhanVien nv = new NhanVien();
@@ -89,7 +90,7 @@ public class NhanVienController {
             nv.setIdChiNhanh(null);
         } else {
             if (request.getIdChiNhanh() == null) {
-                return ResponseEntity.badRequest().body(new ErrorResponse("Vai trò " + vaiTro + " bắt buộc phải có chi nhánh"));
+                return ResponseEntity.badRequest().body( ApiResponse.err("Vai trò " + vaiTro + " bắt buộc phải có chi nhánh"));
             }
             nv.setIdChiNhanh(request.getIdChiNhanh());
         }
@@ -151,11 +152,11 @@ public class NhanVienController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (nhanVienRepository.existsById(id)) {
             nhanVienRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa nhân viên thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa nhân viên thành công"));
         }
         return ResponseEntity.notFound().build();
     }
 
-    record ErrorResponse(String message) {}
-    record SuccessResponse(String message) {}
+//    record ErrorResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

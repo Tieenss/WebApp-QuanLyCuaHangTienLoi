@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.HoaDonDTO;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiNhanh;
 import com.erp.cuahangtienloi.entity.ChiTietHoaDon;
 import com.erp.cuahangtienloi.entity.HoaDon;
@@ -27,7 +28,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/hoa-don")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class HoaDonController {
 
     private final HoaDonRepository hoaDonRepository;
@@ -115,10 +116,10 @@ public class HoaDonController {
     @Transactional
     public ResponseEntity<?> createWithLines(@RequestBody CreateSaleRequest request, HttpServletRequest httpRequest) {
         if (request.getIdChiNhanh() == null) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Thiếu chi nhánh"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Thiếu chi nhánh"));
         }
         if (request.getLines() == null || request.getLines().isEmpty()) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Giỏ hàng trống"));
+            return ResponseEntity.badRequest().body( ApiResponse.ok("Giỏ hàng trống"));
         }
         if (request.getIdThuNgan() == null) {
             UUID authenticatedId = null;
@@ -300,7 +301,7 @@ public class HoaDonController {
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (hoaDonRepository.existsById(id)) {
             hoaDonRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa hóa đơn thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa hóa đơn thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -339,5 +340,5 @@ public class HoaDonController {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

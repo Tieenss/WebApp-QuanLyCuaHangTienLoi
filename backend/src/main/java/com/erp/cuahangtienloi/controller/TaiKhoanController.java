@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.CreateTaiKhoanRequest;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.TaiKhoanDTO;
 import com.erp.cuahangtienloi.dto.UpdateTaiKhoanRequest;
 import com.erp.cuahangtienloi.entity.NhanVien;
@@ -79,7 +80,7 @@ public class TaiKhoanController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createTaiKhoan(@RequestBody CreateTaiKhoanRequest request) {
         if (taiKhoanRepository.findByTenDangNhap(request.getTenDangNhap()).isPresent()) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Tên đăng nhập đã tồn tại"));
+            return ResponseEntity.badRequest().body( ApiResponse.err("Tên đăng nhập đã tồn tại"));
         }
 
         // Nếu không chọn nhân viên có sẵn → tự tạo nhan_vien mới
@@ -141,7 +142,7 @@ public class TaiKhoanController {
             });
         }
 
-        return ResponseEntity.ok(new SuccessResponse("Tạo tài khoản thành công"));
+        return ResponseEntity.ok( ApiResponse.ok("Tạo tài khoản thành công"));
     }
 
     @PutMapping("/{id}")
@@ -168,7 +169,7 @@ public class TaiKhoanController {
                         });
                     }
 
-                    return ResponseEntity.ok(new SuccessResponse("Cập nhật thành công"));
+                    return ResponseEntity.ok( ApiResponse.ok("Cập nhật thành công"));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -178,7 +179,7 @@ public class TaiKhoanController {
     public ResponseEntity<?> deleteTaiKhoan(@PathVariable UUID id) {
         if (taiKhoanRepository.existsById(id)) {
             taiKhoanRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa tài khoản thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa tài khoản thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -213,12 +214,12 @@ public class TaiKhoanController {
 
         if (request.newPassword() == null || request.newPassword().length() < 8) {
             return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("Mật khẩu mới tối thiểu 8 ký tự"));
+                    .body( ApiResponse.err("Mật khẩu mới tối thiểu 8 ký tự"));
         }
 
         if (request.currentPassword() == null || request.currentPassword().isBlank()) {
             return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("Vui lòng nhập mật khẩu hiện tại"));
+                    .body( ApiResponse.err("Vui lòng nhập mật khẩu hiện tại"));
         }
 
         return taiKhoanRepository.findById(id)
@@ -229,7 +230,7 @@ public class TaiKhoanController {
                             tk.getMatKhauHash())) {
 
                         return ResponseEntity.badRequest()
-                                .body(new ErrorResponse("Mật khẩu hiện tại không đúng"));
+                                .body( ApiResponse.err("Mật khẩu hiện tại không đúng"));
                     }
 
                     tk.setMatKhauHash(
@@ -239,13 +240,13 @@ public class TaiKhoanController {
                     taiKhoanRepository.save(tk);
 
                     return ResponseEntity.ok(
-                            new SuccessResponse("Đổi mật khẩu thành công")
+                             ApiResponse.ok("Đổi mật khẩu thành công")
                     );
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    record ErrorResponse(String message) {}
-    record SuccessResponse(String message) {}
+//    record ErrorResponse(String message) {}
+//    record SuccessResponse(String message) {}
     record NhanVienOption(UUID id, String hoTen, String email, String vaiTro) {}
 }

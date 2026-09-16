@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.TonKhoDTO;
 import com.erp.cuahangtienloi.entity.SanPham;
 import com.erp.cuahangtienloi.entity.TonKho;
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/ton-kho")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class TonKhoController {
 
     private final TonKhoRepository tonKhoRepository;
@@ -66,7 +67,7 @@ public class TonKhoController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody TonKho request) {
         if (tonKhoRepository.findByIdSanPhamAndIdChiNhanh(request.getIdSanPham(), request.getIdChiNhanh()).isPresent()) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("Tồn kho đã tồn tại"));
+            return ResponseEntity.badRequest().body( ApiResponse.err("Tồn kho đã tồn tại"));
         }
 
         TonKho tk = new TonKho();
@@ -110,7 +111,7 @@ public class TonKhoController {
     public ResponseEntity<?> delete(@PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh) {
         tonKhoRepository.findByIdSanPhamAndIdChiNhanh(idSanPham, idChiNhanh)
                 .ifPresent(tk -> tonKhoRepository.delete(tk));
-        return ResponseEntity.ok(new SuccessResponse("Xóa tồn kho thành công"));
+        return ResponseEntity.ok( ApiResponse.ok("Xóa tồn kho thành công"));
     }
 
     private TonKhoDTO toDTO(TonKho tk) {
@@ -140,6 +141,6 @@ public class TonKhoController {
         return dto;
     }
 
-    record ErrorResponse(String message) {}
-    record SuccessResponse(String message) {}
+//    record ErrorResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }
