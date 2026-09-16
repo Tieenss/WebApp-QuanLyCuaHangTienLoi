@@ -2,6 +2,8 @@ package com.erp.cuahangtienloi.repository;
 
 import com.erp.cuahangtienloi.entity.HoaDon;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,4 +17,11 @@ public interface HoaDonRepository extends JpaRepository<HoaDon, UUID> {
     List<HoaDon> findByIdThuNgan(UUID idThuNgan);
     List<HoaDon> findByTrangThai(String trangThai);
     List<HoaDon> findByNgayBanBetween(LocalDateTime from, LocalDateTime to);
+
+    @Query("""
+    SELECT COUNT(h)
+    FROM HoaDon h
+    WHERE h.maHoaDon LIKE CONCAT(:prefix, '%')
+""")
+    long countByMaHoaDonPrefix(@Param("prefix") String prefix);
 }

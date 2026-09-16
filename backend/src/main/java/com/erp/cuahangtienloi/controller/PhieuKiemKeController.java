@@ -4,6 +4,7 @@ import com.erp.cuahangtienloi.dto.PhieuKiemKeDTO;
 import com.erp.cuahangtienloi.entity.ChiTietKiemKe;
 import com.erp.cuahangtienloi.entity.PhieuKiemKe;
 import com.erp.cuahangtienloi.repository.*;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -60,7 +61,7 @@ public class PhieuKiemKeController {
     }
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody PhieuKiemKe request) {
+    public ResponseEntity<?> create(@RequestBody PhieuKiemKe request, HttpServletRequest httpRequest) {
         PhieuKiemKe pkk = new PhieuKiemKe();
         pkk.setId(UUID.randomUUID());
         // Sinh mã ở Java để response trả về đúng mã ngay, tránh Hibernate
@@ -68,12 +69,10 @@ public class PhieuKiemKeController {
         pkk.setMaPhieu(sinhMaPhieuKiemKe(
                 request.getNgayKiemKe() != null ? request.getNgayKiemKe() : LocalDate.now()));
         pkk.setIdChiNhanh(request.getIdChiNhanh());
-        java.util.UUID idNguoiTao = request.getIdNguoiTao();
+        UUID idNguoiTao = request.getIdNguoiTao();
+
         if (idNguoiTao == null || !nhanVienRepository.existsById(idNguoiTao)) {
-            idNguoiTao = nhanVienRepository.findAll().stream()
-                    .findFirst()
-                    .map(nv -> nv.getId())
-                    .orElse(null);
+            idNguoiTao = resolveAuthenticatedIdNhanVien(httpRequest);
         }
         pkk.setIdNguoiTao(idNguoiTao);
         pkk.setIdNguoiDuyet(request.getIdNguoiDuyet());
@@ -94,11 +93,15 @@ public class PhieuKiemKeController {
      * tự đọc lại field do trigger gán sau save).
      */
     private String sinhMaPhieuKiemKe(LocalDate ngay) {
-        String dateStr = ngay.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = phieuKiemKeRepository.findAll().stream()
-                .filter(p -> p.getMaPhieu() != null && p.getMaPhieu().startsWith("KK-" + dateStr + "-"))
-                .count();
-        return "KK-" + dateStr + "-" + String.format("%03d", count + 1);
+        String dateStr = ngay.format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")
+        );
+
+        String prefix = "KK-" + dateStr + "-";
+
+        long count = phieuKiemKeRepository.countByMaPhieuPrefix(prefix);
+
+        return prefix + String.format("%03d", count + 1);
     }
 
     /**
@@ -108,7 +111,7 @@ public class PhieuKiemKeController {
      */
     @PostMapping("/with-lines")
     @Transactional
-    public ResponseEntity<?> createWithLines(@RequestBody CreateStocktakeRequest request) {
+    public ResponseEntity<?> createWithLines(@RequestBody CreateStocktakeRequest request, HttpServletRequest httpRequest) {
         if (request.getIdChiNhanh() == null) {
             return ResponseEntity.badRequest().body(new SuccessResponse("Thiếu chi nhánh"));
         }
@@ -122,11 +125,9 @@ public class PhieuKiemKeController {
         pkk.setMaPhieu(null); // trigger DB tự sinh mã KK-YYYYMMDD-NNN
         pkk.setIdChiNhanh(request.getIdChiNhanh());
         UUID idNguoiTao = request.getIdNguoiTao();
+
         if (idNguoiTao == null || !nhanVienRepository.existsById(idNguoiTao)) {
-            idNguoiTao = nhanVienRepository.findAll().stream()
-                    .findFirst()
-                    .map(nv -> nv.getId())
-                    .orElse(null);
+            idNguoiTao = resolveAuthenticatedIdNhanVien(httpRequest);
         }
         pkk.setIdNguoiTao(idNguoiTao);
         pkk.setNgayKiemKe(request.getNgayKiemKe() != null ? request.getNgayKiemKe() : LocalDate.now());
@@ -180,6 +181,7 @@ public class PhieuKiemKeController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuKiemKe request) {
         return phieuKiemKeRepository.findById(id)
                 .map(pkk -> {
@@ -203,6 +205,24 @@ public class PhieuKiemKeController {
             return ResponseEntity.ok(new SuccessResponse("Xóa phiếu kiểm kê thành công"));
         }
         return ResponseEntity.notFound().build();
+    }
+
+    private UUID resolveAuthenticatedIdNhanVien(HttpServletRequest request) {
+        Object attr = request.getAttribute("authenticatedIdNhanVien");
+
+        if (attr instanceof String s) {
+            try {
+                UUID id = UUID.fromString(s);
+
+                if (nhanVienRepository.existsById(id)) {
+                    return id;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // JWT chứa UUID không hợp lệ
+            }
+        }
+
+        return null;
     }
 
     private PhieuKiemKeDTO toDTO(PhieuKiemKe pkk) {

@@ -7,6 +7,7 @@ import com.erp.cuahangtienloi.entity.PhieuXuatKho;
 import com.erp.cuahangtienloi.repository.*;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -85,7 +86,7 @@ public class PhieuXuatKhoController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
-    public ResponseEntity<?> create(@RequestBody PhieuXuatKho request) {
+    public ResponseEntity<?> create(@RequestBody PhieuXuatKho request, HttpServletRequest httpRequest) {
         PhieuXuatKho pxk = new PhieuXuatKho();
         pxk.setMaPhieu(request.getMaPhieu());
         pxk.setIdChiNhanhXuat(request.getIdChiNhanhXuat());
@@ -96,11 +97,9 @@ public class PhieuXuatKhoController {
         pxk.setTrangThai(trangThai);
         // idNguoiTao: lấy NV đầu tiên trong DB
         UUID idNguoiTao = request.getIdNguoiTao();
+
         if (idNguoiTao == null || !nhanVienRepository.existsById(idNguoiTao)) {
-            idNguoiTao = nhanVienRepository.findAll().stream()
-                    .findFirst()
-                    .map(nv -> nv.getId())
-                    .orElse(null);
+            idNguoiTao = resolveAuthenticatedIdNhanVien(httpRequest);
         }
         if (idNguoiTao == null) {
             throw new RuntimeException("Bảng nhan_vien rỗng, không thể tạo phiếu xuất");
@@ -161,7 +160,7 @@ public class PhieuXuatKhoController {
      */
     @PutMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
-    public ResponseEntity<?> approve(@PathVariable UUID id, @RequestBody(required = false) ApproveRequest body) {
+    public ResponseEntity<?> approve(@PathVariable UUID id, @RequestBody(required = false) ApproveRequest body, HttpServletRequest httpRequest) {
         return phieuXuatKhoRepository.findById(id)
                 .map(pxk -> {
                     if (!"PENDING".equals(pxk.getTrangThai())) {
@@ -170,17 +169,15 @@ public class PhieuXuatKhoController {
                     }
                     // Tìm NV theo idNguoiDuyet hoặc fallback NV đầu tiên có vai trò THỦ KHO/ADMIN
                     UUID idNguoiDuyet = null;
-                    if (body != null && body.idNguoiDuyet() != null && nhanVienRepository.existsById(body.idNguoiDuyet())) {
+
+                    if (body != null
+                            && body.idNguoiDuyet() != null
+                            && nhanVienRepository.existsById(body.idNguoiDuyet())) {
+
                         idNguoiDuyet = body.idNguoiDuyet();
+
                     } else {
-                        idNguoiDuyet = nhanVienRepository.findAll().stream()
-                                .filter(nv -> "THU_KHO".equals(nv.getVaiTro()) || "ADMIN".equals(nv.getVaiTro()))
-                                .map(nv -> nv.getId())
-                                .findFirst()
-                                .orElseGet(() -> nhanVienRepository.findAll().stream()
-                                        .findFirst()
-                                        .map(nv -> nv.getId())
-                                        .orElse(null));
+                        idNguoiDuyet = resolveAuthenticatedIdNhanVien(httpRequest);
                     }
                     if (idNguoiDuyet == null) {
                         return ResponseEntity.badRequest().body(
@@ -200,7 +197,7 @@ public class PhieuXuatKhoController {
     /** Từ chối yêu cầu xuất: PENDING → CANCELLED. */
     @PutMapping("/{id}/reject")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
-    public ResponseEntity<?> reject(@PathVariable UUID id, @RequestBody(required = false) RejectRequest body) {
+    public ResponseEntity<?> reject(@PathVariable UUID id, @RequestBody(required = false) RejectRequest body, HttpServletRequest httpRequest) {
         return phieuXuatKhoRepository.findById(id)
                 .map(pxk -> {
                     if (!"PENDING".equals(pxk.getTrangThai())) {
@@ -211,7 +208,7 @@ public class PhieuXuatKhoController {
                     if (body != null && body.idNguoiDuyet() != null && nhanVienRepository.existsById(body.idNguoiDuyet())) {
                         idNguoiDuyet = body.idNguoiDuyet();
                     } else {
-                        idNguoiDuyet = nhanVienRepository.findAll().stream().findFirst().map(nv -> nv.getId()).orElse(null);
+                        idNguoiDuyet = resolveAuthenticatedIdNhanVien(httpRequest);
                     }
                     pxk.setTrangThai("CANCELLED");
                     pxk.setIdNguoiDuyet(idNguoiDuyet);
@@ -247,11 +244,15 @@ public class PhieuXuatKhoController {
         public void setLines(List<MoveLine> lines) { this.lines = lines; }
     }
 
-    private UUID resolveStaffUuid(UUID candidate) {
+    private UUID resolveStaffUuid(
+            UUID candidate,
+            HttpServletRequest httpRequest
+    ) {
         if (candidate != null && nhanVienRepository.existsById(candidate)) {
             return candidate;
         }
-        return nhanVienRepository.findAll().stream().map(NhanVien::getId).findFirst().orElse(null);
+
+        return resolveAuthenticatedIdNhanVien(httpRequest);
     }
 
     /**
@@ -262,7 +263,7 @@ public class PhieuXuatKhoController {
     @PutMapping("/{id}/ship")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     @Transactional
-    public ResponseEntity<?> ship(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body) {
+    public ResponseEntity<?> ship(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body, HttpServletRequest httpRequest) {
         return phieuXuatKhoRepository.findById(id).<ResponseEntity<?>>map(pxk -> {
             if (!"PENDING".equals(pxk.getTrangThai())) {
                 return ResponseEntity.badRequest().body(
@@ -273,7 +274,11 @@ public class PhieuXuatKhoController {
                 return ResponseEntity.badRequest().body(
                         new ErrorResponse("Phiếu không có dòng chi tiết — không thể xuất"));
             }
-            UUID idNguoiDuyet = resolveStaffUuid(body != null ? body.getIdNguoiThucHien() : null);
+            UUID idNguoiDuyet =
+                    resolveStaffUuid(
+                            body != null ? body.getIdNguoiThucHien() : null,
+                            httpRequest
+                    );
             if (idNguoiDuyet == null) {
                 return ResponseEntity.badRequest().body(new ErrorResponse("Không tìm thấy nhân viên duyệt"));
             }
@@ -347,14 +352,18 @@ public class PhieuXuatKhoController {
     @PutMapping("/{id}/receive")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     @Transactional
-    public ResponseEntity<?> receive(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body) {
+    public ResponseEntity<?> receive(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body, HttpServletRequest httpRequest) {
         return phieuXuatKhoRepository.findById(id).<ResponseEntity<?>>map(pxk -> {
             if (!"SHIPPED".equals(pxk.getTrangThai())) {
                 return ResponseEntity.badRequest().body(
                         new ErrorResponse("Chỉ xác nhận nhận được phiếu ở trạng thái SHIPPED (chờ nhận hàng)"));
             }
             List<ChiTietPhieuXuat> lines = chiTietPhieuXuatRepository.findByIdPhieuXuat(id);
-            UUID idNguoiNhan = resolveStaffUuid(body != null ? body.getIdNguoiThucHien() : null);
+            UUID idNguoiNhan =
+                    resolveStaffUuid(
+                            body != null ? body.getIdNguoiThucHien() : null,
+                            httpRequest
+                    );
             if (idNguoiNhan == null) {
                 return ResponseEntity.badRequest().body(new ErrorResponse("Không tìm thấy nhân viên nhận"));
             }
@@ -399,6 +408,24 @@ public class PhieuXuatKhoController {
             entityManager.clear();
             return ResponseEntity.ok(toDTO(phieuXuatKhoRepository.findById(id).orElseThrow()));
         }).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private UUID resolveAuthenticatedIdNhanVien(HttpServletRequest request) {
+        Object attr = request.getAttribute("authenticatedIdNhanVien");
+
+        if (attr instanceof String s) {
+            try {
+                UUID id = UUID.fromString(s);
+
+                if (nhanVienRepository.existsById(id)) {
+                    return id;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // UUID không hợp lệ
+            }
+        }
+
+        return null;
     }
 
     private PhieuXuatKhoDTO toDTO(PhieuXuatKho pxk) {

@@ -5,6 +5,7 @@ import com.erp.cuahangtienloi.entity.ChiTietPhieuNhap;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuNhap;
 import com.erp.cuahangtienloi.repository.*;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -85,7 +86,7 @@ public class PhieuNhapController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     @Transactional
-    public ResponseEntity<?> create(@RequestBody PhieuNhap request) {
+    public ResponseEntity<?> create(@RequestBody PhieuNhap request, HttpServletRequest httpRequest) {
         PhieuNhap pn = new PhieuNhap();
         pn.setId(UUID.randomUUID());
         pn.setMaPhieu(request.getMaPhieu());
@@ -93,16 +94,21 @@ public class PhieuNhapController {
         pn.setIdNcc(request.getIdNcc());
         // Lấy idNguoiNhap từ request - nếu null hoặc không tồn tại thì lấy NV bất kỳ
         UUID idNguoiNhap = request.getIdNguoiNhap();
+
         if (idNguoiNhap == null || !nhanVienRepository.existsById(idNguoiNhap)) {
-            // Tìm thủ kho đầu tiên
-            idNguoiNhap = nhanVienRepository.findAll().stream()
-                    .filter(nv -> "THU_KHO".equals(nv.getVaiTro()))
-                    .map(nv -> nv.getId())
-                    .findFirst()
-                    .orElseGet(() -> nhanVienRepository.findAll().stream()
-                            .map(nv -> nv.getId())
-                            .findFirst()
-                            .orElse(null));
+            Object attr = httpRequest.getAttribute("authenticatedIdNhanVien");
+
+            if (attr instanceof String s) {
+                try {
+                    UUID id = UUID.fromString(s);
+
+                    if (nhanVienRepository.existsById(id)) {
+                        idNguoiNhap = id;
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // UUID không hợp lệ
+                }
+            }
         }
         pn.setIdNguoiNhap(idNguoiNhap);
         pn.setNgayDatHang(request.getNgayDatHang() != null ? request.getNgayDatHang() : LocalDate.now());
@@ -134,18 +140,22 @@ public class PhieuNhapController {
             pxk.setMaPhieu("PX-" + java.time.LocalDate.now().toString().replace("-", "") + "-" + phieuNhapRepository.count());
             pxk.setIdChiNhanhXuat(request.getIdChiNhanh());
             pxk.setIdChiNhanhNhan(DEFAULT_DISTRIBUTION_CENTER_ID);
-            // id_nguoi_tao - lấy NV đầu tiên có THU_KHO hoặc ADMIN, fallback NV đầu tiên
-            java.util.UUID idNguoiTaoPhieuXuat = nhanVienRepository.findAll().stream()
-                    .filter(nv -> "THU_KHO".equals(nv.getVaiTro()) || "ADMIN".equals(nv.getVaiTro()))
-                    .map(nv -> nv.getId())
-                    .findFirst()
-                    .orElseGet(() -> nhanVienRepository.findAll().stream().findFirst().map(nv -> nv.getId()).orElse(null));
+            java.util.UUID idNguoiTaoPhieuXuat = pn.getIdNguoiNhap();
+
             if (idNguoiTaoPhieuXuat == null) {
-                idNguoiTaoPhieuXuat = nhanVienRepository.findAll().stream()
-                        .filter(nv -> nv.getId().equals(pn.getIdNguoiNhap()))
-                        .map(nv -> nv.getId())
-                        .findFirst()
-                        .orElseGet(() -> nhanVienRepository.findAll().stream().findFirst().map(nv -> nv.getId()).orElse(pn.getIdNguoiNhap()));
+                Object attr = httpRequest.getAttribute("authenticatedIdNhanVien");
+
+                if (attr instanceof String s) {
+                    try {
+                        UUID id = UUID.fromString(s);
+
+                        if (nhanVienRepository.existsById(id)) {
+                            idNguoiTaoPhieuXuat = id;
+                        }
+                    } catch (IllegalArgumentException ignored) {
+                        // UUID không hợp lệ
+                    }
+                }
             }
             pxk.setIdNguoiTao(idNguoiTaoPhieuXuat);
             pxk.setIdNguoiDuyet(idNguoiTaoPhieuXuat);
@@ -192,7 +202,7 @@ public class PhieuNhapController {
     @PostMapping("/with-lines")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     @Transactional
-    public ResponseEntity<?> createWithLines(@RequestBody CreatePurchaseRequest request) {
+    public ResponseEntity<?> createWithLines(@RequestBody CreatePurchaseRequest request, HttpServletRequest httpRequest) {
         if (request.getIdNcc() == null) {
             return ResponseEntity.badRequest().body(new SuccessResponse("Thiếu nhà cung cấp"));
         }
@@ -210,15 +220,21 @@ public class PhieuNhapController {
         pn.setIdChiNhanh(idChiNhanh);
         pn.setIdNcc(request.getIdNcc());
         UUID idNguoiNhap = request.getIdNguoiNhap();
+
         if (idNguoiNhap == null || !nhanVienRepository.existsById(idNguoiNhap)) {
-            idNguoiNhap = nhanVienRepository.findAll().stream()
-                    .filter(nv -> "THU_KHO".equals(nv.getVaiTro()) || "ADMIN".equals(nv.getVaiTro()))
-                    .map(NhanVien::getId)
-                    .findFirst()
-                    .orElseGet(() -> nhanVienRepository.findAll().stream()
-                            .map(NhanVien::getId)
-                            .findFirst()
-                            .orElse(null));
+            Object attr = httpRequest.getAttribute("authenticatedIdNhanVien");
+
+            if (attr instanceof String s) {
+                try {
+                    UUID id = UUID.fromString(s);
+
+                    if (nhanVienRepository.existsById(id)) {
+                        idNguoiNhap = id;
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // UUID không hợp lệ
+                }
+            }
         }
         pn.setIdNguoiNhap(idNguoiNhap);
         LocalDate ngayNhap = request.getNgayDatHang() != null ? request.getNgayDatHang() : LocalDate.now();

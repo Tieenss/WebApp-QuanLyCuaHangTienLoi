@@ -55,10 +55,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .getContext()
                         .setAuthentication(auth);
 
-                request.setAttribute(
-                        "authenticatedUserId",
-                        claims.getSubject()
-                );
+                request.setAttribute("authenticatedUserId", claims.getSubject());
+
+                String idNhanVien = claims.get("idNhanVien", String.class);
+                if (idNhanVien != null) {
+                    request.setAttribute("authenticatedIdNhanVien", idNhanVien);
+                }
+
+                String idChiNhanh = claims.get("idChiNhanh", String.class);
+                if (idChiNhanh != null) {
+                    request.setAttribute("authenticatedIdChiNhanh", idChiNhanh);
+                }
             }
         }
 

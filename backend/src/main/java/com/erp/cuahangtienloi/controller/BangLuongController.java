@@ -8,6 +8,8 @@ import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -240,14 +242,26 @@ public class BangLuongController {
                     if (request.getKhauTru() != null) bl.setKhauTru(request.getKhauTru());
                     if (request.getTongTienLuong() != null) bl.setTongTienLuong(request.getTongTienLuong());
                     if (request.getTrangThai() != null) {
-                        bl.setTrangThai(request.getTrangThai());
-                        if ("DA_XAC_NHAN".equals(request.getTrangThai())) {
-                            bl.setIdNguoiXacNhan(request.getIdNguoiXacNhan());
-                            bl.setNgayXacNhan(LocalDateTime.now());
-                        } else if ("DA_THANH_TOAN".equals(request.getTrangThai())) {
-                            bl.setIdNguoiThanhToan(request.getIdNguoiThanhToan());
-                            bl.setNgayThanhToan(LocalDateTime.now());
+
+                        if ("DA_THANH_TOAN".equals(request.getTrangThai())) {
+                            Authentication auth =
+                                    SecurityContextHolder.getContext().getAuthentication();
+
+                            boolean isKeToanOrAdmin = auth.getAuthorities().stream()
+                                    .anyMatch(a ->
+                                            a.getAuthority().equals("ROLE_ADMIN")
+                                                    || a.getAuthority().equals("ROLE_KE_TOAN")
+                                    );
+
+                            if (!isKeToanOrAdmin) {
+                                return ResponseEntity.badRequest()
+                                        .body(new SuccessResponse(
+                                                "Chỉ Kế toán/Admin mới được duyệt chi lương"
+                                        ));
+                            }
                         }
+                        
+                        bl.setTrangThai(request.getTrangThai());
                     }
                     bl.setNgayCapNhat(LocalDateTime.now());
                     bangLuongRepository.save(bl);

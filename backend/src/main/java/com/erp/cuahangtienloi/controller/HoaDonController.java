@@ -9,6 +9,7 @@ import com.erp.cuahangtienloi.repository.ChiNhanhRepository;
 import com.erp.cuahangtienloi.repository.ChiTietHoaDonRepository;
 import com.erp.cuahangtienloi.repository.HoaDonRepository;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -112,7 +113,7 @@ public class HoaDonController {
     @PostMapping("/with-lines")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
     @Transactional
-    public ResponseEntity<?> createWithLines(@RequestBody CreateSaleRequest request) {
+    public ResponseEntity<?> createWithLines(@RequestBody CreateSaleRequest request, HttpServletRequest httpRequest) {
         if (request.getIdChiNhanh() == null) {
             return ResponseEntity.badRequest().body(new SuccessResponse("Thiếu chi nhánh"));
         }
@@ -120,9 +121,23 @@ public class HoaDonController {
             return ResponseEntity.badRequest().body(new SuccessResponse("Giỏ hàng trống"));
         }
         if (request.getIdThuNgan() == null) {
-            // Fallback: nhân viên đầu tiên (tránh FK violation)
-            request.setIdThuNgan(nhanVienRepository.findAll().stream()
-                    .findFirst().map(NhanVien::getId).orElse(null));
+            UUID authenticatedId = null;
+
+            Object attr = httpRequest.getAttribute("authenticatedIdNhanVien");
+
+            if (attr instanceof String s) {
+                try {
+                    UUID id = UUID.fromString(s);
+
+                    if (nhanVienRepository.existsById(id)) {
+                        authenticatedId = id;
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // UUID không hợp lệ
+                }
+            }
+
+            request.setIdThuNgan(authenticatedId);
         }
 
         HoaDon hd = new HoaDon();
@@ -170,13 +185,15 @@ public class HoaDonController {
     }
 
     /** Sinh mã hoá đơn HD-YYYYMMDD-NNNN (đếm số hoá đơn trong ngày hiện tại). */
-    private synchronized String sinhMaHoaDon() {
-        String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long count = hoaDonRepository.findAll().stream()
-                .filter(hd -> hd.getMaHoaDon() != null
-                        && hd.getMaHoaDon().startsWith("HD-" + dateStr + "-"))
-                .count();
-        return "HD-" + dateStr + "-" + String.format("%04d", count + 1);
+    private String sinhMaHoaDon() {
+        String dateStr = LocalDate.now()
+                .format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+        String prefix = "HD-" + dateStr + "-";
+
+        long count = hoaDonRepository.countByMaHoaDonPrefix(prefix);
+
+        return prefix + String.format("%04d", count + 1);
     }
 
     /** Request body cho /with-lines: header + danh sách dòng chi tiết. */

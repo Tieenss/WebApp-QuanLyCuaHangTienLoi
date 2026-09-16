@@ -3,14 +3,17 @@ package com.erp.cuahangtienloi.controller;
 import com.erp.cuahangtienloi.dto.SoQuyDTO;
 import com.erp.cuahangtienloi.entity.SoQuy;
 import com.erp.cuahangtienloi.repository.*;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -81,7 +84,8 @@ public class SoQuyController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
-    public ResponseEntity<?> create(@RequestBody SoQuy request) {
+    @Transactional
+    public ResponseEntity<?> create(@RequestBody SoQuy request, HttpServletRequest httpRequest) {
         SoQuy sq = new SoQuy();
         sq.setId(UUID.randomUUID());
         sq.setMaChungTu(request.getMaChungTu());
@@ -90,11 +94,21 @@ public class SoQuyController {
         // id_nguoi_tao NOT NULL theo DB — nếu frontend không gửi (session cũ
         // chưa có idNhanVien) thì fallback nhân viên đầu tiên.
         UUID idNguoiTao = request.getIdNguoiTao();
+
         if (idNguoiTao == null || !nhanVienRepository.existsById(idNguoiTao)) {
-            idNguoiTao = nhanVienRepository.findAll().stream()
-                    .findFirst()
-                    .map(nv -> nv.getId())
-                    .orElse(null);
+            Object attr = httpRequest.getAttribute("authenticatedIdNhanVien");
+
+            if (attr instanceof String s) {
+                try {
+                    UUID id = UUID.fromString(s);
+
+                    if (nhanVienRepository.existsById(id)) {
+                        idNguoiTao = id;
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // UUID không hợp lệ
+                }
+            }
         }
         sq.setIdNguoiTao(idNguoiTao);
         sq.setDirection(request.getDirection());
@@ -109,12 +123,36 @@ public class SoQuyController {
         sq.setNgayTao(LocalDateTime.now());
         sq.setNgayCapNhat(LocalDateTime.now());
 
+        SoQuy latest = soQuyRepository.findByIdChiNhanh(sq.getIdChiNhanh()).stream()
+                .sorted(
+                        Comparator.comparing(SoQuy::getEntryDate)
+                                .reversed()
+                                .thenComparing(
+                                        SoQuy::getNgayTao,
+                                        Comparator.reverseOrder()
+                                )
+                )
+                .findFirst()
+                .orElse(null);
+
+        BigDecimal prevBalance =
+                latest != null
+                        ? latest.getRunningBalance()
+                        : BigDecimal.ZERO;
+
+        if ("THU".equals(sq.getDirection())) {
+            sq.setRunningBalance(prevBalance.add(sq.getSoTien()));
+        } else {
+            sq.setRunningBalance(prevBalance.subtract(sq.getSoTien()));
+        }
+
         soQuyRepository.save(sq);
         return ResponseEntity.ok(toDTO(sq));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
+    @Transactional
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody SoQuy request) {
         return soQuyRepository.findById(id)
                 .map(sq -> {
