@@ -266,74 +266,81 @@ const sale = buildSalesOrder({
         />
       ) : (
         <div className="pos-cart-lines">
-          {lines.map((line) => (
-            <div className="pos-cart-line" key={line.productId}>
-              <div className="cart-line-info">
-                <Text strong className="cart-line-name">
-                  {line.productName}
-                </Text>
-                <Text type="secondary" className="cart-line-price">
-                  {formatVND(line.unitPrice)} / {line.unit}
-                  {line.lineDiscount > 0 && ` · giảm ${formatVND(line.lineDiscount)}`}
-                </Text>
+          {lines.map((line) => {
+            const cap = line.availableStock > 0 ? line.availableStock : undefined;
 
-                <Space size={4} className="cart-line-qty">
-                  <Button
-                    size="small"
-                    icon={<MinusOutlined />}
-                    onClick={() =>
-                      dispatch(
-                        updateLineQuantity({
-                          productId: line.productId,
-                          quantity: line.quantity - 1,
-                        }),
-                      )
-                    }
-                  />
-                  <InputNumber
-                    size="small"
-                    min={1}
-                    value={line.quantity}
-                    className="cart-line-qty-input"
-                    onChange={(value) =>
-                      dispatch(
-                        updateLineQuantity({
-                          productId: line.productId,
-                          quantity: value ?? 1,
-                        }),
-                      )
-                    }
-                  />
-                  <Button
-                    size="small"
-                    icon={<PlusOutlined />}
-                    onClick={() =>
-                      dispatch(
-                        updateLineQuantity({
-                          productId: line.productId,
-                          quantity: line.quantity + 1,
-                        }),
-                      )
-                    }
-                  />
-                </Space>
-              </div>
+            return (
+              <div className="pos-cart-line" key={line.productId}>
+                <div className="cart-line-info">
+                  <Text strong className="cart-line-name">
+                    {line.productName}
+                  </Text>
+                  <Text type="secondary" className="cart-line-price">
+                    {formatVND(line.unitPrice)} / {line.unit}
+                    {line.lineDiscount > 0 && ` · giảm ${formatVND(line.lineDiscount)}`}
+                  </Text>
 
-              <div className="cart-line-total">
-                <Text strong className="numeric-cell cart-line-amount">
-                  {formatVND(line.unitPrice * line.quantity - line.lineDiscount)}
-                </Text>
-                <br />
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  onClick={() => dispatch(removeFromCart(line.productId))}
-                />
+                  <Space size={4} className="cart-line-qty">
+                    <Button
+                      size="small"
+                      icon={<MinusOutlined />}
+                      disabled={line.quantity <= 1}
+                      onClick={() =>
+                        dispatch(
+                          updateLineQuantity({
+                            productId: line.productId,
+                            quantity: line.quantity - 1,
+                          }),
+                        )
+                      }
+                    />
+                    <InputNumber
+                      size="small"
+                      min={1}
+                      max={cap}
+                      value={line.quantity}
+                      className="cart-line-qty-input"
+                      onChange={(value) =>
+                        dispatch(
+                          updateLineQuantity({
+                            productId: line.productId,
+                            quantity: value ?? 1,
+                          }),
+                        )
+                      }
+                    />
+                    <Button
+                      size="small"
+                      icon={<PlusOutlined />}
+                      disabled={cap !== undefined && line.quantity >= cap}
+                      onClick={() =>
+                        dispatch(
+                          updateLineQuantity({
+                            productId: line.productId,
+                            quantity: line.quantity + 1,
+                          }),
+                        )
+                      }
+                    />
+                  </Space>
+                </div>
+
+                <div className="cart-line-total">
+                  <Text strong className="numeric-cell cart-line-amount">
+                    {formatVND(line.unitPrice * line.quantity - line.lineDiscount)}
+                  </Text>
+                  <br />
+                  <Button
+                    type="text"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    onClick={() => dispatch(removeFromCart(line.productId))}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

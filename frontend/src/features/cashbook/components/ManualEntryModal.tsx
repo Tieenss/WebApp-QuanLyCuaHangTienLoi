@@ -185,7 +185,7 @@ export const ManualEntryModal: FC<ManualEntryModalProps> = ({ open, onClose }) =
           label="Ngày hạch toán"
           rules={[{ required: true, message: 'Vui lòng chọn ngày.' }]}
         >
-          <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }}  disabled/>
+          <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabled />
         </Form.Item>
       </Form>
     </Modal>

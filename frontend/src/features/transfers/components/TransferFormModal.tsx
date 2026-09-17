@@ -390,7 +390,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
             min={0}
             // BR-01: chặn xuất vượt tồn ngay tại ô nhập.
             max={available}
-            step={6}
+            step={1}
             value={value}
             disabled={row.productId === ''}
             status={value > available ? 'error' : undefined}

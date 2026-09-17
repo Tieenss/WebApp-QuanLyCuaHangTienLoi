@@ -23,6 +23,7 @@ import {
   RECORD_STATUS,
   type BranchFormValues,
 } from '@/types';
+import { COMMON_PATTERNS } from '@/utils/apiError';
 import './BranchFormModal.css';
 
 const KIND_OPTIONS = Object.values(BRANCH_KIND).map((kind) => ({
@@ -67,11 +68,12 @@ export const BranchFormModal: FC = () => {
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
+      const payload = { ...values, phone: values.phone.replace(/\s+/g, '') };
       if (isEditing && selectedBranch) {
-        await dispatch(updateBranchThunk({ id: selectedBranch.id, values })).unwrap();
+        await dispatch(updateBranchThunk({ id: selectedBranch.id, values: payload })).unwrap();
         message.success('Đã cập nhật thông tin chi nhánh.');
       } else {
-        await dispatch(createBranch(values)).unwrap();
+        await dispatch(createBranch(payload)).unwrap();
         message.success('Đã thêm chi nhánh mới.');
       }
       dispatch(setBranchModalOpen(false));
@@ -172,7 +174,14 @@ export const BranchFormModal: FC = () => {
             <Form.Item
               name="phone"
               label="Điện thoại"
-              rules={[{ required: true, message: 'Vui lòng nhập điện thoại.' }]}
+              normalize={(value: string | undefined) => value?.replace(/\s+/g, '')}
+              rules={[
+                { required: true, message: 'Vui lòng nhập điện thoại.' },
+                {
+                  pattern: COMMON_PATTERNS.PHONE,
+                  message: 'Số điện thoại không hợp lệ (bắt đầu bằng 0, gồm 10 hoặc 11 chữ số).',
+                },
+              ]}
             >
               <Input placeholder="028 xxxx xxxx" />
             </Form.Item>

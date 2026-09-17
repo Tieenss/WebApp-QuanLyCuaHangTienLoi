@@ -1,4 +1,4 @@
-import { useEffect,useMemo, type FC } from 'react';
+import { useEffect, useMemo, type FC } from 'react';
 import {
   App as AntdApp,
   Col,
@@ -249,12 +249,12 @@ export const ProductFormModal: FC = () => {
                 },
                 {
                   type: 'number',
-                  min: 0,
-                  message: 'Giá bán phải >= 0.',
+                  min: 1,
+                  message: 'Giá bán phải lớn hơn 0.',
                 },
               ]}
             >
-              <InputNumber className="product-amount-input" min={0} step={100} addonAfter="₫" />
+              <InputNumber className="product-amount-input" min={1} step={100} addonAfter="₫" />
             </Form.Item>
           </Col>
         </Row>

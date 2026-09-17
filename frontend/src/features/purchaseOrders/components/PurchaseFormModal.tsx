@@ -30,7 +30,6 @@ import { formatVND } from '@/utils/formatters';
 import type { Dayjs } from 'dayjs';
 import './PurchaseFormModal.css';
 
-// const DISTRIBUTION_CENTER_ID = 'br-dc-001';
 const DISTRIBUTION_CENTER_ID = 'a1b2c3d4-0001-0000-0000-000000000001';
 
 const { Text, Paragraph } = Typography;
@@ -191,6 +190,11 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         return;
       }
 
+      if (validRows.some((row) => row.unitCost <= 0)) {
+        message.error('Đơn giá nhập phải lớn hơn 0.');
+        return;
+      }
+
       // Bước 1 của luồng mới: Thủ kho lập phiếu ở trạng thái "Chờ thanh toán".
       // Chưa cộng tồn Kho Tổng — Kế toán bấm "Thanh toán" (/pay) hàng mới vào
       // kho và phiếu chi trả NCC mới được lập.
@@ -278,7 +282,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         <InputNumber<number>
           className="purchase-line-input"
           min={0}
-          step={12}
+          step={1}
           value={value}
           disabled={row.productId === ''}
           onChange={(quantity) => updateRow(row.key, { quantity: quantity ?? 0 })}
@@ -293,7 +297,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       render: (value: number, row) => (
         <InputNumber<number>
           className="purchase-line-input"
-          min={0}
+          min={1}
           step={1_000}
           value={value}
           disabled={row.productId === ''}

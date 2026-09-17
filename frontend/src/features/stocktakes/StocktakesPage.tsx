@@ -78,8 +78,6 @@ export const StocktakesPage: FC = () => {
         approvedBy: d.tenNguoiDuyet || null,
         note: d.ghiChu || '',
       }));
-      setStocktakes(mapped);
-
       // Load chi tiết cho tất cả phiếu (1 lần, tránh lazy-load khi expand)
       const allDetails: Record<string, StocktakeLine[]> = {};
       await Promise.all(

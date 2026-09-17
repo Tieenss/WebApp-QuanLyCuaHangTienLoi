@@ -359,7 +359,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
             initialValue={dayjs(today())}
             rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
           >
-            <DatePicker format="DD/MM/YYYY" style={{ width: 160 }}  disabled />
+            <DatePicker format="DD/MM/YYYY" style={{ width: 160 }} disabled />
           </Form.Item>
         </Space>
 

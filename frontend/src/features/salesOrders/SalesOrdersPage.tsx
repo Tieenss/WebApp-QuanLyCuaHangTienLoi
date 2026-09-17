@@ -23,12 +23,14 @@ import {
   setSelectedOrder,
 } from '@/store/slices/salesOrderSlice';
 import { hoaDonApi, type HoaDonDTO } from '@/api/hoaDon';
-import { chiTietHoaDonApi } from '@/api/chiTietHoaDon';
+import { chiTietHoaDonApi, type ChiTietHoaDonDTO } from '@/api/chiTietHoaDon';
 import {
   ORDER_STATUS,
   PAYMENT_METHOD_LABEL,
   USER_ROLE,
+  type OrderLine,
   type PaymentMethod,
+  type Product,
   type SalesOrder,
 } from '@/types';
 import { formatDate, formatTime, today } from '@/utils/dateUtils';
@@ -61,6 +63,29 @@ const mapDtoToOrder = (dto: HoaDonDTO, branchName: string, cashierName: string):
   memberPhone: dto.sdtThanhVien ?? null,
   note: dto.ghiChu ?? '',
 });
+
+/** Map chi tiết hoá đơn và bổ sung thông tin hiển thị từ danh mục sản phẩm. */
+const mapDtoToOrderLine = (
+  dto: ChiTietHoaDonDTO,
+  index: number,
+  products: readonly Product[],
+): OrderLine => {
+  const product = products.find((item) => item.id === dto.idSanPham);
+
+  return {
+    id: dto.id ?? `line-${index}`,
+    productId: dto.idSanPham,
+    sku: product?.sku ?? '',
+    productName: product?.name ?? '',
+    unit: product?.unit ?? '',
+    unitPrice: dto.donGia,
+    quantity: dto.soLuong,
+    lineDiscount: dto.giamGia ?? 0,
+    vatPercent: 8,
+    lineTotal: dto.thanhTien,
+    unitCost: 0,
+  };
+};
 
 /**
  * Module — Lịch sử hoá đơn bán hàng.
@@ -118,7 +143,22 @@ export const SalesOrdersPage: FC = () => {
           branches.find((b) => b.id === id)?.name ?? '';
         const cashierNameOf = (id: string) =>
           employees.find((e) => e.id === id)?.fullName ?? 'Thu ngân';
-        setApiOrders(list.map((d) => mapDtoToOrder(d, branchNameOf(d.idChiNhanh), cashierNameOf(d.idThuNgan))));
+        const mapped = await Promise.all(
+          list.map(async (dto) => {
+            const detailDtos = await chiTietHoaDonApi.getByHoaDon(dto.id).catch(() => []);
+            return {
+              ...mapDtoToOrder(
+                dto,
+                branchNameOf(dto.idChiNhanh),
+                cashierNameOf(dto.idThuNgan),
+              ),
+              lines: detailDtos.map((line, index) =>
+                mapDtoToOrderLine(line, index, products),
+              ),
+            };
+          }),
+        );
+        if (!cancelled) setApiOrders(mapped);
       } catch {
         // im lặng — vẫn hiện đơn trong session
       }
@@ -128,7 +168,7 @@ export const SalesOrdersPage: FC = () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branches.length, employees.length]);
+  }, [branches.length, employees.length, products.length]);
 
   // Hợp nhất: API (DB) + session (đơn vừa bán chưa load lại trang).
   const orders = useMemo(() => {
@@ -454,20 +494,9 @@ export const SalesOrdersPage: FC = () => {
               o.id === order.id
                 ? {
                     ...o,
-                    lines: lines.map((l, i) => ({
-                      id: l.id ?? `line-${i}`,
-                      productId: l.idSanPham,
-                      sku: products.find((p) => p.id === l.idSanPham)?.sku ?? '',
-                      productName:
-                        products.find((p) => p.id === l.idSanPham)?.name ?? '',
-                      unit: '',
-                      unitPrice: l.donGia,
-                      quantity: l.soLuong,
-                      lineDiscount: l.giamGia ?? 0,
-                      vatPercent: 8,
-                      lineTotal: l.thanhTien,
-                      unitCost: 0,
-                    })),
+                    lines: lines.map((line, index) =>
+                      mapDtoToOrderLine(line, index, products),
+                    ),
                   }
                 : o,
             ),
