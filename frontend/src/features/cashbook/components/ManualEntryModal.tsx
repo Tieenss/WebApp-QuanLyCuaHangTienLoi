@@ -141,12 +141,12 @@ export const ManualEntryModal: FC<ManualEntryModalProps> = ({ open, onClose }) =
               label="Số tiền (đồng)"
               rules={[
                 { required: true, message: 'Vui lòng nhập số tiền.' },
-                { type: 'number', min: 0, message: 'Số tiền phải >= 0.' },
+                { type: 'number', min: 1, message: 'Số tiền phải lớn hơn 0.' },
               ]}
             >
               <InputNumber
                 className="manual-entry-amount-input"
-                min={0}
+                min={1}
                 step={1000}
                 addonAfter="₫"
                 style={{ width: '100%' }}
@@ -185,7 +185,7 @@ export const ManualEntryModal: FC<ManualEntryModalProps> = ({ open, onClose }) =
           label="Ngày hạch toán"
           rules={[{ required: true, message: 'Vui lòng chọn ngày.' }]}
         >
-          <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
+          <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }}  disabled/>
         </Form.Item>
       </Form>
     </Modal>

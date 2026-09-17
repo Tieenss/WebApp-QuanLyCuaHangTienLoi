@@ -424,6 +424,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
               allowClear={false}
               // Không ghi nhận hàng nhập ở tương lai.
               maxDate={dayjs(today())}
+              disabled
             />
           </Form.Item>
         </Space>

@@ -90,7 +90,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   const products = useAppSelector((state) => state.product.products);
   const transferCount = useAppSelector((state) => state.transfer.transfers.length);
 
-  const activeStores = branches.filter((b) => b.status === 'Active');
+  // const activeStores = branches.filter((b) => b.status === 'Active');
   const sellableProducts = products.filter((p) => p.status === 'Active');
   const branchNameById = (id: string) => branches.find((b) => b.id === id)?.name ?? '';
   const productById = (id: string) => products.find((p) => p.id === id);
@@ -494,7 +494,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
               onChange={setToBranchId}
               options={availableBranches.map((branch) => ({
                 value: branch.id,
-                label: `${(branch as any).maChiNhanh || branch.code} — ${(branch as any).tenChiNhanh || branch.name}`,
+                label: `${(branch as any).maChiNhanh } — ${(branch as any).tenChiNhanh }`,
               }))}
             />
           </Form.Item>
@@ -508,6 +508,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
               format="DD/MM/YYYY"
               allowClear={false}
               maxDate={dayjs(today())}
+              disabled
             />
           </Form.Item>
         </Space>
