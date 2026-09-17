@@ -66,7 +66,7 @@ const mapDtoToTransfer = (dto: PhieuXuatKhoDTO): StockTransfer => ({
   toBranchId: dto.idChiNhanhNhan || '',
   toBranchName: '',
   createdById: dto.idNguoiTao || '',
-  createdByName: '',
+  createdByName: dto.tenNguoiTao || '',
   requestDate: dto.ngayYeuCau || '',
   shippedDate: dto.ngayXuatThucTe || null,
   receivedDate: dto.ngayNhanThucTe || null,
@@ -74,8 +74,8 @@ const mapDtoToTransfer = (dto: PhieuXuatKhoDTO): StockTransfer => ({
   note: dto.ghiChu || '',
   lines: [],
   totalValue: 0,
-  requestedBy: '',
-  approvedBy: dto.idNguoiDuyet || null,
+  requestedBy: dto.tenNguoiTao || '',
+  approvedBy: dto.tenNguoiDuyet || null,
 });
 
 export const fetchTransfers = createAsyncThunk('transfer/fetchAll', async () => {

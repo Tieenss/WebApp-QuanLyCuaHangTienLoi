@@ -35,6 +35,7 @@ const { Text } = Typography;
 export const StocktakesPage: FC = () => {
   const branches = useAppSelector((state) => state.branch.branches);
   const products = useAppSelector((state) => state.product.products);
+  const user = useAppSelector((state) => state.auth.user);
   const productById = (id: string) => products.find((p) => p.id === id);
   const dispatch = useAppDispatch();
   const [search, setSearch] = useState('');
@@ -73,8 +74,8 @@ export const StocktakesPage: FC = () => {
         totalItemsCounted: 0,
         totalVarianceItems: 0,
         totalVarianceValue: 0,
-        countedBy: '',
-        approvedBy: d.idNguoiDuyet || null,
+        countedBy: d.tenNguoiTao || '',
+        approvedBy: d.tenNguoiDuyet || null,
         note: d.ghiChu || '',
       }));
       setStocktakes(mapped);
@@ -519,14 +520,25 @@ export const StocktakesPage: FC = () => {
 
   const handleApprove = async (stocktake: Stocktake): Promise<void> => {
     try {
-      await phieuKiemKeApi.update(stocktake.id, { trangThai: 'DA_DUYET' });
+      await phieuKiemKeApi.update(stocktake.id, {
+        trangThai: 'DA_DUYET',
+        ...(user?.idNhanVien
+            ? { idNguoiDuyet: user.idNhanVien }
+            : {}),
+      });
+
       setStocktakes((prev) =>
-        prev.map((s) =>
-          s.id === stocktake.id
-            ? { ...s, status: DOCUMENT_STATUS.Approved, approvedBy: 'Quản lý cửa hàng' }
-            : s,
-        ),
+          prev.map((s) =>
+              s.id === stocktake.id
+                  ? {
+                    ...s,
+                    status: DOCUMENT_STATUS.Approved,
+                    approvedBy: user?.fullName ?? 'Chưa xác định',
+                  }
+                  : s,
+          ),
       );
+
       message.success(`Đã duyệt phiếu ${stocktake.code}`);
     } catch (e: any) {
       message.error('Lỗi duyệt phiếu: ' + (e?.message || e));

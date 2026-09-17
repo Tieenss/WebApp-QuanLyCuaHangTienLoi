@@ -6,7 +6,7 @@ export interface PhieuNhapDTO {
   idChiNhanh?: string;
   idNcc?: string;
   idNguoiNhap?: string;
-  nguoiNhapTen?: string;
+  tenNguoiNhap?: string;
   ngayDatHang?: string;
   ngayDuKienGiao?: string;
   ngayNhanThucTe?: string;

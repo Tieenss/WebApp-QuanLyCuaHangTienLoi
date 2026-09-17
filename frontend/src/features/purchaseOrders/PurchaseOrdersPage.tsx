@@ -346,12 +346,12 @@ export const PurchaseOrdersPage: FC = () => {
     },
     {
       title: 'Người nhập',
-      dataIndex: 'idNguoiNhap',
-      width: 200,
-      render: () => (
-        <Text className="po-text-12-5">
-          {user?.fullName || '—'}
-        </Text>
+      dataIndex: 'createdBy',
+      width: 160,
+      render: (value: string) => (
+          <Text className="inv-text-12-5">
+            {value || '—'}
+          </Text>
       ),
     },
     {

@@ -12,6 +12,8 @@ export interface PhieuKiemKeDTO {
   ghiChu?: string;
   ngayTao?: string;
   ngayCapNhat?: string;
+  tenNguoiTao?: string;
+  tenNguoiDuyet?: string;
 }
 
 export interface ChiTietKiemKeDTO {

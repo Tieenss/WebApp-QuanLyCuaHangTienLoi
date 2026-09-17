@@ -57,14 +57,19 @@ export const TransfersPage: FC = () => {
   }, [dispatch]);
 
   const enrichedTransfers = useMemo(
-    () =>
-      transfers.map((t) => ({
-        ...t,
-        fromBranchName: t.fromBranchName || branches.find((b) => b.id === t.fromBranchId)?.name || '',
-        toBranchName: t.toBranchName || branches.find((b) => b.id === t.toBranchId)?.name || '',
-        createdByName: t.createdById ? usersCache[t.createdById] : '',
-      })),
-    [transfers, branches, usersCache],
+      () =>
+          transfers.map((t) => ({
+            ...t,
+            fromBranchName:
+                t.fromBranchName ||
+                branches.find((b) => b.id === t.fromBranchId)?.name ||
+                '',
+            toBranchName:
+                t.toBranchName ||
+                branches.find((b) => b.id === t.toBranchId)?.name ||
+                '',
+          })),
+      [transfers, branches],
   );
 
   useEffect(() => {
@@ -264,11 +269,13 @@ export const TransfersPage: FC = () => {
     },
     {
       title: 'Người yêu cầu',
+      dataIndex: 'requestedBy',
       width: 160,
-      render: (_, row) => {
-        const ten = (row as any).createdByName || usersCache[(row as any).createdById] || '—';
-        return <Text className="inv-text-12-5">{ten}</Text>;
-      },
+      render: (value: string) => (
+          <Text className="inv-text-12-5">
+            {value || '—'}
+          </Text>
+      ),
     },
     {
       title: 'Trạng thái',
@@ -397,7 +404,7 @@ export const TransfersPage: FC = () => {
           accessor: (row) => (row.lines || []).reduce((sum, line) => sum + line.shippedQuantity, 0),
         },
         { header: 'Giá trị hàng', accessor: (row) => row.totalValue },
-        { header: 'Người yêu cầu', accessor: (row) => row.requestedBy },
+        { header: 'Người yêu cầu', accessor: (row) => row.requestedBy || row.createdByName || '', },
         { header: 'Người xuất kho', accessor: (row) => row.approvedBy ?? '' },
         { header: 'Trạng thái', accessor: (row) => row.status },
       ],

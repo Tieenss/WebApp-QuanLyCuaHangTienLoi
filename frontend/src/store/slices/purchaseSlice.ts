@@ -53,11 +53,11 @@ const mapDtoToOrder = (dto: PhieuNhapDTO): PurchaseOrder => ({
   discount: dto.giamGia || 0,
   grandTotal: dto.grandTotal || 0,
   paidAmount: dto.daThanhToan || 0,
-  debtAmount: dto.congNo || 0,
+  // debtAmount: dto.congNo || 0,
   note: dto.ghiChu || '',
-  createdAt: dto.ngayTao || '',
-  createdBy: '',
-  idNguoiNhap: dto.idNguoiNhap || '',
+  // createdAt: dto.ngayTao || '',
+  createdBy: dto.tenNguoiNhap || '',
+  // idNguoiNhap: dto.idNguoiNhap || '',
   lines: [],
 });
 

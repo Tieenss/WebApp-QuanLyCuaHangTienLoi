@@ -72,6 +72,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
   const balances = useAppSelector((state) => state.stock.balances);
   const branches = useAppSelector((state) => state.branch.branches);
   const products = useAppSelector((state) => state.product.products);
+  const user = useAppSelector((state) => state.auth.user);
 
   const sellableProducts = products.filter((p) => p.status === 'Active');
   const branchById = (id: string) => branches.find((b) => b.id === id);
@@ -304,7 +305,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
           totalItemsCounted: validRows.length,
           totalVarianceItems: varianceLines.length,
           totalVarianceValue: varianceLines.reduce((sum, row) => sum + row.varianceValue, 0),
-          countedBy: branch?.managerName ?? 'Thủ kho',
+          countedBy: user?.fullName ?? 'Thủ kho',
           approvedBy: null,
           note: values.note,
         };
