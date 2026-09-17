@@ -59,6 +59,7 @@ export const PurchaseOrdersPage: FC = () => {
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
   const products = useAppSelector((state) => state.product.products);
   const branches = useAppSelector((state) => state.branch.branches);
+  const [paying, setPaying] = useState<string | null>(null); // orderId đang thanh toán
 
   // Enrich orders: thêm tên NCC + tên kho
   const enrichedOrders = useMemo(
@@ -130,6 +131,7 @@ export const PurchaseOrdersPage: FC = () => {
    */
   const handlePay = async (order: PurchaseOrder): Promise<void> => {
     if (user === null) return;
+    setPaying(order.id);
     try {
       const updated = await phieuNhapApi.pay(order.id);
       const details = detailsCache[order.id] ?? [];
@@ -166,6 +168,8 @@ export const PurchaseOrdersPage: FC = () => {
       dispatch(fetchStock());
     } catch (e) {
       message.error((e as Error).message || 'Lỗi thanh toán phiếu nhập');
+    } finally {
+      setPaying(null);
     }
   };
 
@@ -385,7 +389,12 @@ export const PurchaseOrdersPage: FC = () => {
                   cancelText="Đóng"
                   onConfirm={() => void handlePay(row)}
                 >
-                  <Button type="primary" size="small">
+                  <Button
+                      type="primary"
+                      size="small"
+                      loading={paying === row.id}
+                      disabled={paying !== null}
+                  >
                     Thanh toán
                   </Button>
                 </Popconfirm>

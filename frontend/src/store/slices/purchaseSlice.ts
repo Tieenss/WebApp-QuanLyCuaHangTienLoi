@@ -1,7 +1,7 @@
 import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
-  DOCUMENT_STATUS,
+  DOCUMENT_STATUS, type DocumentStatus,
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '@/types';
@@ -47,7 +47,7 @@ const mapDtoToOrder = (dto: PhieuNhapDTO): PurchaseOrder => ({
   orderDate: dto.ngayDatHang || '',
   expectedDate: dto.ngayDuKienGiao || null,
   receivedDate: dto.ngayNhanThucTe || null,
-  status: (dto.trangThai as any) || 'PENDING',
+  status: (dto.trangThai as DocumentStatus) ?? DOCUMENT_STATUS.Pending,
   subTotal: dto.subTotal || 0,
   vatTotal: dto.vatTotal || 0,
   discount: dto.giamGia || 0,
@@ -185,7 +185,12 @@ export const purchaseSlice = createSlice({
       });
     // Bước 1: lưu phiếu nhập, mới nhất lên đầu.
     builder.addCase(purchaseReceived, (state, action) => {
-      state.orders.unshift(action.payload.order);
+      const idx = state.orders.findIndex((o) => o.id === action.payload.order.id);
+      if (idx >= 0) {
+        state.orders[idx] = action.payload.order;   // cập nhật status → COMPLETED
+      } else {
+        state.orders.unshift(action.payload.order); // phiếu hoàn toàn mới (luồng cũ)
+      }
     });
   },
 });
