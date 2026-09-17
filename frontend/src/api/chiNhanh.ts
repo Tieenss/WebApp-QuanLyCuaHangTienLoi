@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { parseApiError } from '@/utils/apiError';
 
 export interface ChiNhanhDTO {
   id: string;
@@ -78,10 +79,7 @@ export const chiNhanhApi = {
       headers: { 'Content-Type': 'application/json', ...getHeaders() },
       body: JSON.stringify(data),
     });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create');
-    }
+    if (!response.ok) throw await parseApiError(response, 'Không thể tạo chi nhánh');
     return response.json();
   },
 
@@ -91,7 +89,7 @@ export const chiNhanhApi = {
       headers: { 'Content-Type': 'application/json', ...getHeaders() },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update');
+    if (!response.ok) throw await parseApiError(response, 'Không thể cập nhật chi nhánh');
     return response.json();
   },
 

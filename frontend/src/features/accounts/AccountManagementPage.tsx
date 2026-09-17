@@ -18,6 +18,11 @@ import { taiKhoanApi, type TaiKhoanDTO, type CreateTaiKhoanRequest } from '@/api
 import { chiNhanhApi, type ChiNhanhDTO } from '@/api/chiNhanh';
 import { nhanVienApi, type NhanVienDTO } from '@/api/nhanVien';
 import { USER_ROLE_LABEL, type UserRole } from '@/types';
+import {
+  applyFormErrors,
+  COMMON_PATTERNS,
+  getErrorMessage,
+} from '@/utils/apiError';
 
 const VAI_TRO_OPTIONS = [
   { value: 'ADMIN', label: 'Admin / Giám đốc' },
@@ -149,8 +154,14 @@ export const AccountManagementPage = () => {
       form.resetFields();
       fetchData();
       fetchNhanVienOptions();
-    } catch (e: any) {
-      message.error(e.message || 'Lỗi khi tạo tài khoản');
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, 'Lỗi khi tạo tài khoản');
+      const handled = applyFormErrors(form, errorMessage, {
+        tenDangNhap: ['tên đăng nhập', 'tendangnhap'],
+        matKhau: ['mật khẩu', 'matkhau'],
+        idNhanVien: ['nhân viên', 'chi nhánh'],
+      });
+      if (!handled) message.error(errorMessage);
     }
   };
 
@@ -163,8 +174,14 @@ export const AccountManagementPage = () => {
       setEditing(null);
       form.resetFields();
       fetchData();
-    } catch {
-      message.error('Lỗi khi cập nhật tài khoản');
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, 'Lỗi khi cập nhật tài khoản');
+      const handled = applyFormErrors(form, errorMessage, {
+        matKhau: ['mật khẩu', 'matkhau'],
+        trangThai: ['trạng thái', 'trangthai'],
+        vaiTro: ['vai trò', 'vaitro'],
+      });
+      if (!handled) message.error(errorMessage);
     }
   };
 
@@ -174,8 +191,8 @@ export const AccountManagementPage = () => {
       message.success('Xóa tài khoản thành công');
       fetchData();
       fetchNhanVienOptions();
-    } catch {
-      message.error('Lỗi khi xóa tài khoản');
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, 'Lỗi khi xóa tài khoản'));
     }
   };
 
@@ -290,7 +307,13 @@ export const AccountManagementPage = () => {
               <Form.Item
                 name="tenDangNhap"
                 label="Tên đăng nhập"
-                rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập' }]}
+                rules={[
+                  { required: true, whitespace: true, message: 'Vui lòng nhập tên đăng nhập' },
+                  {
+                    pattern: COMMON_PATTERNS.USERNAME,
+                    message: 'Tên đăng nhập phải từ 3 đến 50 ký tự, chỉ gồm chữ, số và dấu gạch dưới.',
+                  },
+                ]}
               >
                 <Input placeholder="Nhập tên đăng nhập" />
               </Form.Item>
@@ -298,7 +321,10 @@ export const AccountManagementPage = () => {
               <Form.Item
                 name="matKhau"
                 label="Mật khẩu"
-                rules={[{ required: !editing, message: 'Vui lòng nhập mật khẩu' }]}
+                rules={[
+                  { required: true, message: 'Vui lòng nhập mật khẩu' },
+                  { min: 8, max: 100, message: 'Mật khẩu phải từ 8 đến 100 ký tự.' },
+                ]}
               >
                 <Input.Password placeholder="Nhập mật khẩu" />
               </Form.Item>
@@ -423,7 +449,11 @@ export const AccountManagementPage = () => {
 
           {editing && (
             <>
-              <Form.Item name="matKhau" label="Mật khẩu mới (để trống nếu không đổi)">
+              <Form.Item
+                name="matKhau"
+                label="Mật khẩu mới (để trống nếu không đổi)"
+                rules={[{ min: 8, max: 100, message: 'Mật khẩu phải từ 8 đến 100 ký tự.' }]}
+              >
                 <Input.Password placeholder="Nhập mật khẩu mới" />
               </Form.Item>
 

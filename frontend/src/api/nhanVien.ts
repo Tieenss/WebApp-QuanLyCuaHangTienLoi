@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { parseApiError } from '@/utils/apiError';
 
 export interface NhanVienDTO {
   id: string;
@@ -47,10 +48,7 @@ export const nhanVienApi = {
       headers: { 'Content-Type': 'application/json', ...getHeaders() },
       body: JSON.stringify(data),
     });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create');
-    }
+    if (!response.ok) throw await parseApiError(response, 'Không thể tạo nhân viên');
     return response.json();
   },
 
@@ -60,7 +58,7 @@ export const nhanVienApi = {
       headers: { 'Content-Type': 'application/json', ...getHeaders() },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update');
+    if (!response.ok) throw await parseApiError(response, 'Không thể cập nhật nhân viên');
     return response.json();
   },
 
@@ -69,6 +67,6 @@ export const nhanVienApi = {
       method: 'DELETE',
       headers: getHeaders(),
     });
-    if (!response.ok) throw new Error('Failed to delete');
+    if (!response.ok) throw await parseApiError(response, 'Không thể xóa nhân viên');
   },
 };

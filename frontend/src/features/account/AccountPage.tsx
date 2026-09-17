@@ -41,6 +41,10 @@ import {
   type ChangePasswordFormValues,
   type ProfileFormValues,
 } from '@/types';
+import {
+  applyFormErrors,
+  getErrorMessage,
+} from '@/utils/apiError';
 import './AccountPage.css';
 
 const { Text, Paragraph } = Typography;
@@ -104,12 +108,13 @@ export const AccountPage: FC = () => {
       passwordForm.resetFields();
 
       message.success('Đổi mật khẩu thành công');
-    } catch (e) {
-      message.error(
-          e instanceof Error
-              ? e.message
-              : String(e)
-      );
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, 'Đổi mật khẩu thất bại');
+      const handled = applyFormErrors(passwordForm, errorMessage, {
+        currentPassword: ['mật khẩu hiện tại không đúng', 'currentpassword'],
+        newPassword: ['mật khẩu mới', 'newpassword'],
+      });
+      if (!handled) message.error(errorMessage);
     }
   };
 
@@ -351,16 +356,18 @@ export const AccountPage: FC = () => {
                                   min: MIN_PASSWORD_LENGTH,
                                   message: `Mật khẩu tối thiểu ${MIN_PASSWORD_LENGTH} ký tự.`,
                                 },
-                                {
+                                ({ getFieldValue }) => ({
                                   validator: (_rule, value: string) =>
-                                    value === undefined || value !== ''
+                                    value === undefined
+                                    || value === ''
+                                    || value !== getFieldValue('currentPassword')
                                       ? Promise.resolve()
                                       : Promise.reject(
                                           new Error(
                                             'Mật khẩu mới phải khác mật khẩu hiện tại.',
                                           ),
                                         ),
-                                },
+                                }),
                               ]}
                             >
                               <Input.Password

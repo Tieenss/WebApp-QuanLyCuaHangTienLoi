@@ -1,5 +1,6 @@
 import type { LoginFormValues, LoginResult } from '@/types/authTypes';
 import { API_BASE_URL } from '@/config/api';
+import { parseApiError } from '@/utils/apiError';
 
 export const authApi = {
   login: async (values: LoginFormValues): Promise<LoginResult> => {
@@ -91,10 +92,7 @@ export const taiKhoanApi = {
       },
       body: JSON.stringify(data),
     });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create');
-    }
+    if (!response.ok) throw await parseApiError(response, 'Không thể tạo tài khoản');
   },
 
   update: async (id: string, data: UpdateTaiKhoanRequest): Promise<void> => {
@@ -107,7 +105,7 @@ export const taiKhoanApi = {
       },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update');
+    if (!response.ok) throw await parseApiError(response, 'Không thể cập nhật tài khoản');
   },
 
   delete: async (id: string): Promise<void> => {
@@ -116,7 +114,7 @@ export const taiKhoanApi = {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) throw new Error('Failed to delete');
+    if (!response.ok) throw await parseApiError(response, 'Không thể xóa tài khoản');
   },
 
   changePassword: async (
@@ -140,10 +138,7 @@ export const taiKhoanApi = {
         }
     );
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed');
-    }
+    if (!response.ok) throw await parseApiError(response, 'Đổi mật khẩu thất bại');
   },
 
   getNhanVienChuaCoTaiKhoan: async (): Promise<any[]> => {
