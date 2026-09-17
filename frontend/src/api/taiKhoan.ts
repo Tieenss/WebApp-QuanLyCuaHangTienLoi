@@ -52,8 +52,8 @@ export interface CreateTaiKhoanRequest {
   tenDangNhap: string;
   matKhau: string;
   idNhanVien?: string;
-  vaiTro?: string;
-  idChiNhanh?: string;
+  // vaiTro?: string;
+  // idChiNhanh?: string;
 }
 
 export interface UpdateTaiKhoanRequest {

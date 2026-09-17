@@ -59,7 +59,7 @@ export const createEmployee = createAsyncThunk(
       caMacDinh: values.defaultShift,
       luongTheoGio: values.hourlyWage,
       luongCung: values.baseSalary,
-      idChiNhanh: values.branchId,
+      ...(values.branchId ? { idChiNhanh: values.branchId } : {}),
       trangThai: values.status === 'Active' ? 'ACTIVE' : 'INACTIVE',
     };
     const data = await nhanVienApi.create(dto);
@@ -81,7 +81,7 @@ export const updateEmployeeThunk = createAsyncThunk(
       caMacDinh: values.defaultShift,
       luongTheoGio: values.hourlyWage,
       luongCung: values.baseSalary,
-      idChiNhanh: values.branchId,
+      ...(values.branchId ? { idChiNhanh: values.branchId } : {}),
       trangThai: values.status === 'Active' ? 'ACTIVE' : 'INACTIVE',
     };
     const data = await nhanVienApi.update(id, dto);

@@ -82,7 +82,7 @@ export const EmployeeFormModal: FC = () => {
       const values = await form.validateFields();
       // Nếu vai trò là ADMIN/KE_TOAN → KHÔNG gửi branchId (DB constraint)
       if (values.role === 'ADMIN' || values.role === 'KE_TOAN') {
-        values.branchId = '';
+        // values.branchId = null;
       }
       if (isEditing && selectedEmployee) {
         await dispatch(updateEmployeeThunk({ id: selectedEmployee.id, values })).unwrap();

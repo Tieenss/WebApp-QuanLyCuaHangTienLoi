@@ -10,6 +10,7 @@ import {
   Popconfirm,
   message,
   Tag,
+  Alert,
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -32,10 +33,39 @@ export const AccountManagementPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TaiKhoanDTO | null>(null);
   const [form] = Form.useForm();
+  const selectedNhanVienId = Form.useWatch('idNhanVien', form);
   const [nhanVienOptions, setNhanVienOptions] = useState<any[]>([]);
   const [branches, setBranches] = useState<ChiNhanhDTO[]>([]);
   const [allNhanVien, setAllNhanVien] = useState<NhanVienDTO[]>([]);
-  const [selectedVaiTro, setSelectedVaiTro] = useState<string>('THU_NGAN');
+  const nvById = useMemo(
+      () => new Map(allNhanVien.map((nv) => [nv.id, nv])),
+      [allNhanVien]
+  );
+
+  const branchNameById = useMemo(
+      () =>
+          new Map(
+              branches.map((b) => [
+                b.id,
+                `${b.maChiNhanh} - ${b.tenChiNhanh}`,
+              ])
+          ),
+      [branches]
+  );
+
+  const selectedNhanVien = selectedNhanVienId
+      ? nvById.get(selectedNhanVienId)
+      : undefined;
+
+  const requiresBranch =
+      !!selectedNhanVien &&
+      !['ADMIN', 'KE_TOAN'].includes(selectedNhanVien.vaiTro ?? '');
+
+  const canCreateAccount =
+      nhanVienOptions.length > 0 &&
+      Boolean(selectedNhanVien?.vaiTro) &&
+      (!requiresBranch || Boolean(selectedNhanVien?.idChiNhanh));
+  // const [selectedVaiTro, setSelectedVaiTro] = useState<string>('THU_NGAN');
 
   const fetchData = async () => {
     setLoading(true);
@@ -83,30 +113,37 @@ export const AccountManagementPage = () => {
   }, []);
 
   // NV chưa có tài khoản + lọc theo idChiNhanh được chọn
-  const filteredNhanVienOptions = useMemo(() => {
-    const chiNhanhId = form.getFieldValue('idChiNhanh');
-    return nhanVienOptions.filter((nv: any) => {
-      if (!chiNhanhId) return true;
-      return nv.idChiNhanh === chiNhanhId;
-    });
-  }, [nhanVienOptions, form, modalOpen]);
+  // const filteredNhanVienOptions = useMemo(() => {
+  //   const chiNhanhId = form.getFieldValue('idChiNhanh');
+  //   return nhanVienOptions.filter((nv: any) => {
+  //     if (!chiNhanhId) return true;
+  //     return nv.idChiNhanh === chiNhanhId;
+  //   });
+  // }, [nhanVienOptions, form, modalOpen]);
 
   // Chỉ hiện chi nhánh nếu vai trò yêu cầu
-  const requiresBranch = !['ADMIN', 'KE_TOAN'].includes(selectedVaiTro);
+  // const requiresBranch = !['ADMIN', 'KE_TOAN'].includes(selectedVaiTro);
 
   // Cập nhật NV options khi chọn chi nhánh
-  const handleBranchChange = (value: string) => {
-    // Reset nhân viên đã chọn nếu không thuộc chi nhánh mới
-    const currentNvId = form.getFieldValue('idNhanVien');
-    if (currentNvId) {
-      const nvExists = nhanVienOptions.some((nv: any) => nv.id === currentNvId && nv.idChiNhanh === value);
-      if (!nvExists) form.setFieldValue('idNhanVien', undefined);
-    }
-  };
+  // const handleBranchChange = (value: string) => {
+  //   // Reset nhân viên đã chọn nếu không thuộc chi nhánh mới
+  //   const currentNvId = form.getFieldValue('idNhanVien');
+  //   if (currentNvId) {
+  //     const nvExists = nhanVienOptions.some((nv: any) => nv.id === currentNvId && nv.idChiNhanh === value);
+  //     if (!nvExists) form.setFieldValue('idNhanVien', undefined);
+  //   }
+  // };
 
   const handleCreate = async (values: any) => {
     try {
-      await taiKhoanApi.create(values as CreateTaiKhoanRequest);
+      const payload: CreateTaiKhoanRequest = {
+        tenDangNhap: values.tenDangNhap,
+        matKhau: values.matKhau,
+        idNhanVien: values.idNhanVien,
+      };
+
+      await taiKhoanApi.create(payload);
+
       message.success('Tạo tài khoản thành công');
       setModalOpen(false);
       form.resetFields();
@@ -266,29 +303,120 @@ export const AccountManagementPage = () => {
                 <Input.Password placeholder="Nhập mật khẩu" />
               </Form.Item>
 
+              {/*<Form.Item*/}
+              {/*  name="vaiTro"*/}
+              {/*  label="Vai trò"*/}
+              {/*  rules={[{ required: true, message: 'Chọn vai trò' }]}*/}
+              {/*>*/}
+              {/*  <Select*/}
+              {/*    placeholder="Chọn vai trò"*/}
+              {/*    options={VAI_TRO_OPTIONS}*/}
+              {/*    onChange={(v: string) => setSelectedVaiTro(v)}*/}
+              {/*  />*/}
+              {/*</Form.Item>*/}
+
+              {nhanVienOptions.length === 0 && (
+                  <Alert
+                      type="warning"
+                      showIcon
+                      message="Chưa có nhân viên nào chưa gắn tài khoản — hãy tạo nhân viên ở mục Nhân sự trước"
+                      style={{ marginBottom: 16 }}
+                  />
+              )}
+
               <Form.Item
-                name="vaiTro"
-                label="Vai trò"
-                rules={[{ required: true, message: 'Chọn vai trò' }]}
+                  name="idNhanVien"
+                  label="Nhân viên liên kết"
+                  rules={[
+                    {
+                      required: true,
+                      message: 'Vui lòng chọn nhân viên liên kết',
+                    },
+                  ]}
               >
                 <Select
-                  placeholder="Chọn vai trò"
-                  options={VAI_TRO_OPTIONS}
-                  onChange={(v: string) => setSelectedVaiTro(v)}
+                    placeholder="Chọn nhân viên chưa có tài khoản"
+                    options={nhanVienOptions.map((nv: any) => {
+                      const meta = nvById.get(nv.id);
+
+                      const roleValue = meta?.vaiTro ?? nv.vaiTro;
+                      const roleLabel =
+                          USER_ROLE_LABEL[roleValue as UserRole] ??
+                          roleValue ??
+                          '—';
+
+                      return {
+                        value: nv.id,
+                        label: `${meta?.maNhanVien ?? 'NV'} - ${nv.hoTen} (${roleLabel})`,
+                      };
+                    })}
+                    showSearch
+                    optionFilterProp="label"
                 />
               </Form.Item>
 
-              <Form.Item name="idNhanVien" label="Nhân viên liên kết (tùy chọn)">
-                <Select
-                  placeholder="Chọn nhân viên chưa có tài khoản"
-                  options={nhanVienOptions.map((nv: any) => ({
-                    value: nv.id,
-                    label: `${nv.hoTen} - ${nv.email || ''}`,
-                  }))}
-                  allowClear
-                  showSearch
-                  optionFilterProp="label"
-                />
+              <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, currentValues) =>
+                      prevValues.idNhanVien !== currentValues.idNhanVien
+                  }
+              >
+                {({ getFieldValue }) => {
+                  const idNhanVien = getFieldValue('idNhanVien');
+                  const nv = idNhanVien ? nvById.get(idNhanVien) : undefined;
+
+                  if (!nv) {
+                    return null;
+                  }
+
+                  const roleLabel =
+                      USER_ROLE_LABEL[nv.vaiTro as UserRole] || nv.vaiTro || 'Chưa xác định';
+
+                  const branchName = nv.idChiNhanh
+                      ? branchNameById.get(nv.idChiNhanh) || 'Không xác định'
+                      : 'Chưa có chi nhánh';
+
+                  const requiresBranch =
+                      !['ADMIN', 'KE_TOAN'].includes(nv.vaiTro ?? '');
+
+                  const isValid =
+                      Boolean(nv.vaiTro) &&
+                      (!requiresBranch || Boolean(nv.idChiNhanh));
+
+                  return (
+                      <Alert
+                          type={isValid ? 'info' : 'warning'}
+                          showIcon
+                          message={
+                            isValid
+                                ? 'Thông tin kế thừa từ nhân viên'
+                                : 'Nhân viên chưa đủ thông tin để tạo tài khoản'
+                          }
+                          description={
+                            <div>
+                              <div>
+                                <strong>Vai trò:</strong> {roleLabel}
+                              </div>
+                              <div>
+                                <strong>Chi nhánh:</strong> {branchName}
+                              </div>
+
+                              {!nv.vaiTro && (
+                                  <div style={{ marginTop: 8 }}>
+                                    ⚠️ Nhân viên chưa được gán vai trò.
+                                  </div>
+                              )}
+
+                              {requiresBranch && !nv.idChiNhanh && (
+                                  <div style={{ marginTop: 4 }}>
+                                    ⚠️ Nhân viên chưa được gán chi nhánh.
+                                  </div>
+                              )}
+                            </div>
+                          }
+                      />
+                  );
+                }}
               </Form.Item>
             </>
           )}
@@ -317,7 +445,11 @@ export const AccountManagementPage = () => {
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
             <Space>
               <Button onClick={() => setModalOpen(false)}>Hủy</Button>
-              <Button type="primary" htmlType="submit">
+              <Button
+                  type="primary"
+                  htmlType="submit"
+                  disabled={!editing && !canCreateAccount}
+              >
                 {editing ? 'Cập nhật' : 'Tạo mới'}
               </Button>
             </Space>
