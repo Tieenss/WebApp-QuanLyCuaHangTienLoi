@@ -10,7 +10,14 @@ import com.erp.cuahangtienloi.repository.ChiNhanhRepository;
 import com.erp.cuahangtienloi.repository.ChiTietHoaDonRepository;
 import com.erp.cuahangtienloi.repository.HoaDonRepository;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
+import com.erp.cuahangtienloi.repository.SanPhamRepository;
+import com.erp.cuahangtienloi.repository.TonKhoRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +32,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static com.erp.cuahangtienloi.validation.InputValidator.PAYMENT_METHODS;
+
 @RestController
 @RequestMapping("/api/hoa-don")
 @RequiredArgsConstructor
@@ -35,6 +44,8 @@ public class HoaDonController {
     private final ChiNhanhRepository chiNhanhRepository;
     private final NhanVienRepository nhanVienRepository;
     private final ChiTietHoaDonRepository chiTietHoaDonRepository;
+    private final SanPhamRepository sanPhamRepository;
+    private final TonKhoRepository tonKhoRepository;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
@@ -83,6 +94,10 @@ public class HoaDonController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<?> create(@RequestBody HoaDon request) {
+        if (request.getIdChiNhanh() == null || !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh bán hàng không tồn tại"));
+        }
+        validatePayment(request.getHinhThucTt(), request.getGrandTotal(), request.getTienKhachDua());
         HoaDon hd = new HoaDon();
         hd.setId(UUID.randomUUID());
         hd.setMaHoaDon(request.getMaHoaDon());
@@ -114,12 +129,28 @@ public class HoaDonController {
     @PostMapping("/with-lines")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
     @Transactional
-    public ResponseEntity<?> createWithLines(@RequestBody CreateSaleRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<?> createWithLines(@Valid @RequestBody CreateSaleRequest request, HttpServletRequest httpRequest) {
         if (request.getIdChiNhanh() == null) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Thiếu chi nhánh"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Thiếu chi nhánh"));
         }
         if (request.getLines() == null || request.getLines().isEmpty()) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Giỏ hàng trống"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Giỏ hàng trống"));
+        }
+        if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh bán hàng không tồn tại"));
+        }
+        validatePayment(request.getHinhThucTt(), request.getGrandTotal(), request.getTienKhachDua());
+        for (SaleLine line : request.getLines()) {
+            var product = sanPhamRepository.findById(line.getIdSanPham()).orElse(null);
+            if (product == null || !Boolean.TRUE.equals(product.getDangHoatDong())) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm không tồn tại hoặc đã ngừng bán"));
+            }
+            int stock = tonKhoRepository.findByIdSanPhamAndIdChiNhanh(line.getIdSanPham(), request.getIdChiNhanh())
+                    .map(tk -> tk.getSoLuongTon() == null ? 0 : tk.getSoLuongTon())
+                    .orElse(0);
+            if (line.getSoLuong() > stock) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("Số lượng bán vượt tồn kho hiện tại"));
+            }
         }
         if (request.getIdThuNgan() == null) {
             UUID authenticatedId = null;
@@ -199,6 +230,7 @@ public class HoaDonController {
 
     /** Request body cho /with-lines: header + danh sách dòng chi tiết. */
     public static class CreateSaleRequest {
+        @NotNull(message = "Chi nhánh bắt buộc chọn")
         private UUID idChiNhanh;
         private UUID idThuNgan;
         private String caLamViec;
@@ -211,6 +243,8 @@ public class HoaDonController {
         private BigDecimal grandTotal;
         private BigDecimal tienKhachDua;
         private BigDecimal tienThoi;
+        @NotEmpty(message = "Giỏ hàng không được để trống")
+        @Valid
         private List<SaleLine> lines;
 
         public UUID getIdChiNhanh() { return idChiNhanh; }
@@ -243,8 +277,13 @@ public class HoaDonController {
 
     /** Dòng chi tiết hoá đơn trong request. */
     public static class SaleLine {
+        @NotNull(message = "Sản phẩm bắt buộc chọn")
         private UUID idSanPham;
+        @NotNull(message = "Số lượng bắt buộc nhập")
+        @Min(value = 1, message = "Số lượng bán phải lớn hơn 0")
         private Integer soLuong;
+        @NotNull(message = "Đơn giá bắt buộc nhập")
+        @DecimalMin(value = "0", message = "Đơn giá phải lớn hơn hoặc bằng 0")
         private BigDecimal donGia;
         private BigDecimal giamGiaDong;
         private Integer vatPhantram;
@@ -265,6 +304,20 @@ public class HoaDonController {
         public void setThanhTien(BigDecimal v) { this.thanhTien = v; }
         public BigDecimal getDonGiaVon() { return donGiaVon; }
         public void setDonGiaVon(BigDecimal v) { this.donGiaVon = v; }
+    }
+
+    private void validatePayment(String method, BigDecimal total, BigDecimal customerPaid) {
+        String paymentMethod = method != null ? method : "CASH";
+        if (!PAYMENT_METHODS.contains(paymentMethod)) {
+            throw new IllegalArgumentException("Phương thức thanh toán không hợp lệ");
+        }
+        if (total != null && total.signum() < 0) {
+            throw new IllegalArgumentException("Tổng tiền phải lớn hơn hoặc bằng 0");
+        }
+        if ("CASH".equals(paymentMethod)
+                && total != null && (customerPaid == null || customerPaid.compareTo(total) < 0)) {
+            throw new IllegalArgumentException("Tiền khách đưa phải lớn hơn hoặc bằng tổng tiền");
+        }
     }
 
     @PutMapping("/{id}")

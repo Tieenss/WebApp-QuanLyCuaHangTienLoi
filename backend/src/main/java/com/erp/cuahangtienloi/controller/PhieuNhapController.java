@@ -7,6 +7,12 @@ import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuNhap;
 import com.erp.cuahangtienloi.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -33,6 +39,7 @@ public class PhieuNhapController {
     private final com.erp.cuahangtienloi.repository.PhieuXuatKhoRepository phieuXuatKhoRepository;
     private final com.erp.cuahangtienloi.repository.ChiTietPhieuXuatRepository chiTietPhieuXuatRepository;
     private final com.erp.cuahangtienloi.repository.ChiTietPhieuNhapRepository chiTietPhieuNhapRepository;
+    private final SanPhamRepository sanPhamRepository;
     private final JdbcTemplate jdbcTemplate;
 
     @jakarta.persistence.PersistenceContext
@@ -88,6 +95,13 @@ public class PhieuNhapController {
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     @Transactional
     public ResponseEntity<?> create(@RequestBody PhieuNhap request, HttpServletRequest httpRequest) {
+        if (request.getIdNcc() == null || !nhaCungCapRepository.existsById(request.getIdNcc())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Nhà cung cấp không tồn tại"));
+        }
+        if (request.getIdChiNhanh() != null && !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+        }
+        validatePurchaseTotals(request);
         PhieuNhap pn = new PhieuNhap();
         pn.setId(UUID.randomUUID());
         pn.setMaPhieu(request.getMaPhieu());
@@ -203,18 +217,32 @@ public class PhieuNhapController {
     @PostMapping("/with-lines")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     @Transactional
-    public ResponseEntity<?> createWithLines(@RequestBody CreatePurchaseRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<?> createWithLines(@Valid @RequestBody CreatePurchaseRequest request, HttpServletRequest httpRequest) {
         if (request.getIdNcc() == null) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Thiếu nhà cung cấp"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Thiếu nhà cung cấp"));
         }
         if (request.getLines() == null || request.getLines().isEmpty()) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Phiếu không có dòng hàng"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Phiếu không có dòng hàng"));
+        }
+        if (!nhaCungCapRepository.existsById(request.getIdNcc())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Nhà cung cấp không tồn tại"));
         }
 
         // Kho nhận: ưu tiên request, mặc định = Kho Tổng (BR-05).
         UUID idChiNhanh = request.getIdChiNhanh() != null
                 ? request.getIdChiNhanh()
                 : DEFAULT_DISTRIBUTION_CENTER_ID;
+        if (!chiNhanhRepository.existsById(idChiNhanh)) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh nhập hàng không tồn tại"));
+        }
+        for (PurchaseLine line : request.getLines()) {
+            if (!sanPhamRepository.existsById(line.getIdSanPham())) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm trong phiếu nhập không tồn tại"));
+            }
+            if (line.getSoLuongNhan() != null && line.getSoLuongNhan() > line.getSoLuong()) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("Số lượng nhận không được vượt số lượng đặt"));
+            }
+        }
 
         PhieuNhap pn = new PhieuNhap();
         pn.setId(UUID.randomUUID());
@@ -345,13 +373,13 @@ public class PhieuNhapController {
         if (!"PENDING_PAYMENT".equalsIgnoreCase(pn.getTrangThai())
                 && !"PENDING".equalsIgnoreCase(pn.getTrangThai())) {
             return ResponseEntity.badRequest()
-                    .body( ApiResponse.ok("Chỉ thanh toán được phiếu ở trạng thái chờ thanh toán"));
+                    .body(ApiResponse.err("Chỉ thanh toán được phiếu ở trạng thái chờ thanh toán"));
         }
 
         List<ChiTietPhieuNhap> lines = chiTietPhieuNhapRepository.findByIdPhieuNhap(id);
         if (lines.isEmpty()) {
             return ResponseEntity.badRequest()
-                    .body( ApiResponse.ok("Phiếu không có dòng chi tiết — không thể thanh toán"));
+                    .body(ApiResponse.err("Phiếu không có dòng chi tiết — không thể thanh toán"));
         }
 
         BigDecimal grand = jdbcTemplate.queryForObject(
@@ -360,7 +388,7 @@ public class PhieuNhapController {
                 ? request.getDaThanhToan() : grand;
         if (paid.compareTo(grand) > 0) {
             return ResponseEntity.badRequest()
-                    .body( ApiResponse.ok("Số tiền trả vượt giá trị phiếu"));
+                    .body(ApiResponse.err("Số tiền trả vượt giá trị phiếu"));
         }
 
         for (ChiTietPhieuNhap ct : lines) {
@@ -392,6 +420,7 @@ public class PhieuNhapController {
     /** Request body cho /with-lines: header + danh sách dòng hàng. */
     public static class CreatePurchaseRequest {
         private UUID idChiNhanh;
+        @NotNull(message = "Nhà cung cấp bắt buộc chọn")
         private UUID idNcc;
         private UUID idNguoiNhap;
         private LocalDate ngayDatHang;
@@ -401,6 +430,8 @@ public class PhieuNhapController {
         private BigDecimal daThanhToan;
         private String trangThai;
         private String ghiChu;
+        @NotEmpty(message = "Phiếu nhập phải có ít nhất một dòng hàng")
+        @Valid
         private List<PurchaseLine> lines;
 
         public UUID getIdChiNhanh() { return idChiNhanh; }
@@ -429,10 +460,18 @@ public class PhieuNhapController {
 
     /** Dòng hàng trong request. */
     public static class PurchaseLine {
+        @NotNull(message = "Sản phẩm bắt buộc chọn")
         private UUID idSanPham;
+        @NotNull(message = "Số lượng bắt buộc nhập")
+        @Min(value = 1, message = "Số lượng phải lớn hơn 0")
         private Integer soLuong;
+        @Min(value = 1, message = "Số lượng nhận phải lớn hơn 0")
         private Integer soLuongNhan;
+        @NotNull(message = "Đơn giá nhập bắt buộc nhập")
+        @DecimalMin(value = "0", message = "Đơn giá nhập phải lớn hơn hoặc bằng 0")
         private BigDecimal donGiaNhap;
+        @Min(value = 0, message = "VAT phải từ 0 đến 100")
+        @Max(value = 100, message = "VAT phải từ 0 đến 100")
         private Integer vatPhantram;
         private LocalDate hanSuDung;
 
@@ -455,6 +494,7 @@ public class PhieuNhapController {
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuNhap request) {
         return phieuNhapRepository.findById(id)
                 .map(pn -> {
+                    validatePurchaseTotals(request);
                     if (request.getMaPhieu() != null) pn.setMaPhieu(request.getMaPhieu());
                     if (request.getNgayDatHang() != null) pn.setNgayDatHang(request.getNgayDatHang());
                     if (request.getNgayDuKienGiao() != null) pn.setNgayDuKienGiao(request.getNgayDuKienGiao());
@@ -472,6 +512,15 @@ public class PhieuNhapController {
                     return ResponseEntity.ok(toDTO(pn));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private void validatePurchaseTotals(PhieuNhap request) {
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getSubTotal(), "Tạm tính");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getVatTotal(), "Tiền VAT");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getGiamGia(), "Giảm giá");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getGrandTotal(), "Tổng tiền");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getDaThanhToan(), "Đã thanh toán");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getCongNo(), "Công nợ");
     }
 
     @DeleteMapping("/{id}")

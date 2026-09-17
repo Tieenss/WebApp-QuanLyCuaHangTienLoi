@@ -2,7 +2,7 @@ package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuNhap;
-import com.erp.cuahangtienloi.repository.ChiTietPhieuNhapRepository;
+import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +21,8 @@ import java.util.UUID;
 public class ChiTietPhieuNhapController {
 
     private final ChiTietPhieuNhapRepository chiTietPhieuNhapRepository;
+    private final PhieuNhapRepository phieuNhapRepository;
+    private final SanPhamRepository sanPhamRepository;
 
     @GetMapping("/by-phieu/{idPhieuNhap}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'KE_TOAN')")
@@ -37,6 +39,7 @@ public class ChiTietPhieuNhapController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> create(@RequestBody ChiTietPhieuNhap request) {
+        validate(request);
         ChiTietPhieuNhap ct = new ChiTietPhieuNhap();
         ct.setId(UUID.randomUUID());
         ct.setIdPhieuNhap(request.getIdPhieuNhap());
@@ -57,7 +60,11 @@ public class ChiTietPhieuNhapController {
     @PostMapping("/batch")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> createBatch(@RequestBody List<ChiTietPhieuNhap> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Danh sách chi tiết phiếu nhập rỗng"));
+        }
         for (ChiTietPhieuNhap request : requests) {
+            validate(request);
             ChiTietPhieuNhap ct = new ChiTietPhieuNhap();
             ct.setId(UUID.randomUUID());
             ct.setIdPhieuNhap(request.getIdPhieuNhap());
@@ -73,6 +80,26 @@ public class ChiTietPhieuNhapController {
             chiTietPhieuNhapRepository.save(ct);
         }
         return ResponseEntity.ok( ApiResponse.ok("Tạo chi tiết phiếu nhập thành công"));
+    }
+
+    private void validate(ChiTietPhieuNhap request) {
+        if (request.getIdPhieuNhap() == null || !phieuNhapRepository.existsById(request.getIdPhieuNhap())) {
+            throw new IllegalArgumentException("Phiếu nhập không tồn tại");
+        }
+        if (request.getIdSanPham() == null || !sanPhamRepository.existsById(request.getIdSanPham())) {
+            throw new IllegalArgumentException("Sản phẩm không tồn tại");
+        }
+        com.erp.cuahangtienloi.validation.InputValidator.positive(request.getSoLuongDat(), "Số lượng đặt");
+        if (request.getSoLuongNhan() != null) {
+            com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getSoLuongNhan(), "Số lượng nhận");
+            if (request.getSoLuongNhan() > request.getSoLuongDat()) {
+                throw new IllegalArgumentException("Số lượng nhận không được vượt số lượng đặt");
+            }
+        }
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getDonGiaNhap(), "Đơn giá nhập");
+        if (request.getVatPhantram() != null && (request.getVatPhantram() < 0 || request.getVatPhantram() > 100)) {
+            throw new IllegalArgumentException("VAT phải từ 0 đến 100");
+        }
     }
 
     @DeleteMapping("/{id}")

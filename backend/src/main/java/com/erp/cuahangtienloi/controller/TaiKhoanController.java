@@ -8,6 +8,10 @@ import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.TaiKhoan;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import com.erp.cuahangtienloi.repository.TaiKhoanRepository;
+import com.erp.cuahangtienloi.repository.ChiNhanhRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +31,7 @@ public class TaiKhoanController {
 
     private final TaiKhoanRepository taiKhoanRepository;
     private final NhanVienRepository nhanVienRepository;
+    private final ChiNhanhRepository chiNhanhRepository;
     private final PasswordEncoder passwordEncoder;
 
     @GetMapping
@@ -78,13 +83,48 @@ public class TaiKhoanController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createTaiKhoan(@RequestBody CreateTaiKhoanRequest request) {
+    public ResponseEntity<?> createTaiKhoan(@Valid @RequestBody CreateTaiKhoanRequest request) {
         if (taiKhoanRepository.findByTenDangNhap(request.getTenDangNhap()).isPresent()) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Tên đăng nhập đã tồn tại"));
         }
 
         // Nếu không chọn nhân viên có sẵn → tự tạo nhan_vien mới
         UUID nhanVienId = request.getIdNhanVien();
+        if (nhanVienId != null && !nhanVienRepository.existsById(nhanVienId)) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên không tồn tại"));
+        }
+        if (nhanVienId != null && taiKhoanRepository.findByIdNhanVien(nhanVienId).isPresent()) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên đã có tài khoản"));
+        }
+        NhanVien linkedEmployee = nhanVienId != null
+                ? nhanVienRepository.findById(nhanVienId).orElse(null)
+                : null;
+        String vaiTroYeuCau = request.getVaiTro() != null
+                ? request.getVaiTro()
+                : linkedEmployee != null ? linkedEmployee.getVaiTro() : "THU_NGAN";
+        if (!List.of("ADMIN", "KE_TOAN", "THU_KHO", "QUAN_LY", "THU_NGAN").contains(vaiTroYeuCau)) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Vai trò không hợp lệ"));
+        }
+        UUID chiNhanhId = null;
+        if (request.getIdChiNhanh() != null && !request.getIdChiNhanh().isBlank()) {
+            try {
+                chiNhanhId = UUID.fromString(request.getIdChiNhanh());
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("ID chi nhánh không hợp lệ"));
+            }
+            if (!chiNhanhRepository.existsById(chiNhanhId)) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+            }
+        }
+        if (chiNhanhId == null && linkedEmployee != null) {
+            chiNhanhId = linkedEmployee.getIdChiNhanh();
+        }
+        if (!List.of("ADMIN", "KE_TOAN").contains(vaiTroYeuCau) && chiNhanhId == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Vai trò này bắt buộc phải chọn chi nhánh"));
+        }
+        if (List.of("ADMIN", "KE_TOAN").contains(vaiTroYeuCau) && chiNhanhId != null) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("ADMIN và KẾ TOÁN không thuộc chi nhánh"));
+        }
         if (nhanVienId == null) {
             NhanVien newNv = new NhanVien();
             newNv.setId(UUID.randomUUID());
@@ -92,7 +132,7 @@ public class TaiKhoanController {
             newNv.setTenDangNhap(request.getTenDangNhap());
             newNv.setMatKhau(passwordEncoder.encode(request.getMatKhau()));
             newNv.setHoTen(request.getTenDangNhap());
-            String vaiTro = request.getVaiTro() != null ? request.getVaiTro() : "THU_NGAN";
+            String vaiTro = vaiTroYeuCau;
             newNv.setVaiTro(vaiTro);
             newNv.setLoaiHopDong("FULL_TIME");
             newNv.setCaMacDinh("MORNING");
@@ -101,7 +141,7 @@ public class TaiKhoanController {
             // Rule chk_vai_tro_chi_nhanh: ADMIN/KE_TOAN phải NULL id_chi_nhanh
             if (!"ADMIN".equals(vaiTro) && !"KE_TOAN".equals(vaiTro)) {
                 // THU_KHO/QUAN_LY/THU_NGAN cần chi nhánh - mặc định NULL, user tự cập nhật sau
-                newNv.setIdChiNhanh(null);
+                newNv.setIdChiNhanh(chiNhanhId);
             } else {
                 newNv.setIdChiNhanh(null);
             }
@@ -147,7 +187,7 @@ public class TaiKhoanController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> updateTaiKhoan(@PathVariable UUID id, @RequestBody UpdateTaiKhoanRequest request) {
+    public ResponseEntity<?> updateTaiKhoan(@PathVariable UUID id, @Valid @RequestBody UpdateTaiKhoanRequest request) {
         return taiKhoanRepository.findById(id)
                 .map(tk -> {
                     if (request.getMatKhau() != null && !request.getMatKhau().isEmpty()) {
@@ -202,15 +242,20 @@ public class TaiKhoanController {
     }
 
     public record ChangePasswordRequest(
-            String currentPassword,
-            String newPassword
+            @NotBlank(message = "Vui lòng nhập mật khẩu hiện tại") String currentPassword,
+            @NotBlank(message = "Vui lòng nhập mật khẩu mới")
+            @Size(min = 8, max = 100, message = "Mật khẩu mới phải từ 8 đến 100 ký tự") String newPassword
     ) {}
 
     @PutMapping("/{id}/change-password")
     @PreAuthorize("hasRole('ADMIN') or authentication.name == #id.toString()")
     public ResponseEntity<?> changePassword(
             @PathVariable UUID id,
-            @RequestBody ChangePasswordRequest request) {
+            @Valid @RequestBody ChangePasswordRequest request) {
+
+        if (request.newPassword().equals(request.currentPassword())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Mật khẩu mới phải khác mật khẩu hiện tại"));
+        }
 
         if (request.newPassword() == null || request.newPassword().length() < 8) {
             return ResponseEntity.badRequest()

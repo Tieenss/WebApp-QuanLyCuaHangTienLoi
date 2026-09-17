@@ -7,6 +7,7 @@ import com.erp.cuahangtienloi.entity.NhaCungCapDanhMuc;
 import com.erp.cuahangtienloi.repository.DanhMucRepository;
 import com.erp.cuahangtienloi.repository.NhaCungCapDanhMucRepository;
 import com.erp.cuahangtienloi.repository.NhaCungCapRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -59,11 +60,19 @@ public class NhaCungCapController {
     @Transactional
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> create(@RequestBody NhaCungCapDTO request) {
+    public ResponseEntity<?> create(@Valid @RequestBody NhaCungCapDTO request) {
+
+        if (request.getTenNcc() == null || request.getTenNcc().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Tên NCC không được để trống"));
+        }
 
         if (nhaCungCapRepository.existsByMaNcc(request.getMaNcc())) {
             return ResponseEntity.badRequest()
                     .body( ApiResponse.err("Mã NCC đã tồn tại"));
+        }
+        if (request.getCategoryIds() != null
+                && request.getCategoryIds().stream().anyMatch(categoryId -> !danhMucRepository.existsById(categoryId))) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Danh mục của nhà cung cấp không tồn tại"));
         }
 
         NhaCungCap ncc = new NhaCungCap();
@@ -139,10 +148,24 @@ public class NhaCungCapController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> update(
             @PathVariable UUID id,
-            @RequestBody NhaCungCapDTO request
+            @Valid @RequestBody NhaCungCapDTO request
     ) {
         return nhaCungCapRepository.findById(id)
                 .map(ncc -> {
+
+                    if (request.getTenNcc() != null && request.getTenNcc().isBlank()) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Tên NCC không được để trống"));
+                    }
+                    if (request.getMaNcc() != null) {
+                        NhaCungCap duplicate = nhaCungCapRepository.findByMaNcc(request.getMaNcc()).orElse(null);
+                        if (duplicate != null && !duplicate.getId().equals(id)) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Mã NCC đã tồn tại"));
+                        }
+                    }
+                    if (request.getCategoryIds() != null
+                            && request.getCategoryIds().stream().anyMatch(categoryId -> !danhMucRepository.existsById(categoryId))) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Danh mục của nhà cung cấp không tồn tại"));
+                    }
 
                     if (request.getMaNcc() != null) {
                         ncc.setMaNcc(request.getMaNcc());

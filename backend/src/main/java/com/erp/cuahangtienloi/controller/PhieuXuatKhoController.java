@@ -88,6 +88,15 @@ public class PhieuXuatKhoController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody PhieuXuatKho request, HttpServletRequest httpRequest) {
+        if (request.getIdChiNhanhXuat() == null || !chiNhanhRepository.existsById(request.getIdChiNhanhXuat())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh xuất không tồn tại"));
+        }
+        if (request.getIdChiNhanhNhan() == null || !chiNhanhRepository.existsById(request.getIdChiNhanhNhan())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh nhận không tồn tại"));
+        }
+        if (request.getIdChiNhanhXuat().equals(request.getIdChiNhanhNhan())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Kho xuất và kho nhận phải khác nhau"));
+        }
         PhieuXuatKho pxk = new PhieuXuatKho();
         pxk.setMaPhieu(request.getMaPhieu());
         pxk.setIdChiNhanhXuat(request.getIdChiNhanhXuat());
@@ -129,6 +138,19 @@ public class PhieuXuatKhoController {
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuXuatKho request) {
         return phieuXuatKhoRepository.findById(id)
                 .map(pxk -> {
+                    UUID sourceId = request.getIdChiNhanhXuat() != null
+                            ? request.getIdChiNhanhXuat() : pxk.getIdChiNhanhXuat();
+                    UUID destinationId = request.getIdChiNhanhNhan() != null
+                            ? request.getIdChiNhanhNhan() : pxk.getIdChiNhanhNhan();
+                    if (sourceId == null || !chiNhanhRepository.existsById(sourceId)) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh xuất không tồn tại"));
+                    }
+                    if (destinationId == null || !chiNhanhRepository.existsById(destinationId)) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh nhận không tồn tại"));
+                    }
+                    if (sourceId.equals(destinationId)) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Kho xuất và kho nhận phải khác nhau"));
+                    }
                     if (request.getMaPhieu() != null) pxk.setMaPhieu(request.getMaPhieu());
                     if (request.getIdChiNhanhXuat() != null) pxk.setIdChiNhanhXuat(request.getIdChiNhanhXuat());
                     if (request.getIdChiNhanhNhan() != null) pxk.setIdChiNhanhNhan(request.getIdChiNhanhNhan());

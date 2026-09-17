@@ -10,6 +10,7 @@ import com.erp.cuahangtienloi.entity.SanPham;
 import com.erp.cuahangtienloi.repository.DanhMucRepository;
 import com.erp.cuahangtienloi.repository.NhaCungCapRepository;
 import com.erp.cuahangtienloi.repository.SanPhamRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -76,12 +77,24 @@ public class SanPhamController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
-    public ResponseEntity<?> create(@RequestBody CreateSanPhamRequest request) {
+    public ResponseEntity<?> create(@Valid @RequestBody CreateSanPhamRequest request) {
         if (sanPhamRepository.existsBySku(request.getSku())) {
             return ResponseEntity.badRequest().body( ApiResponse.err("SKU đã tồn tại"));
         }
-        if (sanPhamRepository.existsByMaVach(request.getMaVach())) {
+        if (request.getMaVach() != null && !request.getMaVach().isBlank()
+                && sanPhamRepository.existsByMaVach(request.getMaVach())) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Mã vạch đã tồn tại"));
+        }
+        if (!danhMucRepository.existsById(request.getIdDanhMuc())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Danh mục không tồn tại"));
+        }
+        if (request.getIdNhaCungCap() != null && !nhaCungCapRepository.existsById(request.getIdNhaCungCap())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Nhà cung cấp không tồn tại"));
+        }
+        int tonToiThieu = request.getTonToiThieu() != null ? request.getTonToiThieu() : 0;
+        int tonToiDa = request.getTonToiDa() != null ? request.getTonToiDa() : 0;
+        if (tonToiDa > 0 && tonToiDa < tonToiThieu) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Tồn tối đa phải lớn hơn hoặc bằng tồn tối thiểu"));
         }
 
         SanPham sp = new SanPham();
@@ -111,9 +124,39 @@ public class SanPhamController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
-    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody UpdateSanPhamRequest request) {
+    public ResponseEntity<?> update(@PathVariable UUID id, @Valid @RequestBody UpdateSanPhamRequest request) {
         return sanPhamRepository.findById(id)
                 .map(sp -> {
+                    if (request.getTenSanPham() != null && request.getTenSanPham().isBlank()) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Tên sản phẩm không được để trống"));
+                    }
+                    if (request.getSku() != null) {
+                        SanPham duplicate = sanPhamRepository.findBySku(request.getSku()).orElse(null);
+                        if (duplicate != null && !duplicate.getId().equals(id)) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("SKU đã tồn tại"));
+                        }
+                    }
+                    if (request.getMaVach() != null && !request.getMaVach().isBlank()) {
+                        SanPham duplicate = sanPhamRepository.findByMaVach(request.getMaVach()).orElse(null);
+                        if (duplicate != null && !duplicate.getId().equals(id)) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Mã vạch đã tồn tại"));
+                        }
+                    }
+                    if (request.getIdDanhMuc() != null && !danhMucRepository.existsById(request.getIdDanhMuc())) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Danh mục không tồn tại"));
+                    }
+                    if (request.getIdNhaCungCap() != null && !nhaCungCapRepository.existsById(request.getIdNhaCungCap())) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Nhà cung cấp không tồn tại"));
+                    }
+                    int min = request.getTonToiThieu() != null
+                            ? request.getTonToiThieu()
+                            : (sp.getTonToiThieu() != null ? sp.getTonToiThieu() : 0);
+                    int max = request.getTonToiDa() != null
+                            ? request.getTonToiDa()
+                            : (sp.getTonToiDa() != null ? sp.getTonToiDa() : 0);
+                    if (max > 0 && max < min) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Tồn tối đa phải lớn hơn hoặc bằng tồn tối thiểu"));
+                    }
                     if (request.getIdDanhMuc() != null) sp.setIdDanhMuc(request.getIdDanhMuc());
                     if (request.getSku() != null) sp.setSku(request.getSku());
                     if (request.getMaVach() != null) sp.setMaVach(request.getMaVach());

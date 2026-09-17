@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.erp.cuahangtienloi.validation.InputValidator.nonNegative;
+
 @RestController
 @RequestMapping("/api/bang-luong")
 @RequiredArgsConstructor
@@ -47,7 +49,7 @@ public class BangLuongController {
         try {
             YearMonth ym = YearMonth.parse(thangNam, DateTimeFormatter.ofPattern("MM-yyyy"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Tháng không hợp lệ, dùng MM-YYYY"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Tháng không hợp lệ, dùng MM-YYYY"));
         }
 
         LocalDate firstDay = YearMonth.parse(thangNam, DateTimeFormatter.ofPattern("MM-yyyy")).atDay(1);
@@ -197,6 +199,13 @@ public class BangLuongController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     public ResponseEntity<?> create(@RequestBody BangLuong request) {
+        if (request.getIdNhanVien() == null || !nhanVienRepository.existsById(request.getIdNhanVien())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên không tồn tại"));
+        }
+        if (request.getIdChiNhanh() != null && !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+        }
+        validateAmounts(request);
         BangLuong bl = new BangLuong();
         bl.setId(UUID.randomUUID());
         bl.setIdNhanVien(request.getIdNhanVien());
@@ -229,6 +238,7 @@ public class BangLuongController {
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody BangLuong request) {
         return bangLuongRepository.findById(id)
                 .map(bl -> {
+                    validateAmounts(request);
                     if (request.getTongGioLam() != null) bl.setTongGioLam(request.getTongGioLam());
                     if (request.getOvertimeHours() != null) bl.setOvertimeHours(request.getOvertimeHours());
                     if (request.getTongSoCa() != null) bl.setTongSoCa(request.getTongSoCa());
@@ -256,7 +266,7 @@ public class BangLuongController {
 
                             if (!isKeToanOrAdmin) {
                                 return ResponseEntity.badRequest()
-                                        .body( ApiResponse.ok(
+                                        .body(ApiResponse.err(
                                                 "Chỉ Kế toán/Admin mới được duyệt chi lương"
                                         ));
                             }
@@ -269,6 +279,21 @@ public class BangLuongController {
                     return ResponseEntity.ok(toDTO(bl));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private void validateAmounts(BangLuong request) {
+        nonNegative(request.getTongGioLam(), "Tổng giờ làm");
+        nonNegative(request.getOvertimeHours(), "Giờ tăng ca");
+        nonNegative(request.getTongSoCa(), "Tổng số ca");
+        nonNegative(request.getGioDieuChinh(), "Giờ điều chỉnh");
+        nonNegative(request.getLuongTheoGio(), "Lương theo giờ");
+        nonNegative(request.getLuongCung(), "Lương cứng");
+        nonNegative(request.getLuongCungThucTe(), "Lương cứng thực tế");
+        nonNegative(request.getTienCongTheoGio(), "Tiền công theo giờ");
+        nonNegative(request.getTienOt(), "Tiền tăng ca");
+        nonNegative(request.getThuong(), "Thưởng");
+        nonNegative(request.getKhauTru(), "Khấu trừ");
+        nonNegative(request.getTongTienLuong(), "Tổng tiền lương");
     }
 
     @DeleteMapping("/{id}")

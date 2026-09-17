@@ -2,7 +2,7 @@ package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietKiemKe;
-import com.erp.cuahangtienloi.repository.ChiTietKiemKeRepository;
+import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,6 +23,8 @@ import java.util.UUID;
 public class ChiTietKiemKeController {
 
     private final ChiTietKiemKeRepository chiTietKiemKeRepository;
+    private final PhieuKiemKeRepository phieuKiemKeRepository;
+    private final SanPhamRepository sanPhamRepository;
 
     @GetMapping("/by-phieu/{idPhieuKiemKe}")
     public ResponseEntity<List<ChiTietKiemKe>> getByPhieuKiemKe(@PathVariable UUID idPhieuKiemKe) {
@@ -35,7 +37,9 @@ public class ChiTietKiemKeController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody ChiTietKiemKe request) {
+        validate(request);
         ChiTietKiemKe ct = new ChiTietKiemKe();
         ct.setId(UUID.randomUUID());
         ct.setIdPhieuKiemKe(request.getIdPhieuKiemKe());
@@ -53,13 +57,15 @@ public class ChiTietKiemKeController {
     }
 
     @PostMapping("/batch")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     @Transactional
     public ResponseEntity<?> createBatch(@RequestBody List<ChiTietKiemKe> requests) {
         if (requests == null || requests.isEmpty()) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Danh sách chi tiết rỗng"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Danh sách chi tiết rỗng"));
         }
         List<ChiTietKiemKe> saved = new ArrayList<>();
         for (ChiTietKiemKe request : requests) {
+            validate(request);
             ChiTietKiemKe ct = new ChiTietKiemKe();
             ct.setId(UUID.randomUUID());
             ct.setIdPhieuKiemKe(request.getIdPhieuKiemKe());
@@ -77,7 +83,20 @@ public class ChiTietKiemKeController {
         return ResponseEntity.ok(saved);
     }
 
+    private void validate(ChiTietKiemKe request) {
+        if (request.getIdPhieuKiemKe() == null || !phieuKiemKeRepository.existsById(request.getIdPhieuKiemKe())) {
+            throw new IllegalArgumentException("Phiếu kiểm kê không tồn tại");
+        }
+        if (request.getIdSanPham() == null || !sanPhamRepository.existsById(request.getIdSanPham())) {
+            throw new IllegalArgumentException("Sản phẩm không tồn tại");
+        }
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getTonHeThong(), "Tồn hệ thống");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getTonThucTe(), "Tồn thực tế");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getDonGiaVon(), "Đơn giá vốn");
+    }
+
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (chiTietKiemKeRepository.existsById(id)) {
             chiTietKiemKeRepository.deleteById(id);
@@ -87,6 +106,7 @@ public class ChiTietKiemKeController {
     }
 
     @DeleteMapping("/by-phieu/{idPhieuKiemKe}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> deleteByPhieuKiemKe(@PathVariable UUID idPhieuKiemKe) {
         List<ChiTietKiemKe> list = chiTietKiemKeRepository.findByIdPhieuKiemKe(idPhieuKiemKe);
         chiTietKiemKeRepository.deleteAll(list);

@@ -6,6 +6,10 @@ import com.erp.cuahangtienloi.entity.ChiTietKiemKe;
 import com.erp.cuahangtienloi.entity.PhieuKiemKe;
 import com.erp.cuahangtienloi.repository.*;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,6 +33,7 @@ public class PhieuKiemKeController {
     private final ChiNhanhRepository chiNhanhRepository;
     private final NhanVienRepository nhanVienRepository;
     private final ChiTietKiemKeRepository chiTietKiemKeRepository;
+    private final SanPhamRepository sanPhamRepository;
 
     @GetMapping
     public ResponseEntity<List<PhieuKiemKeDTO>> getAll() {
@@ -63,6 +68,9 @@ public class PhieuKiemKeController {
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody PhieuKiemKe request, HttpServletRequest httpRequest) {
+        if (request.getIdChiNhanh() == null || !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+        }
         PhieuKiemKe pkk = new PhieuKiemKe();
         pkk.setId(UUID.randomUUID());
         // Sinh mã ở Java để response trả về đúng mã ngay, tránh Hibernate
@@ -112,12 +120,23 @@ public class PhieuKiemKeController {
      */
     @PostMapping("/with-lines")
     @Transactional
-    public ResponseEntity<?> createWithLines(@RequestBody CreateStocktakeRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<?> createWithLines(@Valid @RequestBody CreateStocktakeRequest request, HttpServletRequest httpRequest) {
         if (request.getIdChiNhanh() == null) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Thiếu chi nhánh"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Thiếu chi nhánh"));
         }
         if (request.getLines() == null || request.getLines().isEmpty()) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Thiếu danh sách sản phẩm kiểm kê"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Thiếu danh sách sản phẩm kiểm kê"));
+        }
+        if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+        }
+        for (ChiTietKiemKe line : request.getLines()) {
+            if (line.getIdSanPham() == null || !sanPhamRepository.existsById(line.getIdSanPham())) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm kiểm kê không tồn tại"));
+            }
+            if (line.getTonThucTe() == null || line.getTonThucTe() < 0) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("Tồn thực tế phải lớn hơn hoặc bằng 0"));
+            }
         }
 
         // 1. Tạo header
@@ -163,10 +182,13 @@ public class PhieuKiemKeController {
 
     /** Request body cho /with-lines: header + danh sách dòng chi tiết. */
     public static class CreateStocktakeRequest {
+        @NotNull(message = "Chi nhánh bắt buộc chọn")
         private UUID idChiNhanh;
         private UUID idNguoiTao;
         private LocalDate ngayKiemKe;
         private String ghiChu;
+        @NotEmpty(message = "Phiếu kiểm kê phải có ít nhất một sản phẩm")
+        @Valid
         private List<ChiTietKiemKe> lines;
 
         public UUID getIdChiNhanh() { return idChiNhanh; }

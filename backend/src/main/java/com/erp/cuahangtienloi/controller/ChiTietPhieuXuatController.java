@@ -2,7 +2,7 @@ package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuXuat;
-import com.erp.cuahangtienloi.repository.ChiTietPhieuXuatRepository;
+import com.erp.cuahangtienloi.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +21,8 @@ import java.util.UUID;
 public class ChiTietPhieuXuatController {
 
     private final ChiTietPhieuXuatRepository chiTietPhieuXuatRepository;
+    private final PhieuXuatKhoRepository phieuXuatKhoRepository;
+    private final SanPhamRepository sanPhamRepository;
 
     @GetMapping("/by-phieu/{idPhieuXuat}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
@@ -37,6 +39,7 @@ public class ChiTietPhieuXuatController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody ChiTietPhieuXuat request) {
+        validate(request);
         ChiTietPhieuXuat ct = new ChiTietPhieuXuat();
         ct.setId(UUID.randomUUID());
         ct.setIdPhieuXuat(request.getIdPhieuXuat());
@@ -57,7 +60,11 @@ public class ChiTietPhieuXuatController {
     @PostMapping("/batch")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> createBatch(@RequestBody List<ChiTietPhieuXuat> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Danh sách chi tiết phiếu xuất rỗng"));
+        }
         for (ChiTietPhieuXuat request : requests) {
+            validate(request);
             ChiTietPhieuXuat ct = new ChiTietPhieuXuat();
             ct.setId(UUID.randomUUID());
             ct.setIdPhieuXuat(request.getIdPhieuXuat());
@@ -73,6 +80,22 @@ public class ChiTietPhieuXuatController {
             chiTietPhieuXuatRepository.save(ct);
         }
         return ResponseEntity.ok( ApiResponse.ok("Tạo chi tiết phiếu xuất thành công"));
+    }
+
+    private void validate(ChiTietPhieuXuat request) {
+        if (request.getIdPhieuXuat() == null || !phieuXuatKhoRepository.existsById(request.getIdPhieuXuat())) {
+            throw new IllegalArgumentException("Phiếu xuất không tồn tại");
+        }
+        if (request.getIdSanPham() == null || !sanPhamRepository.existsById(request.getIdSanPham())) {
+            throw new IllegalArgumentException("Sản phẩm không tồn tại");
+        }
+        com.erp.cuahangtienloi.validation.InputValidator.positive(request.getSoLuongYeuCau(), "Số lượng yêu cầu");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getSoLuongXuat(), "Số lượng xuất");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getSoLuongNhan(), "Số lượng nhận");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getDonGiaVon(), "Đơn giá vốn");
+        if (request.getSoLuongXuat() != null && request.getSoLuongXuat() > request.getSoLuongYeuCau()) {
+            throw new IllegalArgumentException("Số lượng xuất không được vượt số lượng yêu cầu");
+        }
     }
 
     @DeleteMapping("/{id}")

@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.erp.cuahangtienloi.validation.InputValidator.*;
+
 @RestController
 @RequestMapping("/api/ton-kho")
 @RequiredArgsConstructor
@@ -66,6 +68,13 @@ public class TonKhoController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody TonKho request) {
+        if (request.getIdSanPham() == null || !sanPhamRepository.existsById(request.getIdSanPham())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm không tồn tại"));
+        }
+        if (request.getIdChiNhanh() == null || !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+        }
+        validateNumbers(request);
         if (tonKhoRepository.findByIdSanPhamAndIdChiNhanh(request.getIdSanPham(), request.getIdChiNhanh()).isPresent()) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Tồn kho đã tồn tại"));
         }
@@ -92,6 +101,7 @@ public class TonKhoController {
     public ResponseEntity<?> update(@PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh, @RequestBody TonKho request) {
         return tonKhoRepository.findByIdSanPhamAndIdChiNhanh(idSanPham, idChiNhanh)
                 .map(tk -> {
+                    validateNumbers(request);
                     if (request.getSoLuongTon() != null) tk.setSoLuongTon(request.getSoLuongTon());
                     if (request.getGiaVonTrungBinh() != null) tk.setGiaVonTrungBinh(request.getGiaVonTrungBinh());
                     if (request.getGiaTriTon() != null) tk.setGiaTriTon(request.getGiaTriTon());
@@ -104,6 +114,18 @@ public class TonKhoController {
                     return ResponseEntity.ok(toDTO(tk));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private void validateNumbers(TonKho request) {
+        nonNegative(request.getSoLuongTon(), "Số lượng tồn");
+        nonNegative(request.getGiaVonTrungBinh(), "Giá vốn trung bình");
+        nonNegative(request.getGiaTriTon(), "Giá trị tồn");
+        nonNegative(request.getTonToiThieu(), "Tồn tối thiểu");
+        nonNegative(request.getTonToiDa(), "Tồn tối đa");
+        if (request.getTonToiThieu() != null && request.getTonToiDa() != null
+                && request.getTonToiDa() > 0 && request.getTonToiDa() < request.getTonToiThieu()) {
+            throw new IllegalArgumentException("Tồn tối đa phải lớn hơn hoặc bằng tồn tối thiểu");
+        }
     }
 
     @DeleteMapping("/{idSanPham}/{idChiNhanh}")

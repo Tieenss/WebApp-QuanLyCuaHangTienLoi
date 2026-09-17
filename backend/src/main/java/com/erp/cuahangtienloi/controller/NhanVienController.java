@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
+
+import static com.erp.cuahangtienloi.validation.InputValidator.*;
 
 @RestController
 @RequestMapping("/api/nhan-vien")
@@ -60,6 +63,15 @@ public class NhanVienController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody NhanVien request) {
+        request.setHoTen(requireText(request.getHoTen(), "Họ tên", 1, 255));
+        optionalEmail(request.getEmail());
+        optionalPhone(request.getSoDienThoai(), "Số điện thoại");
+        oneOf(request.getVaiTro(), "Vai trò", Set.of("ADMIN", "KE_TOAN", "THU_KHO", "QUAN_LY", "THU_NGAN"));
+        nonNegative(request.getLuongCung(), "Lương cứng");
+        nonNegative(request.getLuongTheoGio(), "Lương theo giờ");
+        if (request.getTrangThai() != null) {
+            oneOf(request.getTrangThai(), "Trạng thái", Set.of("ACTIVE", "INACTIVE"));
+        }
         if (request.getEmail() != null && nhanVienRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Email đã tồn tại"));
         }
@@ -92,6 +104,9 @@ public class NhanVienController {
             if (request.getIdChiNhanh() == null) {
                 return ResponseEntity.badRequest().body( ApiResponse.err("Vai trò " + vaiTro + " bắt buộc phải có chi nhánh"));
             }
+            if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+            }
             nv.setIdChiNhanh(request.getIdChiNhanh());
         }
         nv.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : "ACTIVE");
@@ -115,6 +130,25 @@ public class NhanVienController {
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody NhanVien request) {
         return nhanVienRepository.findById(id)
                 .map(nv -> {
+                    if (request.getHoTen() != null) {
+                        request.setHoTen(requireText(request.getHoTen(), "Họ tên", 1, 255));
+                    }
+                    optionalEmail(request.getEmail());
+                    optionalPhone(request.getSoDienThoai(), "Số điện thoại");
+                    nonNegative(request.getLuongCung(), "Lương cứng");
+                    nonNegative(request.getLuongTheoGio(), "Lương theo giờ");
+                    if (request.getEmail() != null) {
+                        NhanVien duplicate = nhanVienRepository.findByEmail(request.getEmail()).orElse(null);
+                        if (duplicate != null && !duplicate.getId().equals(id)) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Email đã tồn tại"));
+                        }
+                    }
+                    if (request.getVaiTro() != null) {
+                        oneOf(request.getVaiTro(), "Vai trò", Set.of("ADMIN", "KE_TOAN", "THU_KHO", "QUAN_LY", "THU_NGAN"));
+                    }
+                    if (request.getTrangThai() != null) {
+                        oneOf(request.getTrangThai(), "Trạng thái", Set.of("ACTIVE", "INACTIVE"));
+                    }
                     if (request.getHoTen() != null) nv.setHoTen(request.getHoTen());
                     if (request.getEmail() != null) nv.setEmail(request.getEmail());
                     if (request.getSoDienThoai() != null) nv.setSoDienThoai(request.getSoDienThoai());
@@ -124,11 +158,26 @@ public class NhanVienController {
                     if (request.getCaMacDinh() != null) nv.setCaMacDinh(request.getCaMacDinh());
                     if (request.getLuongTheoGio() != null) nv.setLuongTheoGio(request.getLuongTheoGio());
                     if (request.getLuongCung() != null) nv.setLuongCung(request.getLuongCung());
-                    // Xử lý rule chk_vai_tro_chi_nhanh khi update
-                    String vaiTroUpdate = request.getVaiTro() != null ? request.getVaiTro() : nv.getVaiTro();
-                    if ("ADMIN".equals(vaiTroUpdate) || "KE_TOAN".equals(vaiTroUpdate)) {
-                        nv.setIdChiNhanh(null);
+                    // Chỉ thẩm định quan hệ vai trò/chi nhánh khi một trong hai field được thay đổi.
+                    if (request.getVaiTro() != null) {
+                        String newRole = request.getVaiTro();
+                        if ("ADMIN".equals(newRole) || "KE_TOAN".equals(newRole)) {
+                            nv.setIdChiNhanh(null);
+                        } else if (request.getIdChiNhanh() != null) {
+                            if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+                                return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+                            }
+                            nv.setIdChiNhanh(request.getIdChiNhanh());
+                        } else if (nv.getIdChiNhanh() == null) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Vai trò này bắt buộc phải có chi nhánh"));
+                        }
                     } else if (request.getIdChiNhanh() != null) {
+                        if ("ADMIN".equals(nv.getVaiTro()) || "KE_TOAN".equals(nv.getVaiTro())) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("ADMIN và KẾ TOÁN không thuộc chi nhánh"));
+                        }
+                        if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+                        }
                         nv.setIdChiNhanh(request.getIdChiNhanh());
                     }
                     if (request.getTrangThai() != null) nv.setTrangThai(request.getTrangThai());

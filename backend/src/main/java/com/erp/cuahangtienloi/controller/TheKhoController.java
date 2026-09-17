@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.erp.cuahangtienloi.validation.InputValidator.*;
+
 @RestController
 @RequestMapping("/api/the-kho")
 @RequiredArgsConstructor
@@ -91,6 +93,17 @@ public class TheKhoController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody TheKho request) {
+        if (request.getIdSanPham() == null || !sanPhamRepository.existsById(request.getIdSanPham())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm không tồn tại"));
+        }
+        if (request.getIdChiNhanh() == null || !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+        }
+        if (request.getSoLuong() == null || request.getSoLuong() == 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Số lượng biến động phải khác 0"));
+        }
+        nonNegative(request.getDonGia(), "Đơn giá");
+        nonNegative(request.getThanhTien(), "Thành tiền");
         TheKho tk = new TheKho();
         tk.setId(UUID.randomUUID());
         tk.setNgayPhatSinh(request.getNgayPhatSinh() != null ? request.getNgayPhatSinh() : LocalDateTime.now());

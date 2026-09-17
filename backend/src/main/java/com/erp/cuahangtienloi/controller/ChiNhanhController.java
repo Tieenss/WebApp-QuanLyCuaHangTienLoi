@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
+
+import static com.erp.cuahangtienloi.validation.InputValidator.*;
 
 @RestController
 @RequestMapping("/api/chi-nhanh")
@@ -75,6 +78,13 @@ public class ChiNhanhController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody ChiNhanh request) {
+        request.setMaChiNhanh(requireText(request.getMaChiNhanh(), "Mã chi nhánh", 1, 50));
+        request.setTenChiNhanh(requireText(request.getTenChiNhanh(), "Tên chi nhánh", 1, 255));
+        oneOf(request.getLoaiChiNhanh(), "Loại chi nhánh", Set.of("KHO_TONG", "CUA_HANG_BAN_LE"));
+        optionalPhone(request.getSoDienThoai(), "Số điện thoại");
+        if (request.getIdQuanLy() != null && !nhanVienRepository.existsById(request.getIdQuanLy())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Quản lý chi nhánh không tồn tại"));
+        }
         if (chiNhanhRepository.findByMaChiNhanh(request.getMaChiNhanh()).isPresent()) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Mã chi nhánh đã tồn tại"));
         }
@@ -113,6 +123,22 @@ cn.setLoai(request.getLoaiChiNhanh() != null ? request.getLoaiChiNhanh() : "CUA_
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody ChiNhanh request) {
         return chiNhanhRepository.findById(id)
                 .map(cn -> {
+                    if (request.getTenChiNhanh() != null) {
+                        request.setTenChiNhanh(requireText(request.getTenChiNhanh(), "Tên chi nhánh", 1, 255));
+                    }
+                    if (request.getLoaiChiNhanh() != null) {
+                        oneOf(request.getLoaiChiNhanh(), "Loại chi nhánh", Set.of("KHO_TONG", "CUA_HANG_BAN_LE"));
+                    }
+                    optionalPhone(request.getSoDienThoai(), "Số điện thoại");
+                    if (request.getMaChiNhanh() != null) {
+                        ChiNhanh duplicate = chiNhanhRepository.findByMaChiNhanh(request.getMaChiNhanh()).orElse(null);
+                        if (duplicate != null && !duplicate.getId().equals(id)) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Mã chi nhánh đã tồn tại"));
+                        }
+                    }
+                    if (request.getIdQuanLy() != null && !nhanVienRepository.existsById(request.getIdQuanLy())) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Quản lý chi nhánh không tồn tại"));
+                    }
                     if (request.getMaChiNhanh() != null) cn.setMaChiNhanh(request.getMaChiNhanh());
                     if (request.getTenChiNhanh() != null) cn.setTenChiNhanh(request.getTenChiNhanh());
                     if (request.getDiaChi() != null) cn.setDiaChi(request.getDiaChi());

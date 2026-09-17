@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import static com.erp.cuahangtienloi.validation.InputValidator.nonNegative;
 import java.util.stream.Collectors;
 
 @RestController
@@ -121,6 +123,13 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> create(@RequestBody ChamCong request) {
+        if (request.getIdNhanVien() == null || !nhanVienRepository.existsById(request.getIdNhanVien())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên không tồn tại"));
+        }
+        if (request.getWorkDate() == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Ngày làm việc không được để trống"));
+        }
+        validateTimeAndAmounts(request);
         ChamCong cc = new ChamCong();
         cc.setId(UUID.randomUUID());
         cc.setIdNhanVien(request.getIdNhanVien());
@@ -149,6 +158,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody ChamCong request) {
         return chamCongRepository.findById(id)
                 .map(cc -> {
+                    validateTimeAndAmounts(request);
                     if (request.getWorkDate() != null) cc.setWorkDate(request.getWorkDate());
                     if (request.getCaLamViec() != null) cc.setCaLamViec(request.getCaLamViec());
                     if (request.getCheckInAt() != null) cc.setCheckInAt(request.getCheckInAt());
@@ -167,6 +177,21 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
                     return ResponseEntity.ok(toDTO(cc));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private void validateTimeAndAmounts(ChamCong request) {
+        if (request.getCheckInAt() != null && request.getCheckOutAt() != null
+                && !request.getCheckInAt().isBefore(request.getCheckOutAt())) {
+            throw new IllegalArgumentException("Giờ bắt đầu phải trước giờ kết thúc");
+        }
+        if (request.getClockInAt() != null && request.getClockOutAt() != null
+                && !request.getClockInAt().isBefore(request.getClockOutAt())) {
+            throw new IllegalArgumentException("Giờ check-in phải trước giờ check-out");
+        }
+        nonNegative(request.getDiTrePhut(), "Số phút đi trễ");
+        nonNegative(request.getOvertimeHours(), "Giờ tăng ca");
+        nonNegative(request.getBreakHours(), "Giờ nghỉ");
+        nonNegative(request.getTongGioLam(), "Tổng giờ làm");
     }
 
     @DeleteMapping("/{id}")
@@ -198,7 +223,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         LocalDate date = (workDate != null && !workDate.isBlank()) ? LocalDate.parse(workDate) : LocalDate.now();
         String ca = nv.getCaMacDinh();
         if (ca == null || ca.isBlank()) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Nhân viên chưa có ca mặc định"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên chưa có ca mặc định"));
         }
 
         // Bỏ qua nếu đã có record cho (nv, date, ca)
@@ -237,7 +262,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ChamCong cc = opt.get();
         if (cc.getClockInAt() != null) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Đã check-in trước đó"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Đã check-in trước đó"));
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -263,10 +288,10 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ChamCong cc = opt.get();
         if (cc.getClockInAt() == null) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Chưa check-in"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chưa check-in"));
         }
         if (cc.getClockOutAt() != null) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Đã check-out trước đó"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Đã check-out trước đó"));
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -299,7 +324,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         NhanVien nv = optNv.get();
         String ca = nv.getCaMacDinh();
         if (ca == null || ca.isBlank()) {
-            return ResponseEntity.badRequest().body( ApiResponse.ok("Nhân viên chưa có ca mặc định"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên chưa có ca mặc định"));
         }
 
         LocalDate from = LocalDate.parse(fromDate);

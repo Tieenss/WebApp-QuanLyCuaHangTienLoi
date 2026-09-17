@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.erp.cuahangtienloi.validation.InputValidator.*;
+
 @RestController
 @RequestMapping("/api/so-quy")
 @RequiredArgsConstructor
@@ -87,6 +89,17 @@ public class SoQuyController {
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     @Transactional
     public ResponseEntity<?> create(@RequestBody SoQuy request, HttpServletRequest httpRequest) {
+        if (request.getIdChiNhanh() != null && !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+        }
+        if (request.getDirection() == null || !CASH_DIRECTIONS.contains(request.getDirection())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Loại thu/chi không hợp lệ"));
+        }
+        requireText(request.getHangMuc(), "Hạng mục", 1, 50);
+        if (request.getHinhThucTt() != null && !PAYMENT_METHODS.contains(request.getHinhThucTt())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Hình thức thanh toán không hợp lệ"));
+        }
+        positive(request.getSoTien(), "Số tiền");
         SoQuy sq = new SoQuy();
         sq.setId(UUID.randomUUID());
         sq.setMaChungTu(request.getMaChungTu());
@@ -141,7 +154,7 @@ public class SoQuyController {
                         ? latest.getRunningBalance()
                         : BigDecimal.ZERO;
 
-        if ("THU".equals(sq.getDirection())) {
+        if ("RECEIPT".equals(sq.getDirection())) {
             sq.setRunningBalance(prevBalance.add(sq.getSoTien()));
         } else {
             sq.setRunningBalance(prevBalance.subtract(sq.getSoTien()));
@@ -157,6 +170,14 @@ public class SoQuyController {
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody SoQuy request) {
         return soQuyRepository.findById(id)
                 .map(sq -> {
+                    if (request.getSoTien() != null) positive(request.getSoTien(), "Số tiền");
+                    if (request.getDirection() != null && !CASH_DIRECTIONS.contains(request.getDirection())) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Loại thu/chi không hợp lệ"));
+                    }
+                    if (request.getHangMuc() != null) requireText(request.getHangMuc(), "Hạng mục", 1, 50);
+                    if (request.getHinhThucTt() != null && !PAYMENT_METHODS.contains(request.getHinhThucTt())) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Hình thức thanh toán không hợp lệ"));
+                    }
                     if (request.getDirection() != null) sq.setDirection(request.getDirection());
                     if (request.getHangMuc() != null) sq.setHangMuc(request.getHangMuc());
                     if (request.getHinhThucTt() != null) sq.setHinhThucTt(request.getHinhThucTt());

@@ -3,6 +3,7 @@ package com.erp.cuahangtienloi.controller;
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietHoaDon;
 import com.erp.cuahangtienloi.repository.ChiTietHoaDonRepository;
+import com.erp.cuahangtienloi.repository.HoaDonRepository;
 import com.erp.cuahangtienloi.repository.SanPhamRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ public class ChiTietHoaDonController {
 
     private final ChiTietHoaDonRepository chiTietHoaDonRepository;
     private final SanPhamRepository sanPhamRepository;
+    private final HoaDonRepository hoaDonRepository;
 
     @GetMapping("/by-hoa-don/{idHoaDon}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
@@ -38,6 +40,7 @@ public class ChiTietHoaDonController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody ChiTietHoaDon request) {
+        validate(request);
         ChiTietHoaDon ct = new ChiTietHoaDon();
         ct.setId(UUID.randomUUID());
         ct.setIdHoaDon(request.getIdHoaDon());
@@ -58,7 +61,11 @@ public class ChiTietHoaDonController {
     @PostMapping("/batch")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> createBatch(@RequestBody List<ChiTietHoaDon> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Danh sách chi tiết hóa đơn rỗng"));
+        }
         for (ChiTietHoaDon request : requests) {
+            validate(request);
             ChiTietHoaDon ct = new ChiTietHoaDon();
             ct.setId(UUID.randomUUID());
             ct.setIdHoaDon(request.getIdHoaDon());
@@ -74,6 +81,22 @@ public class ChiTietHoaDonController {
             chiTietHoaDonRepository.save(ct);
         }
         return ResponseEntity.ok( ApiResponse.ok("Tạo chi tiết thành công"));
+    }
+
+    private void validate(ChiTietHoaDon request) {
+        if (request.getIdHoaDon() == null || !hoaDonRepository.existsById(request.getIdHoaDon())) {
+            throw new IllegalArgumentException("Hóa đơn không tồn tại");
+        }
+        if (request.getIdSanPham() == null || !sanPhamRepository.existsById(request.getIdSanPham())) {
+            throw new IllegalArgumentException("Sản phẩm không tồn tại");
+        }
+        com.erp.cuahangtienloi.validation.InputValidator.positive(request.getSoLuong(), "Số lượng");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getDonGia(), "Đơn giá");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getGiamGiaDong(), "Giảm giá dòng");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getThanhTien(), "Thành tiền");
+        if (request.getVatPhantram() != null && (request.getVatPhantram() < 0 || request.getVatPhantram() > 100)) {
+            throw new IllegalArgumentException("VAT phải từ 0 đến 100");
+        }
     }
 
     @DeleteMapping("/{id}")

@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import static com.erp.cuahangtienloi.validation.InputValidator.*;
+
 @RestController
 @RequestMapping("/api/danh-muc")
 @RequiredArgsConstructor
@@ -54,6 +56,14 @@ public class DanhMucController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody DanhMuc request) {
+        request.setTenDanhMuc(requireText(request.getTenDanhMuc(), "Tên danh mục", 2, 100));
+        if (request.getMaDanhMuc() != null && request.getMaDanhMuc().length() > 20) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Mã danh mục tối đa 20 ký tự"));
+        }
+        nonNegative(request.getThuTuHienThi(), "Thứ tự hiển thị");
+        if (request.getParentId() != null && !danhMucRepository.existsById(request.getParentId())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Danh mục cha không tồn tại"));
+        }
         if (danhMucRepository.existsByMaDanhMuc(request.getMaDanhMuc())) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Mã danh mục đã tồn tại"));
         }
@@ -87,6 +97,24 @@ public class DanhMucController {
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody DanhMuc request) {
         return danhMucRepository.findById(id)
                 .map(dm -> {
+                    if (request.getTenDanhMuc() != null) {
+                        request.setTenDanhMuc(requireText(request.getTenDanhMuc(), "Tên danh mục", 2, 100));
+                    }
+                    nonNegative(request.getThuTuHienThi(), "Thứ tự hiển thị");
+                    if (request.getParentId() != null) {
+                        if (request.getParentId().equals(id)) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Danh mục không thể là cha của chính nó"));
+                        }
+                        if (!danhMucRepository.existsById(request.getParentId())) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Danh mục cha không tồn tại"));
+                        }
+                    }
+                    if (request.getMaDanhMuc() != null) {
+                        DanhMuc duplicate = danhMucRepository.findByMaDanhMuc(request.getMaDanhMuc()).orElse(null);
+                        if (duplicate != null && !duplicate.getId().equals(id)) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Mã danh mục đã tồn tại"));
+                        }
+                    }
                     if (request.getMaDanhMuc() != null) dm.setMaDanhMuc(request.getMaDanhMuc());
                     if (request.getTenDanhMuc() != null) dm.setTenDanhMuc(request.getTenDanhMuc());
                     if (request.getParentId() != null) dm.setParentId(request.getParentId());
