@@ -16,6 +16,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.transaction.annotation.Transactional;
 
 import static com.erp.cuahangtienloi.validation.InputValidator.*;
 
@@ -28,6 +31,9 @@ public class TonKhoController {
     private final TonKhoRepository tonKhoRepository;
     private final SanPhamRepository sanPhamRepository;
     private final ChiNhanhRepository chiNhanhRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
@@ -74,7 +80,7 @@ public class TonKhoController {
         if (request.getIdChiNhanh() == null || !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
         }
-        validateNumbers(request);
+        validateConfiguration(request);
         if (tonKhoRepository.findByIdSanPhamAndIdChiNhanh(request.getIdSanPham(), request.getIdChiNhanh()).isPresent()) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Tồn kho đã tồn tại"));
         }
@@ -82,9 +88,9 @@ public class TonKhoController {
         TonKho tk = new TonKho();
         tk.setIdSanPham(request.getIdSanPham());
         tk.setIdChiNhanh(request.getIdChiNhanh());
-        tk.setSoLuongTon(request.getSoLuongTon() != null ? request.getSoLuongTon() : 0);
-        tk.setGiaVonTrungBinh(request.getGiaVonTrungBinh() != null ? request.getGiaVonTrungBinh() : BigDecimal.ZERO);
-        tk.setGiaTriTon(request.getGiaTriTon() != null ? request.getGiaTriTon() : BigDecimal.ZERO);
+        tk.setSoLuongTon(0);
+        tk.setGiaVonTrungBinh(BigDecimal.ZERO);
+        tk.setGiaTriTon(BigDecimal.ZERO);
         tk.setTonToiThieu(request.getTonToiThieu() != null ? request.getTonToiThieu() : 0);
         tk.setTonToiDa(request.getTonToiDa() != null ? request.getTonToiDa() : 0);
         tk.setHanSuDungGanNhat(request.getHanSuDungGanNhat());
@@ -101,10 +107,7 @@ public class TonKhoController {
     public ResponseEntity<?> update(@PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh, @RequestBody TonKho request) {
         return tonKhoRepository.findByIdSanPhamAndIdChiNhanh(idSanPham, idChiNhanh)
                 .map(tk -> {
-                    validateNumbers(request);
-                    if (request.getSoLuongTon() != null) tk.setSoLuongTon(request.getSoLuongTon());
-                    if (request.getGiaVonTrungBinh() != null) tk.setGiaVonTrungBinh(request.getGiaVonTrungBinh());
-                    if (request.getGiaTriTon() != null) tk.setGiaTriTon(request.getGiaTriTon());
+                    validateConfiguration(request);
                     if (request.getTonToiThieu() != null) tk.setTonToiThieu(request.getTonToiThieu());
                     if (request.getTonToiDa() != null) tk.setTonToiDa(request.getTonToiDa());
                     if (request.getHanSuDungGanNhat() != null) tk.setHanSuDungGanNhat(request.getHanSuDungGanNhat());
@@ -116,10 +119,7 @@ public class TonKhoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    private void validateNumbers(TonKho request) {
-        nonNegative(request.getSoLuongTon(), "Số lượng tồn");
-        nonNegative(request.getGiaVonTrungBinh(), "Giá vốn trung bình");
-        nonNegative(request.getGiaTriTon(), "Giá trị tồn");
+    private void validateConfiguration(TonKho request) {
         nonNegative(request.getTonToiThieu(), "Tồn tối thiểu");
         nonNegative(request.getTonToiDa(), "Tồn tối đa");
         if (request.getTonToiThieu() != null && request.getTonToiDa() != null
@@ -127,6 +127,44 @@ public class TonKhoController {
             throw new IllegalArgumentException("Tồn tối đa phải lớn hơn hoặc bằng tồn tối thiểu");
         }
     }
+
+    @PostMapping("/adjust")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    @Transactional
+    public ResponseEntity<?> adjust(@RequestBody TonKhoAdjustmentRequest request) {
+        if (request.idSanPham() == null || !sanPhamRepository.existsById(request.idSanPham())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm không tồn tại"));
+        }
+        if (request.idChiNhanh() == null || !chiNhanhRepository.existsById(request.idChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+        }
+        if (request.soLuong() == null || request.soLuong() == 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Số lượng điều chỉnh phải khác 0"));
+        }
+        nonNegative(request.donGia(), "Đơn giá");
+
+        UUID id = (UUID) entityManager.createNativeQuery(
+                "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, 'ADJUSTMENT', ?::integer, ?::numeric, ?::varchar, ?::varchar, ?::date, ?::text, ?::timestamp)")
+                .setParameter(1, request.idSanPham())
+                .setParameter(2, request.idChiNhanh())
+                .setParameter(3, request.soLuong())
+                .setParameter(4, request.donGia() != null ? request.donGia() : BigDecimal.ZERO)
+                .setParameter(5, request.maChungTu())
+                .setParameter(6, request.nguoiThucHien())
+                .setParameter(7, request.hanSuDung())
+                .setParameter(8, request.ghiChu())
+                .setParameter(9, request.ngayPhatSinh() != null ? request.ngayPhatSinh() : LocalDateTime.now())
+                .getSingleResult();
+
+        return theKhoRepository.findById(id)
+                .map(tk -> ResponseEntity.ok(toDTO(tk)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    public record TonKhoAdjustmentRequest(
+            UUID idSanPham, UUID idChiNhanh, Integer soLuong, BigDecimal donGia,
+            String maChungTu, String nguoiThucHien, LocalDate hanSuDung,
+            String ghiChu, LocalDateTime ngayPhatSinh) {}
 
     @DeleteMapping("/{idSanPham}/{idChiNhanh}")
     @PreAuthorize("hasRole('ADMIN')")

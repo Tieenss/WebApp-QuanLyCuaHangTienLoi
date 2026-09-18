@@ -185,7 +185,7 @@ public class SoQuyController {
                     if (request.getSoTien() != null) sq.setSoTien(request.getSoTien());
                     if (request.getDoiTuong() != null) sq.setDoiTuong(request.getDoiTuong());
                     if (request.getDienGiai() != null) sq.setDienGiai(request.getDienGiai());
-                    if (request.getRunningBalance() != null) sq.setRunningBalance(request.getRunningBalance());
+                    // runningBalance là giá trị dẫn xuất, không nhận từ client.
                     if (request.getTrangThai() != null) sq.setTrangThai(request.getTrangThai());
                     sq.setNgayCapNhat(LocalDateTime.now());
                     soQuyRepository.save(sq);

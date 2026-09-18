@@ -27,6 +27,7 @@ public class ChiNhanhController {
     private final NhanVienRepository nhanVienRepository;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_KHO', 'THU_NGAN', 'KE_TOAN')")
     public ResponseEntity<List<ChiNhanh>> getAll() {
         return ResponseEntity.ok(chiNhanhRepository.findAll());
     }

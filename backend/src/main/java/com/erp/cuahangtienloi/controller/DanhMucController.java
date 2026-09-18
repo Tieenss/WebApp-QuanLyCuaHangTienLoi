@@ -29,6 +29,7 @@ public class DanhMucController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_KHO', 'THU_NGAN', 'KE_TOAN')")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return danhMucRepository.findById(id)
                 .map(ResponseEntity::ok)

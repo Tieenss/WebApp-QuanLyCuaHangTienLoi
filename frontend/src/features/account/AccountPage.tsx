@@ -278,18 +278,18 @@ export const AccountPage: FC = () => {
                         </Col>
                       </Row>
 
-                      <Space>
-                        <Button
-                          type="primary"
-                          htmlType="submit"
-                          icon={<SaveOutlined />}
-                        >
-                          Lưu thay đổi
-                        </Button>
-                        <Button onClick={() => profileForm.resetFields()}>
-                          Hoàn tác
-                        </Button>
-                      </Space>
+                      {/*<Space>*/}
+                      {/*  <Button*/}
+                      {/*    type="primary"*/}
+                      {/*    htmlType="submit"*/}
+                      {/*    icon={<SaveOutlined />}*/}
+                      {/*  >*/}
+                      {/*    Lưu thay đổi*/}
+                      {/*  </Button>*/}
+                      {/*  <Button onClick={() => profileForm.resetFields()}>*/}
+                      {/*    Hoàn tác*/}
+                      {/*  </Button>*/}
+                      {/*</Space>*/}
                     </Form>
                   ),
                 },
