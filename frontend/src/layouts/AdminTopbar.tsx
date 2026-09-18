@@ -24,7 +24,6 @@ import {
   SwapOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-// import { getLandingPath } from '@/config/modules';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout, setActiveBranch } from '@/store/slices/authSlice';
 import {

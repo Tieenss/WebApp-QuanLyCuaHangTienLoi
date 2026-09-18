@@ -10,7 +10,6 @@ import {
   type ChangePasswordFormValues,
   type LoginFormValues,
   type ProfileFormValues,
-  // type UserRole,
 } from '@/types';
 import { authApi } from '@/api/auth';
 import { initialsOf } from '@/utils/formatters';
@@ -92,8 +91,6 @@ export const authSlice = createSlice({
       state.isSubmitting = false;
       state.error = null;
     },
-    // switchRole: (_state, _action: PayloadAction<UserRole>) => {
-    // },
     setActiveBranch: (state, action: PayloadAction<string | null>) => {
       state.activeBranchId = action.payload;
       if (state.user) {
@@ -190,7 +187,6 @@ export const changePassword = createAsyncThunk(
 export const {
   loginStarted,
   loginSucceeded,
-  // switchRole,
   setActiveBranch,
   clearAuthError,
   updateProfile,

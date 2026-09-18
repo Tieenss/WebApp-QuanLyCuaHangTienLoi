@@ -359,6 +359,10 @@ export const MODULE_BY_PATH: Record<string, ModuleDefinition> = MODULES.reduce<R
 export const getModulesForRole = (role: UserRole): ModuleDefinition[] =>
   MODULES.filter((module) => module.allowedRoles.includes(role));
 
+/** Đường dẫn module đầu tiên mà vai trò được phép thấy trên sidebar. */
+export const getFirstAccessibleModulePath = (role: UserRole): string =>
+  getModulesForRole(role)[0]?.path ?? '/login';
+
 /**
  * Trang mặc định sau khi đăng nhập, tuỳ theo vai trò.
  *
@@ -370,16 +374,7 @@ export const getModulesForRole = (role: UserRole): ModuleDefinition[] =>
  * - ADMIN, KE_TOAN → Dashboard.
  */
 export const getLandingPath = (role: UserRole): string => {
-  switch (role) {
-    case USER_ROLE.Cashier:
-      return '/pos';
-    case USER_ROLE.StoreManager:
-      return '/dashboard';
-    case USER_ROLE.WarehouseKeeper:
-      return '/inventory';
-    default:
-      return '/dashboard';
-  }
+  return getFirstAccessibleModulePath(role);
 };
 
 /** Kiểm tra một vai trò có được vào path hay không. */

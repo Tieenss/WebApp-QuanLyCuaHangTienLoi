@@ -23,6 +23,14 @@ import { ReportsPage } from '@/features/reports/ReportsPage';
 import { AccountPage } from '@/features/account/AccountPage';
 import { AccountManagementPage } from '@/features/accounts/AccountManagementPage';
 import { NotFoundPage } from '@/features/shared/NotFoundPage';
+import { getFirstAccessibleModulePath } from '@/config/modules';
+import { USER_ROLE } from '@/types';
+import { useAppSelector } from '@/store/hooks';
+
+const RoleHomeRedirect: FC = () => {
+  const role = useAppSelector((state) => state.auth.user?.role) ?? USER_ROLE.Cashier;
+  return <Navigate to={getFirstAccessibleModulePath(role)} replace />;
+};
 
 
 export const AppRouter: FC = () => (
@@ -53,9 +61,7 @@ export const AppRouter: FC = () => (
           </ProtectedRoute>
         }
       >
-        {/* Điều hướng gốc về Dashboard; thu ngân sẽ bị ProtectedRoute chặn và
-            hướng về POS thông qua trang 403. */}
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<RoleHomeRedirect />} />
 
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/sales-orders" element={<SalesOrdersPage />} />
