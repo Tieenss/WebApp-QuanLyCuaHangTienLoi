@@ -40,6 +40,7 @@ import {
 } from '@/types';
 import {
   formatNumber,
+  compareDateDescWithId,
   formatRatio,
   formatVND,
   matchKeyword,
@@ -117,7 +118,7 @@ export const ProductsPage: FC = () => {
           perishableFilter === null ||
           (perishableFilter === 'yes' ? product.isPerishable : !product.isPerishable);
         return matchSearch && matchCategory && matchStatus && matchPerishable;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.createdAt)),
     [enrichedProducts, search, categoryFilter, statusFilter, perishableFilter],
   );
 

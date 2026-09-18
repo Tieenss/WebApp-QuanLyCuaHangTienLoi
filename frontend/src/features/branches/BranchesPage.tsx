@@ -39,7 +39,7 @@ import {
   type Branch,
 } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { BranchFormModal } from './components/BranchFormModal';
 import './BranchesPage.css';
@@ -86,7 +86,7 @@ export const BranchesPage: FC = () => {
         const matchKind = kindFilter === null || branch.kind === kindFilter;
         const matchStatus = statusFilter === null || branch.status === statusFilter;
         return matchSearch && matchRegion && matchKind && matchStatus;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.openedAt)),
     [branches, search, regionFilter, kindFilter, statusFilter],
   );
 
@@ -286,6 +286,8 @@ export const BranchesPage: FC = () => {
       title: 'Khai trương',
       dataIndex: 'openedAt',
       width: 110,
+      sorter: (a, b) => (b.openedAt ?? '').localeCompare(a.openedAt ?? ''),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {

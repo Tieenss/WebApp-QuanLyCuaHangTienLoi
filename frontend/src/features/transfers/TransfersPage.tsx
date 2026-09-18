@@ -26,7 +26,7 @@ import {
   // type TransferLine,
 } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { ShipModal } from './components/ShipModal';
 import { TransferFormModal } from './components/TransferFormModal';
@@ -110,7 +110,7 @@ export const TransfersPage: FC = () => {
         const matchTo = toFilter === null || transfer.toBranchId === toFilter;
         const matchStatus = statusFilter === null || transfer.status === statusFilter;
         return matchSearch && matchTo && matchStatus;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.requestDate)),
     [scoped, search, toFilter, statusFilter],
   );
 
@@ -266,6 +266,7 @@ export const TransfersPage: FC = () => {
       dataIndex: 'requestDate',
       width: 125,
       sorter: (a, b) => a.requestDate.localeCompare(b.requestDate),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
@@ -447,7 +448,7 @@ export const TransfersPage: FC = () => {
       <Card styles={{ body: { padding: '18px 18px 8px' } }}>
         <TableToolbar
           searchValue={search}
-          searchPlaceholder="Tìm theo mã phiếu, cửa hàng nhận..."
+          searchPlaceholder="Tìm theo mã phiếu, cửa hàng nhận, người yêu cầu..."
           onSearchChange={setSearch}
           filters={filters}
           onExport={handleExport}

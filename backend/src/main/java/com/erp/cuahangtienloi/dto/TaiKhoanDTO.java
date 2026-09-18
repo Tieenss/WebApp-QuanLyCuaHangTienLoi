@@ -2,6 +2,7 @@ package com.erp.cuahangtienloi.dto;
 
 import lombok.Data;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 @Data
 public class TaiKhoanDTO {
@@ -13,4 +14,5 @@ public class TaiKhoanDTO {
     private UUID idNhanVien;
     private UUID idChiNhanh;
     private String trangThai;
+    private LocalDateTime ngayTao;
 }

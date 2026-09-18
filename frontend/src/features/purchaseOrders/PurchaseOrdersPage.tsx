@@ -35,7 +35,7 @@ import {
   type PurchaseOrderLine,
 } from '@/types';
 import { formatDate, today } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { PurchaseFormModal } from './components/PurchaseFormModal';
 import './PurchaseOrdersPage.css';
@@ -188,7 +188,7 @@ export const PurchaseOrdersPage: FC = () => {
         const matchSupplier =
           supplierFilter === null || order.supplierId === supplierFilter;
         return matchSearch && matchStatus && matchSupplier;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.orderDate)),
     [enrichedOrders, search, statusFilter, supplierFilter],
   );
 
@@ -315,6 +315,7 @@ export const PurchaseOrdersPage: FC = () => {
       dataIndex: 'orderDate',
       width: 125,
       sorter: (a, b) => a.orderDate.localeCompare(b.orderDate),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
@@ -585,7 +586,7 @@ export const PurchaseOrdersPage: FC = () => {
       <Card styles={{ body: { padding: '18px 18px 8px' } }}>
         <TableToolbar
           searchValue={search}
-          searchPlaceholder="Tìm theo mã phiếu, nhà cung cấp..."
+          searchPlaceholder="Tìm theo mã phiếu, nhà cung cấp, người tạo..."
           onSearchChange={setSearch}
           filters={filters}
           onExport={handleExport}

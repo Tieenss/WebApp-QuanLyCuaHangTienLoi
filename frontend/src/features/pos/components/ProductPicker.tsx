@@ -23,7 +23,7 @@ import {
 } from '@/store/slices/posSlice';
 import { stockOf } from '@/store/slices/stockSlice';
 import { formatVND } from '@/utils/formatters';
-import { matchKeyword } from '@/utils/formatters';
+import { matchKeyword, normalizeSearch } from '@/utils/formatters';
 
 const { Text } = Typography;
 
@@ -62,7 +62,8 @@ export const ProductPicker: FC = () => {
   /** Sản phẩm sau khi áp bộ lọc danh mục và từ khoá tìm kiếm. */
   const visibleProducts = useMemo(
     () =>
-      sellableProducts.filter((product) => {
+      sellableProducts
+        .filter((product) => {
         const matchCategory =
           activeCategoryId === null || product.categoryId === activeCategoryId;
         const matchSearch = matchKeyword(searchKeyword, [
@@ -71,8 +72,31 @@ export const ProductPicker: FC = () => {
           product.barcode,
         ]);
         return matchCategory && matchSearch;
-      }),
-    [sellableProducts, activeCategoryId, searchKeyword],
+        })
+        .sort((a, b) => {
+          const query = normalizeSearch(searchKeyword);
+          const score = (product: (typeof sellableProducts)[number]): number => {
+            if (!query) return 0;
+            const name = normalizeSearch(product.name);
+            const sku = normalizeSearch(product.sku);
+            const barcode = normalizeSearch(product.barcode);
+            if (barcode === query) return 0;
+            if (sku === query) return 1;
+            if (name === query) return 2;
+            if (sku.startsWith(query) || barcode.startsWith(query)) return 3;
+            if (name.startsWith(query)) return 4;
+            return 5;
+          };
+
+          const relevanceDiff = score(a) - score(b);
+          if (relevanceDiff !== 0) return relevanceDiff;
+
+          const stockA = stockOf(balances, branchId, a.id);
+          const stockB = stockOf(balances, branchId, b.id);
+          const availabilityDiff = Number(stockB > 0) - Number(stockA > 0);
+          return availabilityDiff || stockB - stockA || a.name.localeCompare(b.name);
+        }),
+    [sellableProducts, activeCategoryId, searchKeyword, balances, branchId],
   );
 
   /** Tuỳ chọn danh mục, kèm mục "Tất cả" ở đầu. */

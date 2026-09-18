@@ -15,6 +15,7 @@ import { payrollPaid } from './payrollSlice';
 import { saleCompleted } from './posSlice';
 import { purchaseReceived } from './purchaseSlice';
 import { orderRefunded } from './salesOrderSlice';
+import { compareDateDescWithId } from '@/utils/formatters';
 
 /**
  * Module 12 — Sổ quỹ (dữ liệu ghi được).
@@ -69,7 +70,7 @@ export const fetchCashbook = createAsyncThunk('cashbook/fetchAll', async () => {
   // Backend trả theo thứ tự DB; sắp giảm theo entry_date để mới nhất trước.
   return list
     .map(mapDtoToEntry)
-    .sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+    .sort((a, b) => compareDateDescWithId(a, b, (entry) => entry.entryDate));
 });
 
 /**
@@ -96,7 +97,7 @@ const nextCode = (
  */
 const reindex = (entries: CashEntry[]): CashEntry[] => {
   const ascending = [...entries].sort((a, b) =>
-    a.entryDate.localeCompare(b.entryDate),
+    compareDateDescWithId(b, a, (entry) => entry.entryDate),
   );
 
   const openingEntry = ascending.find((entry) => entry.code === 'OPENING');

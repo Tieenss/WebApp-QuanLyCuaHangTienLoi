@@ -19,7 +19,7 @@ import {
   type StocktakeLine,
 } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { StocktakeFormModal } from './components/StocktakeFormModal';
 import './StocktakesPage.css';
@@ -164,7 +164,7 @@ export const StocktakesPage: FC = () => {
           branchFilter === null || stocktake.branchId === branchFilter;
         const matchStatus = statusFilter === null || stocktake.status === statusFilter;
         return matchSearch && matchBranch && matchStatus;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.countDate)),
     [stocktakes, search, branchFilter, statusFilter],
   );
 
@@ -266,6 +266,7 @@ export const StocktakesPage: FC = () => {
       dataIndex: 'countDate',
       width: 125,
       sorter: (a, b) => a.countDate.localeCompare(b.countDate),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {

@@ -23,6 +23,7 @@ import {
   COMMON_PATTERNS,
   getErrorMessage,
 } from '@/utils/apiError';
+import { compareDateDescWithId, matchKeyword } from '@/utils/formatters';
 
 const VAI_TRO_OPTIONS = [
   { value: 'ADMIN', label: 'Admin / Giám đốc' },
@@ -34,6 +35,7 @@ const VAI_TRO_OPTIONS = [
 
 export const AccountManagementPage = () => {
   const [data, setData] = useState<TaiKhoanDTO[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TaiKhoanDTO | null>(null);
@@ -70,6 +72,23 @@ export const AccountManagementPage = () => {
       nhanVienOptions.length > 0 &&
       Boolean(selectedNhanVien?.vaiTro) &&
       (!requiresBranch || Boolean(selectedNhanVien?.idChiNhanh));
+
+  const filteredAccounts = useMemo(
+    () =>
+      data
+        .filter((account) =>
+          matchKeyword(search, [
+            account.tenDangNhap,
+            account.hoTen ?? '',
+            account.email ?? '',
+            account.vaiTro ?? '',
+            account.trangThai,
+            branchNameById.get(account.idChiNhanh ?? '') ?? '',
+          ]),
+        )
+        .sort((a, b) => compareDateDescWithId(a, b, (row) => row.ngayTao)),
+    [data, search, branchNameById],
+  );
   // const [selectedVaiTro, setSelectedVaiTro] = useState<string>('THU_NGAN');
 
   const fetchData = async () => {
@@ -264,8 +283,15 @@ export const AccountManagementPage = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', gap: 16 }}>
         <h2>Quản lý Tài khoản</h2>
+        <Input.Search
+          allowClear
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Tìm theo tên đăng nhập, họ tên, email, vai trò, chi nhánh..."
+          style={{ maxWidth: 440 }}
+        />
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -281,7 +307,7 @@ export const AccountManagementPage = () => {
 
       <Table
         columns={columns}
-        dataSource={data}
+        dataSource={filteredAccounts}
         rowKey="id"
         loading={loading}
         pagination={{ pageSize: 10 }}

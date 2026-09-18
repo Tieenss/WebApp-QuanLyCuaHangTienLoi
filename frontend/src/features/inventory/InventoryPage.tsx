@@ -38,7 +38,7 @@ import {
   totalStockValue,
 } from '@/store/slices/stockSlice';
 import { daysUntil, formatDate, formatDateTime } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import type { CSSProperties } from 'react';
 import { LedgerDrawer } from './components/LedgerDrawer';
@@ -123,7 +123,7 @@ export const InventoryPage: FC = () => {
   /** Tồn kho sau khi áp toàn bộ bộ lọc. */
   const balances = useMemo(
     () =>
-      enrichedBalances.filter((balance) => {
+    enrichedBalances.filter((balance) => {
         const matchSearch = matchKeyword(searchKeyword, [
           balance.productName,
           balance.sku,
@@ -147,7 +147,23 @@ export const InventoryPage: FC = () => {
           !onlyNearExpiry || (remainingDays !== null && remainingDays <= NEAR_EXPIRY_DAYS);
 
         return matchSearch && matchBranch && matchCategory && matchLevel && matchExpiry;
-      }),
+    }).sort((a, b) => {
+      const levelRank: Record<StockLevel, number> = {
+        [STOCK_LEVEL.OutOfStock]: 0,
+        [STOCK_LEVEL.Critical]: 1,
+        [STOCK_LEVEL.Low]: 2,
+        [STOCK_LEVEL.Healthy]: 3,
+        [STOCK_LEVEL.Overstock]: 4,
+      };
+      const rankDiff =
+        levelRank[resolveStockLevel(a.quantity, a.minStock, a.maxStock)] -
+        levelRank[resolveStockLevel(b.quantity, b.minStock, b.maxStock)];
+      if (rankDiff !== 0) return rankDiff;
+
+      const ratioA = a.minStock > 0 ? a.quantity / a.minStock : a.quantity;
+      const ratioB = b.minStock > 0 ? b.quantity / b.minStock : b.quantity;
+      return ratioA - ratioB || a.productName.localeCompare(b.productName);
+    }),
     [
       enrichedBalances,
       searchKeyword,
@@ -162,7 +178,7 @@ export const InventoryPage: FC = () => {
   /** Thẻ kho sau khi áp bộ lọc. */
   const ledgerEntries = useMemo(
     () =>
-      enrichedLedger.filter((entry) => {
+    enrichedLedger.filter((entry) => {
         const matchSearch = matchKeyword(searchKeyword, [
           entry.productName,
           entry.sku,
@@ -177,7 +193,7 @@ export const InventoryPage: FC = () => {
           categoryFilter === null || product?.categoryId === categoryFilter;
 
         return matchSearch && matchBranch && matchType && matchCategory;
-      }),
+    }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.occurredAt)),
     [enrichedLedger, searchKeyword, branchFilter, ledgerTypeFilter, categoryFilter, allProducts],
   );
 
@@ -607,7 +623,7 @@ export const InventoryPage: FC = () => {
                 <>
                   <TableToolbar
                     searchValue={searchKeyword}
-                    searchPlaceholder="Tìm theo tên sản phẩm, SKU..."
+                    searchPlaceholder="Tìm theo tên sản phẩm, SKU, danh mục..."
                     onSearchChange={(value) => dispatch(setInventorySearch(value))}
                     filters={filters}
                     onExport={handleExportBalances}
@@ -646,7 +662,7 @@ export const InventoryPage: FC = () => {
                 <>
                   <TableToolbar
                     searchValue={searchKeyword}
-                    searchPlaceholder="Tìm theo sản phẩm, SKU, mã chứng từ..."
+                    searchPlaceholder="Tìm theo sản phẩm, SKU, mã chứng từ, người thực hiện..."
                     onSearchChange={(value) => dispatch(setInventorySearch(value))}
                     filters={filters}
                     onExport={handleExportLedger}

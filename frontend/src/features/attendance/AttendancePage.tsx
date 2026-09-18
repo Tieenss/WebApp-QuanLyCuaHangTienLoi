@@ -58,7 +58,7 @@ import {
 import { today } from '@/utils/dateUtils';
 import { formatDate, formatDateTime, formatPeriod, formatTime, nowIso } from '@/utils/dateUtils';
 import dayjs from 'dayjs';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { HourAdjustModal } from './components/HourAdjustModal';
 import './AttendancePage.css';
@@ -172,7 +172,7 @@ export const AttendancePage: FC = () => {
         const matchStatus =
           payrollStatusFilter === null || row.status === payrollStatusFilter;
         return matchSearch && matchBranch && matchStatus;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.period)),
     [payrollRows, search, branchFilter, payrollStatusFilter],
   );
 
@@ -446,6 +446,8 @@ export const AttendancePage: FC = () => {
       dataIndex: 'workDate',
       width: 110,
       fixed: 'left',
+      sorter: (a, b) => b.workDate.localeCompare(a.workDate),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
@@ -590,6 +592,13 @@ export const AttendancePage: FC = () => {
       dataIndex: 'branchName',
       width: 190,
       render: (value: string) => <Text className="pay-text-12-5">{value}</Text>,
+    },
+    {
+      title: 'Kỳ lương',
+      dataIndex: 'period',
+      width: 110,
+      sorter: (a, b) => a.period.localeCompare(b.period),
+      defaultSortOrder: 'descend',
     },
     {
       title: 'Trạng thái',

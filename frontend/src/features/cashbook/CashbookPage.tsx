@@ -26,7 +26,7 @@ import {
   type CashBookSummary,
 } from '@/types';
 import { dayjs, formatDate, lastNDays } from '@/utils/dateUtils';
-import { formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { CapitalInjectionModal } from './components/CapitalInjectionModal';
 import { ManualEntryModal } from './components/ManualEntryModal';
@@ -88,7 +88,7 @@ export const CashbookPage: FC = () => {
         return (
           matchSearch && matchDirection && matchCategory && matchBranch && matchRange
         );
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.entryDate)),
     [allEntries, search, directionFilter, categoryFilter, branchFilter, range],
   );
 
@@ -205,6 +205,7 @@ export const CashbookPage: FC = () => {
       dataIndex: 'entryDate',
       width: 105,
       sorter: (a, b) => a.entryDate.localeCompare(b.entryDate),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
@@ -376,7 +377,7 @@ export const CashbookPage: FC = () => {
       <Card styles={{ body: { padding: '18px 18px 8px' } }}>
         <TableToolbar
           searchValue={search}
-          searchPlaceholder="Tìm theo mã phiếu, nội dung, đối tượng..."
+          searchPlaceholder="Tìm theo mã phiếu, mã tham chiếu, nội dung, đối tượng..."
           onSearchChange={setSearch}
           filters={filters}
           onExport={handleExport}

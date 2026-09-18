@@ -11,6 +11,7 @@ export interface TaiKhoanDTO {
   idNhanVien?: string;
   idChiNhanh?: string;
   trangThai: string;
+  ngayTao?: string;
 }
 
 export interface CreateTaiKhoanRequest {

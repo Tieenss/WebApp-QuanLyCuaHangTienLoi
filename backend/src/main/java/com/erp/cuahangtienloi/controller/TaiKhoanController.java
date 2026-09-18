@@ -43,6 +43,7 @@ public class TaiKhoanController {
                     dto.setId(tk.getId());
                     dto.setTenDangNhap(tk.getTenDangNhap());
                     dto.setTrangThai(tk.getTrangThai());
+                    dto.setNgayTao(tk.getNgayTao());
                     dto.setIdNhanVien(tk.getIdNhanVien());
                     if (tk.getIdNhanVien() != null) {
                         nhanVienRepository.findById(tk.getIdNhanVien()).ifPresent(nv -> {
@@ -67,6 +68,7 @@ public class TaiKhoanController {
                     dto.setId(tk.getId());
                     dto.setTenDangNhap(tk.getTenDangNhap());
                     dto.setTrangThai(tk.getTrangThai());
+                    dto.setNgayTao(tk.getNgayTao());
                     dto.setIdNhanVien(tk.getIdNhanVien());
                     if (tk.getIdNhanVien() != null) {
                         nhanVienRepository.findById(tk.getIdNhanVien()).ifPresent(nv -> {
