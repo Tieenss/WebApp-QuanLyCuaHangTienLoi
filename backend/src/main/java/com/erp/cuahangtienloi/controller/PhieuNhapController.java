@@ -36,8 +36,6 @@ public class PhieuNhapController {
     private final ChiNhanhRepository chiNhanhRepository;
     private final NhaCungCapRepository nhaCungCapRepository;
     private final NhanVienRepository nhanVienRepository;
-    private final com.erp.cuahangtienloi.repository.PhieuXuatKhoRepository phieuXuatKhoRepository;
-    private final com.erp.cuahangtienloi.repository.ChiTietPhieuXuatRepository chiTietPhieuXuatRepository;
     private final com.erp.cuahangtienloi.repository.ChiTietPhieuNhapRepository chiTietPhieuNhapRepository;
     private final SanPhamRepository sanPhamRepository;
     private final JdbcTemplate jdbcTemplate;
@@ -146,63 +144,6 @@ public class PhieuNhapController {
         pn.setNgayCapNhat(LocalDateTime.now());
 
         phieuNhapRepository.save(pn);
-
-        // Tự động tạo phiếu xuất kho nội bộ tương ứng (PENDING - chờ Thủ kho duyệt)
-        // Kho xuất = chi nhánh nhận hàng, Kho nhận = Kho Tổng
-        if (request.getIdChiNhanh() != null) {
-            com.erp.cuahangtienloi.entity.PhieuXuatKho pxk = new com.erp.cuahangtienloi.entity.PhieuXuatKho();
-            pxk.setId(java.util.UUID.randomUUID());
-            pxk.setMaPhieu("PX-" + java.time.LocalDate.now().toString().replace("-", "") + "-" + phieuNhapRepository.count());
-            pxk.setIdChiNhanhXuat(request.getIdChiNhanh());
-            pxk.setIdChiNhanhNhan(DEFAULT_DISTRIBUTION_CENTER_ID);
-            java.util.UUID idNguoiTaoPhieuXuat = pn.getIdNguoiNhap();
-
-            if (idNguoiTaoPhieuXuat == null) {
-                Object attr = httpRequest.getAttribute("authenticatedIdNhanVien");
-
-                if (attr instanceof String s) {
-                    try {
-                        UUID id = UUID.fromString(s);
-
-                        if (nhanVienRepository.existsById(id)) {
-                            idNguoiTaoPhieuXuat = id;
-                        }
-                    } catch (IllegalArgumentException ignored) {
-                        // UUID không hợp lệ
-                    }
-                }
-            }
-            pxk.setIdNguoiTao(idNguoiTaoPhieuXuat);
-            pxk.setIdNguoiDuyet(idNguoiTaoPhieuXuat);
-            pxk.setNgayYeuCau(java.time.LocalDate.now());
-            pxk.setNgayXuatThucTe(java.time.LocalDate.now());
-            pxk.setNgayNhanThucTe(java.time.LocalDate.now());
-            pxk.setTrangThai("PENDING");
-            pxk.setGhiChu("Tự động tạo từ phiếu nhập " + pn.getMaPhieu());
-            pxk.setNgayTao(java.time.LocalDateTime.now());
-            pxk.setNgayCapNhat(java.time.LocalDateTime.now());
-            phieuXuatKhoRepository.save(pxk);
-
-            // Tạo chi tiết phiếu xuất từ chi tiết phiếu nhập
-            java.util.List<com.erp.cuahangtienloi.entity.ChiTietPhieuNhap> chiTietNhapList =
-                    chiTietPhieuNhapRepository.findByIdPhieuNhap(pn.getId());
-            int thuTu = 0;
-            for (com.erp.cuahangtienloi.entity.ChiTietPhieuNhap ct : chiTietNhapList) {
-                com.erp.cuahangtienloi.entity.ChiTietPhieuXuat ctx = new com.erp.cuahangtienloi.entity.ChiTietPhieuXuat();
-                ctx.setId(java.util.UUID.randomUUID());
-                ctx.setIdPhieuXuat(pxk.getId());
-                ctx.setIdSanPham(ct.getIdSanPham());
-                ctx.setSoLuongYeuCau(ct.getSoLuongNhan() != null ? ct.getSoLuongNhan() : 0);
-                ctx.setSoLuongXuat(ct.getSoLuongNhan() != null ? ct.getSoLuongNhan() : 0);
-                ctx.setSoLuongNhan(0);
-                ctx.setDonGiaVon(ct.getDonGiaNhap() != null ? ct.getDonGiaNhap() : java.math.BigDecimal.ZERO);
-                ctx.setThanhTien((ct.getDonGiaNhap() != null && ct.getSoLuongNhan() != null)
-                        ? ct.getDonGiaNhap().multiply(new java.math.BigDecimal(ct.getSoLuongNhan()))
-                        : java.math.BigDecimal.ZERO);
-                ctx.setThuTu(thuTu++);
-                chiTietPhieuXuatRepository.save(ctx);
-            }
-        }
 
         return ResponseEntity.ok(toDTO(pn));
     }

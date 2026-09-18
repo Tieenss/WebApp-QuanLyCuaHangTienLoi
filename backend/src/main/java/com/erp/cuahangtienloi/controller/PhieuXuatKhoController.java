@@ -177,10 +177,7 @@ public class PhieuXuatKhoController {
         return ResponseEntity.notFound().build();
     }
 
-    /**
-     * Thủ kho duyệt yêu cầu xuất: PENDING → COMPLETED.
-     * Tự set ngayXuatThucTe, ngayNhanThucTe, idNguoiDuyet.
-     */
+    /** Chỉ duyệt yêu cầu xuất: PENDING → APPROVED, không đụng tồn kho. */
     @PutMapping("/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> approve(@PathVariable UUID id, @RequestBody(required = false) ApproveRequest body, HttpServletRequest httpRequest) {
@@ -206,10 +203,8 @@ public class PhieuXuatKhoController {
                         return ResponseEntity.badRequest().body(
                                  ApiResponse.err("Không tìm thấy nhân viên để duyệt"));
                     }
-                    pxk.setTrangThai("COMPLETED");
+                    pxk.setTrangThai("APPROVED");
                     pxk.setIdNguoiDuyet(idNguoiDuyet);
-                    pxk.setNgayXuatThucTe(LocalDate.now());
-                    pxk.setNgayNhanThucTe(LocalDate.now());
                     pxk.setNgayCapNhat(LocalDateTime.now());
                     phieuXuatKhoRepository.save(pxk);
                     return ResponseEntity.ok(toDTO(pxk));
@@ -279,7 +274,7 @@ public class PhieuXuatKhoController {
     }
 
     /**
-     * Bước 2: Thủ kho xác nhận XUẤT KHO — PENDING → SHIPPED (chờ nhận hàng).
+     * Bước 2: Thủ kho xác nhận XUẤT KHO — APPROVED/PENDING → SHIPPED.
      * Trừ tồn Kho Tổng + ghi thẻ kho TRANSFER_OUT cho từng dòng (qua hàm DB
      * dùng chung), snapshot giá vốn bình quân vào dòng chi tiết.
      */
@@ -288,9 +283,9 @@ public class PhieuXuatKhoController {
     @Transactional
     public ResponseEntity<?> ship(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body, HttpServletRequest httpRequest) {
         return phieuXuatKhoRepository.findById(id).<ResponseEntity<?>>map(pxk -> {
-            if (!"PENDING".equals(pxk.getTrangThai())) {
+            if (!"PENDING".equals(pxk.getTrangThai()) && !"APPROVED".equals(pxk.getTrangThai())) {
                 return ResponseEntity.badRequest().body(
-                         ApiResponse.err("Chỉ xác nhận xuất được phiếu ở trạng thái PENDING"));
+                         ApiResponse.err("Chỉ xác nhận xuất được phiếu ở trạng thái PENDING hoặc APPROVED"));
             }
             List<ChiTietPhieuXuat> lines = chiTietPhieuXuatRepository.findByIdPhieuXuat(id);
             if (lines.isEmpty()) {
