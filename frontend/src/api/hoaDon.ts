@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 
 export interface HoaDonDTO {
   id: string;
@@ -39,8 +40,7 @@ export interface ChiTietHoaDonDTO {
 }
 
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 export const hoaDonApi = {

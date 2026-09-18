@@ -15,6 +15,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -91,8 +92,12 @@ public class PhieuNhapController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
+    @Deprecated
     @Transactional
     public ResponseEntity<?> create(@RequestBody PhieuNhap request, HttpServletRequest httpRequest) {
+        return ResponseEntity.status(HttpStatus.GONE).body(
+                ApiResponse.err("Endpoint cũ đã ngừng sử dụng. Hãy dùng POST /api/phieu-nhap/with-lines."));
+        /*
         if (request.getIdNcc() == null || !nhaCungCapRepository.existsById(request.getIdNcc())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Nhà cung cấp không tồn tại"));
         }
@@ -146,6 +151,7 @@ public class PhieuNhapController {
         phieuNhapRepository.save(pn);
 
         return ResponseEntity.ok(toDTO(pn));
+        */
     }
 
     /**

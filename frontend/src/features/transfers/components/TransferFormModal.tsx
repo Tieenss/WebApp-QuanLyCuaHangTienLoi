@@ -26,6 +26,7 @@ import {
 } from '@/store/slices/transferSlice';
 import { chiNhanhApi, type ChiNhanhDTO } from '@/api/chiNhanh';
 import { API_BASE_URL } from '@/config/api';
+import { apiFetch } from '@/api/http';
 import { chiTietPhieuXuatApi, phieuXuatKhoApi } from '@/api/phieuXuatKho';
 import { DOCUMENT_STATUS, STOCK_LEVEL, USER_ROLE, type DocumentStatus, type StockLevel } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
@@ -238,11 +239,11 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       // 1) Tạo header PENDING + dòng chi tiết xuống DB. Việc trừ/cộng tồn do
       //    backend làm qua /ship và /receive (fun the_kho + ton_kho).
       try {
-        const response = await fetch(`${API_BASE_URL}/api/phieu-xuat-kho`, {
+        const response = await apiFetch(`${API_BASE_URL}/api/phieu-xuat-kho`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
+            ...{},
           },
           body: JSON.stringify({
             maPhieu: '', // trigger DB tự sinh PX-YYYYMMDD-NNN

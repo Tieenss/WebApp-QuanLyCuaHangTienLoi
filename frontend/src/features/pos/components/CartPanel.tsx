@@ -1,5 +1,6 @@
 import { useMemo, type FC } from 'react';
 import { API_BASE_URL } from '@/config/api';
+import { apiFetch } from '@/api/http';
 import {
   App as AntdApp,
   Button,
@@ -174,13 +175,13 @@ const sale = buildSalesOrder({
     // "Lịch sử hoá đơn" hiển thị đúng dữ liệu đã lưu.
     void (async () => {
       try {
-        const created = await fetch(
+        const created = await apiFetch(
           `${API_BASE_URL}/api/hoa-don/with-lines`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+              ...{},
             },
             body: JSON.stringify({
               idChiNhanh: sale.order.branchId,

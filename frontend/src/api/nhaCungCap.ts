@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 
 export interface NhaCungCapDTO {
   id: string;
@@ -27,8 +28,7 @@ export interface NhaCungCapDTO {
 }
 
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 const parseError = async (response: Response, fallback: string): Promise<Error> => {

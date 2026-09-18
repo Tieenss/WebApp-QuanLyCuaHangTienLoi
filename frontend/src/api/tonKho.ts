@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 
 export interface TonKhoDTO {
   idSanPham: string;
@@ -30,8 +31,7 @@ export interface TheKhoDTO {
 }
 
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 export const tonKhoApi = {

@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 import { parseApiError } from '@/utils/apiError';
 
 export interface NhanVienDTO {
@@ -21,8 +22,7 @@ export interface NhanVienDTO {
 }
 
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 export const nhanVienApi = {
