@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FC, type ReactElement } from 'react';
 import { API_BASE_URL } from '@/config/api';
+import { apiFetch } from '@/api/http';
 import { chiTietPhieuXuatApi, type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
 import { nhanVienApi} from '@/api/nhanVien';
 import { App as AntdApp, Button, Card, Descriptions, Popconfirm, Space, Table, Tag, Typography } from 'antd';
@@ -164,11 +165,11 @@ export const TransfersPage: FC = () => {
 
   const handleReject = (transfer: StockTransfer): void => {
     if (user === null) return;
-    fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${transfer.id}/reject`, {
+    apiFetch(`${API_BASE_URL}/api/phieu-xuat-kho/${transfer.id}/reject`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
+        ...{},
       },
       body: JSON.stringify({ idNguoiDuyet: user.idNhanVien, lyDo: `Từ chối bởi ${user.fullName}` }),
     })

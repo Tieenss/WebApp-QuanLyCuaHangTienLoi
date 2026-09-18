@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
 import { API_BASE_URL } from '@/config/api';
+import { apiFetch } from '@/api/http';
 import {
   Card,
   Col,
@@ -160,9 +161,8 @@ export const ReportsPage: FC = () => {
         await Promise.all(
           sorted.map(async (hd) => {
             try {
-              const res = await fetch(
+              const res = await apiFetch(
                 `${API_BASE_URL}/api/chi-tiet-hoa-don/by-hoa-don/${hd.id}`,
-                { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } },
               );
               if (res.ok) lineMap[hd.id] = await res.json();
             } catch {
@@ -235,7 +235,7 @@ export const ReportsPage: FC = () => {
         const prev = map.get(line.idSanPham) ?? { qty: 0, revenue: 0, cogs: 0 };
         prev.qty += line.soLuong;
         prev.revenue += line.thanhTien;
-        prev.cogs += line.soLuong * (costByProduct.get(line.idSanPham) ?? 0);
+        prev.cogs += line.soLuong * lineCost(line, costByProduct);
         map.set(line.idSanPham, prev);
       }
     }
@@ -254,6 +254,13 @@ export const ReportsPage: FC = () => {
     const revenue = periodInvoices.reduce((s, hd) => s + hd.grandTotal, 0);
     const previousRevenue = previousPeriodInvoices.reduce((s, hd) => s + hd.grandTotal, 0);
     const cogs = [...productStats.values()].reduce((s, v) => s + v.cogs, 0);
+    const previousCogs = previousPeriodInvoices.reduce(
+      (sum, hd) => sum + (invoiceLines[hd.id] ?? []).reduce(
+        (lineSum, line) => lineSum + line.soLuong * lineCost(line, costByProduct),
+        0,
+      ),
+      0,
+    );
     const itemsSold = [...productStats.values()].reduce((s, v) => s + v.qty, 0);
     const stockValue = balances.reduce(
       (sum, b) => sum + Number(b.stockValue ?? 0),
@@ -273,12 +280,12 @@ export const ReportsPage: FC = () => {
           ? 0
           : Math.round(previousRevenue / previousPeriodInvoices.length),
       grossProfit: revenue - cogs,
-      previousGrossProfit: 0,
+      previousGrossProfit: previousRevenue - previousCogs,
       itemsSold,
       stockValue,
       lowStockCount,
     };
-  }, [periodInvoices, previousPeriodInvoices, productStats, balances]);
+  }, [periodInvoices, previousPeriodInvoices, productStats, invoiceLines, costByProduct, balances]);
 
   const summary = useMemo<SummaryItem[]>(() => {
     const grossMargin =
@@ -1112,3 +1119,6 @@ export const ReportsPage: FC = () => {
     </>
   );
 };
+
+const lineCost = (line: ChiTietHoaDonDTO, costByProduct: Map<string, number>): number =>
+  line.donGiaVon ?? costByProduct.get(line.idSanPham) ?? 0;

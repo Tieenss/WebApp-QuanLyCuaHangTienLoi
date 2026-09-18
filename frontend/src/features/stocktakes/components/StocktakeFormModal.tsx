@@ -280,7 +280,6 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
           ngayKiemKe: values.countDate.format('YYYY-MM-DD'),
           ghiChu: values.note,
           lines: validRows.map((row) => ({
-            idPhieuKiemKe: '00000000-0000-0000-0000-000000000000',
             idSanPham: row.productId,
             tonHeThong: row.systemQuantity,
             tonThucTe: row.countedQuantity,
@@ -315,7 +314,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
         onClose();
       } catch (e: any) {
         console.error('[StocktakeForm] create error:', e);
-        alert('Lỗi tạo phiếu kiểm kê: ' + (e.message || e));
+        message.error('Lỗi tạo phiếu kiểm kê: ' + (e.message || e));
       }
     }).catch((err) => {
       console.error('[StocktakeForm] validate error:', err);

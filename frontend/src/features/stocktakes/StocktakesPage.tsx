@@ -513,7 +513,8 @@ export const StocktakesPage: FC = () => {
   };
 
   const canApprove = (stocktake: Stocktake): boolean => {
-    return stocktake.status === DOCUMENT_STATUS.Pending;
+    const canApproveRole = user?.role === 'ADMIN' || user?.role === 'THU_KHO' || user?.role === 'QUAN_LY';
+    return stocktake.status === DOCUMENT_STATUS.Pending && canApproveRole;
   };
 
   const handleApprove = async (stocktake: Stocktake): Promise<void> => {

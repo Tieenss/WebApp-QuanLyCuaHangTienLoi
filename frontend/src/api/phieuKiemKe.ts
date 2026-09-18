@@ -18,7 +18,8 @@ export interface PhieuKiemKeDTO {
 
 export interface ChiTietKiemKeDTO {
   id?: string;
-  idPhieuKiemKe: string;
+  /** Backend assigns this when creating lines under /with-lines. */
+  idPhieuKiemKe?: string;
   idSanPham: string;
   tonHeThong: number;
   tonThucTe: number;

@@ -4,6 +4,7 @@ import { chamCongApi, type ChamCongDTO } from '@/api/chamCong';
 import { today } from '@/utils/dateUtils';
 import dayjs from 'dayjs';
 import { API_BASE_URL } from '@/config/api';
+import { apiFetch } from '@/api/http';
 
 export interface AttendanceState {
   records: AttendanceRecord[];
@@ -73,9 +74,7 @@ export const scheduleAttendance = createAsyncThunk(
       const to = dayjs().add(days, 'day').format('YYYY-MM-DD');
 
       // Lấy ca mặc định của nhân viên từ API
-      const nvList = await fetch(`${API_BASE_URL}/api/nhan-vien/${idNhanVien}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-      }).then((r) => r.json());
+      const nvList = await apiFetch(`${API_BASE_URL}/api/nhan-vien/${idNhanVien}`).then((r) => r.json());
       const ca = nvList.caMacDinh || 'MORNING';
 
       // Định nghĩa giờ cho từng ca

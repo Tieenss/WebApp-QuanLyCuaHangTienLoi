@@ -34,6 +34,8 @@ export interface ChiTietHoaDonDTO {
   donGia: number;
   thanhTien: number;
   giamGia?: number;
+  /** Giá vốn snapshot tại thời điểm bán. */
+  donGiaVon?: number;
 }
 
 const getHeaders = (): HeadersInit => {

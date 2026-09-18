@@ -13,6 +13,7 @@ import {
 import { bangLuongApi, type BangLuongDTO } from '@/api/bangLuong';
 import { nowIso } from '@/utils/dateUtils';
 import { API_BASE_URL } from '@/config/api';
+import { apiFetch } from '@/api/http';
 
 /**
  * Module 11 — Duyệt lương 2 tầng.
@@ -85,11 +86,7 @@ export const fetchPayroll = createAsyncThunk(
     try {
       const [list, nvList] = await Promise.all([
         bangLuongApi.getAll(),
-        fetch(`${API_BASE_URL}/api/nhan-vien`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-          },
-        }).then((r) => r.json() as Promise<Array<{ id: string; vaiTro?: string; maNhanVien?: string; hoTen?: string }>>),
+        apiFetch(`${API_BASE_URL}/api/nhan-vien`).then((r) => r.json() as Promise<Array<{ id: string; vaiTro?: string; maNhanVien?: string; hoTen?: string }>>),
       ]);
 
       const roleById = new Map(nvList.map((nv) => [nv.id, nv.vaiTro]));

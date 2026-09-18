@@ -31,6 +31,7 @@ export const CheckoutSuccessModal: FC = () => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
   const sale = useAppSelector((state) => state.pos.lastCompletedSale);
+  const branches = useAppSelector((state) => state.branch.branches);
 
   if (sale === null) return null;
 
@@ -38,7 +39,14 @@ export const CheckoutSuccessModal: FC = () => {
 
   const handlePrint = (): void => {
     try {
-      printHtml(buildReceiptHtml(order, '', '', ''), `Hoá đơn ${order.code}`);
+      const branch = branches.find((item) => item.id === order.branchId);
+      const address = branch
+        ? [branch.addressLine, branch.district, branch.province].filter(Boolean).join(', ')
+        : '';
+      printHtml(
+        buildReceiptHtml(order, branch?.name ?? order.branchName, address, branch?.phone ?? ''),
+        `Hoá đơn ${order.code}`,
+      );
     } catch {
       // `printHtml` ném lỗi khi trình duyệt chặn popup.
       message.error(
