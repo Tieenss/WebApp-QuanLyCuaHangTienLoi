@@ -509,6 +509,8 @@ export const stockSlice = createSlice({
     // nhưng tồn đã bị trừ lúc bán. KHÔNG tạo phiếu chi sổ quỹ (cashbook
     // không lắng nghe action này) vì không có dòng tiền thực phát sinh.
     builder.addCase(orderCancelled, (state, action) => {
+      // Chỉ hoàn tồn nếu đơn đã hoàn tất bán và đã bị trừ tồn trước đó.
+      if (action.payload.order.status !== 'COMPLETED') return;
       applyReturn(
         state,
         action.payload.order,

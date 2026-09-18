@@ -55,6 +55,7 @@ const emptyRow = (): DraftRow => ({
   productId: '',
   quantity: 0,
   unitCost: 0,
+  vatPercent: 8,
 });
 
 /**
@@ -157,9 +158,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       0,
     );
     const vatTotal = validRows.reduce((sum, row) => {
-      const product = sellableProducts.find((item) => item.id === row.productId);
-      const vatPercent = product?.vatPercent ?? 0;
-      return sum + (row.quantity * row.unitCost * vatPercent) / 100;
+      return sum + (row.quantity * row.unitCost * row.vatPercent) / 100;
     }, 0);
 
     return {
@@ -206,13 +205,12 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         trangThai: 'PENDING_PAYMENT',
         ghiChu: values.note?.trim() ?? '',
         lines: validRows.map((row) => {
-          const product = sellableProducts.find((item) => item.id === row.productId);
           return {
             idSanPham: row.productId,
             soLuong: row.quantity,
             soLuongNhan: row.quantity,
             donGiaNhap: row.unitCost,
-            vatPhantram: product?.vatPercent ?? 8,
+            vatPhantram: row.vatPercent,
           };
         }),
       });
@@ -248,6 +246,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
             updateRow(row.key, {
               productId,
               unitCost: product?.costPrice ?? 0,
+              vatPercent: product?.vatPercent ?? 8,
             });
           }}
           options={supplierProducts.map((product) => ({

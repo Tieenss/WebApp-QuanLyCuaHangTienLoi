@@ -16,9 +16,6 @@ import { saleCompleted } from './posSlice';
 import { purchaseReceived } from './purchaseSlice';
 import { orderRefunded } from './salesOrderSlice';
 
-/** Số dư quỹ đầu kỳ toàn hệ thống. */
-export const OPENING_BALANCE = 50_000_000;
-
 /**
  * Module 12 — Sổ quỹ (dữ liệu ghi được).
  *
@@ -102,8 +99,10 @@ const reindex = (entries: CashEntry[]): CashEntry[] => {
     a.entryDate.localeCompare(b.entryDate),
   );
 
-  let balance = OPENING_BALANCE;
+  const openingEntry = ascending.find((entry) => entry.code === 'OPENING');
+  let balance = openingEntry?.runningBalance ?? 0;
   for (const entry of ascending) {
+    if (entry.code === 'OPENING') continue;
     balance +=
       entry.direction === CASH_FLOW_DIRECTION.Receipt ? entry.amount : -entry.amount;
     entry.runningBalance = balance;

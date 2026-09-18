@@ -101,10 +101,11 @@ export const CashbookPage: FC = () => {
       .reduce((sum, e) => sum + e.amount, 0);
     const lastEntry = entries[0];
     return {
-      openingBalance: 50_000_000,
+      openingBalance:
+        entries.find((entry) => entry.code === 'OPENING')?.runningBalance ?? 0,
       totalReceipt,
       totalPayment,
-      closingBalance: lastEntry?.runningBalance ?? 50_000_000,
+      closingBalance: lastEntry?.runningBalance ?? 0,
       cashOnHand: entries
         .filter((e) => e.paymentMethod === PAYMENT_METHOD.Cash)
         .reduce((sum, e) => sum + (e.direction === CASH_FLOW_DIRECTION.Receipt ? e.amount : -e.amount), 0),

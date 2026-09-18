@@ -74,6 +74,7 @@ export interface PurchaseDraftLine {
   productId: string;
   quantity: number;
   unitCost: number;
+  vatPercent: number;
 }
 
 /** Action dùng chung cho cả transaction nhập kho. */
@@ -116,7 +117,7 @@ export const buildPurchaseOrder = (input: {
       orderedQuantity: draft.quantity,
       receivedQuantity: draft.quantity,
       unitCost: draft.unitCost,
-      vatPercent: 0,
+      vatPercent: draft.vatPercent,
       lineTotal: draft.quantity * draft.unitCost,
       expiryDate: null,
     });
