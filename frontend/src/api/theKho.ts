@@ -2,7 +2,7 @@ import { API_BASE_URL } from '@/config/api';
 import { getAuthHeaders } from './http';
 
 export interface TheKhoDTO {
-  id?: string;
+  id: string;
   idSanPham: string;
   tenSanPham?: string;
   maVach?: string;
@@ -17,6 +17,14 @@ export interface TheKhoDTO {
   donGia?: number;
   thanhTien?: number;
   ghiChu?: string;
+  ngayPhatSinh: string;
+  loaiGiaoDich?: string;
+  maChungTu?: string;
+  nguoiThucHien?: string;
+  hanSuDung?: string;
+  tonTruoc?: number;
+  tonSau?: number;
+  soLuong: number;
 }
 
 const getHeaders = (): HeadersInit => {

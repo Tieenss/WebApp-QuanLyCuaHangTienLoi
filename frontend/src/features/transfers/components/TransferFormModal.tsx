@@ -22,8 +22,8 @@ import {
   buildTransfer,
   fetchTransfers,
   type TransferDraftLine,
-  DISTRIBUTION_CENTER_ID,
 } from '@/store/slices/transferSlice';
+import { DISTRIBUTION_CENTER_ID } from '@/config/businessRules';
 import { chiNhanhApi, type ChiNhanhDTO } from '@/api/chiNhanh';
 import { API_BASE_URL } from '@/config/api';
 import { apiFetch } from '@/api/http';
@@ -142,7 +142,6 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
 
   const [toBranchId, setToBranchId] = useState<string | null>(defaultToBranchId);
   const [fromBranchId, setFromBranchId] = useState<string>(DISTRIBUTION_CENTER_ID);
-  console.log('[TransferForm] DEBUG fromBranchId:', fromBranchId);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
 
   /** Dọn form sau khi modal đóng hẳn (dùng sự kiện, không dùng effect). */
@@ -163,7 +162,6 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   );
 
   // Debug
-  console.log('[TransferForm] balances:', balances.length, 'fromBranchId:', fromBranchId, 'availableProducts:', availableProducts.length);
 
   const usedProductIds = useMemo(
     () => new Set(rows.map((row) => row.productId).filter((id) => id !== '')),

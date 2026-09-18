@@ -12,7 +12,8 @@ import {
   type LedgerType,
   type StockTransfer,
 } from '@/types';
-import { tonKhoApi, theKhoApi, type TonKhoDTO, type TheKhoDTO } from '@/api/tonKho';
+import { tonKhoApi, type TonKhoDTO } from '@/api/tonKho';
+import { theKhoApi, type TheKhoDTO } from '@/api/theKho';
 
 import { purchaseReceived } from './purchaseSlice';
 import { saleCompleted } from './posSlice';

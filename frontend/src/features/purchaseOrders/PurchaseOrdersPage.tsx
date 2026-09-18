@@ -73,7 +73,6 @@ export const PurchaseOrdersPage: FC = () => {
   );
 
   // Debug tạm thời
-  // console.log('[PurchaseOrders] orders:', orders.length, 'enriched:', enrichedOrders.length, 'branches:', branches.length, 'suppliers:', suppliers.length);
 
   // Cache chi tiết phiếu nhập theo orderId
   const [detailsCache, setDetailsCache] = useState<Record<string, ChiTietPhieuNhapDTO[]>>({});

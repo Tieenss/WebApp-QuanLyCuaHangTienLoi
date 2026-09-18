@@ -13,6 +13,7 @@ import {
 import { BarcodeOutlined, SearchOutlined } from '@ant-design/icons';
 import { ProductThumb } from '@/components/ProductThumb';
 import { BRAND } from '@/config/brand';
+import { CATEGORY_ID } from '@/config/businessRules';
 import './ProductPicker.css';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -167,7 +168,7 @@ export const ProductPicker: FC = () => {
               {visibleProducts.map((product) => {
                 const available = stockOf(balances, branchId, product.id);
               // Hàng pha chế tại quầy không quản tồn nên vẫn bán được khi tồn 0.
-              const isMadeToOrder = product.categoryId === 'cat-03';
+              const isMadeToOrder = product.categoryId === CATEGORY_ID.MadeToOrder;
               const isOutOfStock = available <= 0 && !isMadeToOrder;
               const inCart = cartQuantityMap.get(product.id) ?? 0;
 

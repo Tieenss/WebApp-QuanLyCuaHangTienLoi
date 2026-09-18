@@ -1,5 +1,6 @@
 import { useMemo, type FC } from 'react';
 import { API_BASE_URL } from '@/config/api';
+import { CATEGORY_ID } from '@/config/businessRules';
 import { apiFetch } from '@/api/http';
 import {
   App as AntdApp,
@@ -117,7 +118,7 @@ export const CartPanel: FC = () => {
       const currentStock = stockOf(balances, branchId, line.productId);
       if (currentStock > 0) return false;
       const product = productById(line.productId);
-      return product?.categoryId !== 'cat-03';
+      return product?.categoryId !== CATEGORY_ID.MadeToOrder;
     });
   }, [lines, balances, branchId]);
 
@@ -139,7 +140,7 @@ export const CartPanel: FC = () => {
         const currentStock = stockOf(balances, branchId, line.productId);
         if (currentStock > 0) return false;
         const product = productById(line.productId);
-        return product?.categoryId !== 'cat-03';
+        return product?.categoryId !== CATEGORY_ID.MadeToOrder;
       });
       message.error(
         `Sản phẩm "${outOfStockLine?.productName}" đã hết hàng, không thể thanh toán.`,

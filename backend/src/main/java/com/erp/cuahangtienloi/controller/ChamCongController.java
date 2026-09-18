@@ -111,8 +111,8 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     @GetMapping("/by-date-range")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChamCongDTO>> getByDateRange(
-            @RequestParam("start") LocalDate start,
-            @RequestParam("end") LocalDate end) {
+            @RequestParam("from") LocalDate start,
+            @RequestParam("to") LocalDate end) {
         List<ChamCongDTO> list = chamCongRepository
                 .findByWorkDateBetween(start, end).stream()
                 .map(this::toDTO)
@@ -317,8 +317,8 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     @Transactional
     public ResponseEntity<?> scheduleRange(
             @PathVariable UUID idNhanVien,
-            @RequestParam String fromDate,
-            @RequestParam String toDate) {
+            @RequestParam("from") String fromDate,
+            @RequestParam("to") String toDate) {
         Optional<NhanVien> optNv = nhanVienRepository.findById(idNhanVien);
         if (optNv.isEmpty()) return ResponseEntity.notFound().build();
         NhanVien nv = optNv.get();

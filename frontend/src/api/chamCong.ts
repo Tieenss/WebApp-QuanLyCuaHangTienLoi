@@ -59,7 +59,7 @@ export const chamCongApi = {
   },
 
   getByDateRange: async (startDate: string, endDate: string): Promise<ChamCongDTO[]> => {
-    const response = await fetch(`${API_BASE_URL}/api/cham-cong/by-date-range?start=${startDate}&end=${endDate}`, {
+    const response = await fetch(`${API_BASE_URL}/api/cham-cong/by-date-range?from=${startDate}&to=${endDate}`, {
       headers: getHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch chấm công');
@@ -90,7 +90,7 @@ export const chamCongApi = {
   /** Sinh lịch ca cho 1 nhân viên trong khoảng ngày. */
   scheduleRange: async (idNhanVien: string, fromDate: string, toDate: string): Promise<ChamCongDTO[]> => {
     const response = await fetch(
-      `${API_BASE_URL}/api/cham-cong/schedule-range/${idNhanVien}?fromDate=${fromDate}&toDate=${toDate}`,
+      `${API_BASE_URL}/api/cham-cong/schedule-range/${idNhanVien}?from=${fromDate}&to=${toDate}`,
       { method: 'POST', headers: getHeaders() },
     );
     if (!response.ok) throw new Error('Failed to schedule');

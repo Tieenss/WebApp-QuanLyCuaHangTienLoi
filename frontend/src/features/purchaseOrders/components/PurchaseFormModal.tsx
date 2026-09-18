@@ -25,12 +25,11 @@ import { fetchProducts } from '@/store/slices/productSlice';
 import { fetchSuppliers } from '@/store/slices/supplierSlice';
 import { PRODUCT_UNIT_LABEL } from '@/types';
 import { BRANCH_KIND } from '@/types/branchTypes';
+import { DISTRIBUTION_CENTER_ID } from '@/config/businessRules';
 import { dayjs, today } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 import type { Dayjs } from 'dayjs';
 import './PurchaseFormModal.css';
-
-const DISTRIBUTION_CENTER_ID = 'a1b2c3d4-0001-0000-0000-000000000001';
 
 const { Text, Paragraph } = Typography;
 

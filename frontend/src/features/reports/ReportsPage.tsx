@@ -36,7 +36,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { BRAND, CHART_COLORS } from '@/config/brand';
 import { useAppSelector } from '@/store/hooks';
 import { hoaDonApi, type HoaDonDTO, type ChiTietHoaDonDTO } from '@/api/hoaDon';
-import { theKhoApi, type TheKhoDTO } from '@/api/tonKho';
+import { theKhoApi, type TheKhoDTO } from '@/api/theKho';
 import {
   SHRINKAGE_REASON_LABEL,
   TIME_RANGE_LABEL,
