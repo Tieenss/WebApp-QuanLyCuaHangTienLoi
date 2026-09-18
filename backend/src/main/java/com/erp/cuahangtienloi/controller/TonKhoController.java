@@ -156,7 +156,8 @@ public class TonKhoController {
                 .setParameter(9, request.ngayPhatSinh() != null ? request.ngayPhatSinh() : LocalDateTime.now())
                 .getSingleResult();
 
-        return theKhoRepository.findById(id)
+        entityManager.flush();
+        return tonKhoRepository.findByIdSanPhamAndIdChiNhanh(request.idSanPham(), request.idChiNhanh())
                 .map(tk -> ResponseEntity.ok(toDTO(tk)))
                 .orElse(ResponseEntity.notFound().build());
     }
