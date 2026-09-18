@@ -377,9 +377,13 @@ export const getLandingPath = (role: UserRole): string => {
   return getFirstAccessibleModulePath(role);
 };
 
+/** Các route dùng chung cho mọi role sau khi đã đăng nhập. */
+const AUTHENTICATED_SHARED_PATHS = new Set(['/account']);
+
 /** Kiểm tra một vai trò có được vào path hay không. */
 export const canAccessPath = (role: UserRole, path: string): boolean => {
   const module = MODULE_BY_PATH[path];
-  if (!module) return true;
+  if (AUTHENTICATED_SHARED_PATHS.has(path)) return true;
+  if (!module) return false;
   return module.allowedRoles.includes(role);
 };
