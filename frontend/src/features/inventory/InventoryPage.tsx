@@ -26,6 +26,7 @@ import {
   LEDGER_TYPE_LABEL,
   STOCK_LEVEL,
   STOCK_LEVEL_LABEL,
+  USER_ROLE,
   type LedgerType,
   type StockBalance,
   type StockLedgerEntry,
@@ -76,6 +77,9 @@ export const InventoryPage: FC = () => {
   const allProducts = useAppSelector((state) => state.product.products);
   const allBranches = useAppSelector((state) => state.branch.branches);
   const allCategories = useAppSelector((state) => state.category.categories);
+  const user = useAppSelector((state) => state.auth.user);
+  const isBranchScoped = user?.role === USER_ROLE.StoreManager
+    || user?.role === USER_ROLE.WarehouseKeeper;
 
   const productById = (id: string) => allProducts.find((p) => p.id === id);
   const branchById = (id: string) => allBranches.find((b) => b.id === id);
@@ -85,6 +89,13 @@ export const InventoryPage: FC = () => {
       dispatch(fetchStock());
     }
   }, [dispatch, allBalances.length]);
+
+  // Khóa bộ lọc theo chi nhánh thực tế; backend vẫn là lớp bảo vệ chính.
+  useEffect(() => {
+    if (isBranchScoped && user?.branchId) {
+      dispatch(setBranchFilter(user.branchId));
+    }
+  }, [dispatch, isBranchScoped, user?.branchId]);
 
   // Enrich tồn kho: thêm tên sản phẩm, tên chi nhánh, mã SKU
   const enrichedBalances = useMemo(
@@ -251,14 +262,14 @@ export const InventoryPage: FC = () => {
 
   /** Bộ lọc dùng chung, thêm bộ lọc riêng theo tab đang mở. */
   const filters: ToolbarFilter[] = [
-    {
+    ...(!isBranchScoped ? [{
       key: 'branch',
       placeholder: 'Kho / Chi nhánh',
       value: branchFilter,
-      onChange: (value) => dispatch(setBranchFilter(value)),
+      onChange: (value: string | null) => dispatch(setBranchFilter(value)),
       options: branchOptions,
       span: 6,
-    },
+    } as ToolbarFilter] : []),
     {
       key: 'category',
       placeholder: 'Danh mục',

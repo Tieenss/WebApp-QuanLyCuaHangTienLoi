@@ -47,6 +47,7 @@ const { RangePicker } = DatePicker;
 export const CashbookPage: FC = () => {
   const dispatch = useAppDispatch();
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
+  const isBranchScoped = user?.role === USER_ROLE.StoreManager;
   const allEntries = useAppSelector((state) => state.cashbook.entries);
 
   // Nạp sổ quỹ từ backend khi vào trang.
@@ -64,6 +65,10 @@ export const CashbookPage: FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [branchFilter, setBranchFilter] = useState<string | null>(activeBranchId);
   const [range, setRange] = useState(() => lastNDays(30));
+
+  useEffect(() => {
+    if (isBranchScoped && user?.branchId) setBranchFilter(user.branchId);
+  }, [isBranchScoped, user?.branchId]);
 
   const filtered = useMemo(
     () =>
@@ -179,7 +184,7 @@ export const CashbookPage: FC = () => {
       })),
       span: 5,
     },
-    {
+    ...(!isBranchScoped ? [{
       key: 'branch',
       placeholder: 'Chi nhánh',
       value: branchFilter,
@@ -189,7 +194,7 @@ export const CashbookPage: FC = () => {
         label: branch.name,
       })),
       span: 5,
-    },
+    } as ToolbarFilter] : []),
   ];
 
   const columns: ColumnsType<CashEntry> = [

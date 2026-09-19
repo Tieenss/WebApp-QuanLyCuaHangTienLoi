@@ -5,6 +5,8 @@ import com.erp.cuahangtienloi.dto.TonKhoDTO;
 import com.erp.cuahangtienloi.entity.SanPham;
 import com.erp.cuahangtienloi.entity.TonKho;
 import com.erp.cuahangtienloi.repository.*;
+import com.erp.cuahangtienloi.service.BranchAccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,14 +33,19 @@ public class TonKhoController {
     private final TonKhoRepository tonKhoRepository;
     private final SanPhamRepository sanPhamRepository;
     private final ChiNhanhRepository chiNhanhRepository;
+    private final BranchAccessService branchAccessService;
 
     @PersistenceContext
     private EntityManager entityManager;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
-    public ResponseEntity<List<TonKhoDTO>> getAll() {
-        List<TonKhoDTO> list = tonKhoRepository.findAll().stream()
+    public ResponseEntity<List<TonKhoDTO>> getAll(HttpServletRequest request) {
+        var employee = branchAccessService.requireAuthenticatedEmployee(request);
+        List<TonKho> source = branchAccessService.isSystemWide(employee)
+                ? tonKhoRepository.findAll()
+                : tonKhoRepository.findByIdChiNhanh(branchAccessService.requiredOwnBranch(employee));
+        List<TonKhoDTO> list = source.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -46,7 +53,9 @@ public class TonKhoController {
 
     @GetMapping("/by-branch/{idChiNhanh}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
-    public ResponseEntity<List<TonKhoDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
+    public ResponseEntity<List<TonKhoDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh,
+                                                           HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<TonKhoDTO> list = tonKhoRepository.findByIdChiNhanh(idChiNhanh).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -55,9 +64,14 @@ public class TonKhoController {
 
     @GetMapping("/by-product/{idSanPham}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
-    public ResponseEntity<List<TonKhoDTO>> getBySanPham(@PathVariable UUID idSanPham) {
-        List<TonKhoDTO> list = tonKhoRepository.findAll().stream()
-                .filter(tk -> idSanPham.equals(tk.getIdSanPham()))
+    public ResponseEntity<List<TonKhoDTO>> getBySanPham(@PathVariable UUID idSanPham,
+                                                          HttpServletRequest request) {
+        var employee = branchAccessService.requireAuthenticatedEmployee(request);
+        List<TonKho> source = branchAccessService.isSystemWide(employee)
+                ? tonKhoRepository.findByIdSanPham(idSanPham)
+                : tonKhoRepository.findByIdSanPhamAndIdChiNhanh(idSanPham,
+                        branchAccessService.requiredOwnBranch(employee)).stream().toList();
+        List<TonKhoDTO> list = source.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -65,7 +79,9 @@ public class TonKhoController {
 
     @GetMapping("/detail/{idSanPham}/{idChiNhanh}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
-    public ResponseEntity<?> getDetail(@PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh) {
+    public ResponseEntity<?> getDetail(@PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh,
+                                       HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         return tonKhoRepository.findByIdSanPhamAndIdChiNhanh(idSanPham, idChiNhanh)
                 .map(tk -> ResponseEntity.ok(toDTO(tk)))
                 .orElse(ResponseEntity.notFound().build());
@@ -131,13 +147,15 @@ public class TonKhoController {
     @PostMapping("/adjust")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     @Transactional
-    public ResponseEntity<?> adjust(@RequestBody TonKhoAdjustmentRequest request) {
+    public ResponseEntity<?> adjust(@RequestBody TonKhoAdjustmentRequest request, HttpServletRequest httpRequest) {
         if (request.idSanPham() == null || !sanPhamRepository.existsById(request.idSanPham())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm không tồn tại"));
         }
         if (request.idChiNhanh() == null || !chiNhanhRepository.existsById(request.idChiNhanh())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
         }
+        branchAccessService.requireReadableBranch(
+                branchAccessService.requireAuthenticatedEmployee(httpRequest), request.idChiNhanh());
         if (request.soLuong() == null || request.soLuong() == 0) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Số lượng điều chỉnh phải khác 0"));
         }

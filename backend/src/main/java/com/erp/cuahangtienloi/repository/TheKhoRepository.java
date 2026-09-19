@@ -9,6 +9,7 @@ import java.util.UUID;
 
 @Repository
 public interface TheKhoRepository extends JpaRepository<TheKho, UUID> {
+    List<TheKho> findByIdChiNhanhOrderByNgayPhatSinhDesc(UUID idChiNhanh);
     List<TheKho> findByIdSanPhamAndIdChiNhanhOrderByNgayPhatSinhDesc(UUID idSanPham, UUID idChiNhanh);
     List<TheKho> findByMaChungTu(String maChungTu);
     List<TheKho> findByLoaiGiaoDichAndIdChiNhanhOrderByNgayPhatSinhDesc(String loaiGiaoDich, UUID idChiNhanh);

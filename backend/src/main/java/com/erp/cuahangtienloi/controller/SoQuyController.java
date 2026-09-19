@@ -4,6 +4,7 @@ import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.SoQuyDTO;
 import com.erp.cuahangtienloi.entity.SoQuy;
 import com.erp.cuahangtienloi.repository.*;
+import com.erp.cuahangtienloi.service.BranchAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -30,11 +31,12 @@ public class SoQuyController {
     private final SoQuyRepository soQuyRepository;
     private final ChiNhanhRepository chiNhanhRepository;
     private final NhanVienRepository nhanVienRepository;
+    private final BranchAccessService branchAccessService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<List<SoQuyDTO>> getAll() {
-        List<SoQuyDTO> list = soQuyRepository.findAll().stream()
+    public ResponseEntity<List<SoQuyDTO>> getAll(HttpServletRequest request) {
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -42,15 +44,18 @@ public class SoQuyController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<?> getById(@PathVariable UUID id) {
+    public ResponseEntity<?> getById(@PathVariable UUID id, HttpServletRequest request) {
         return soQuyRepository.findById(id)
+                .filter(sq -> canReadEntry(branchAccessService.requireAuthenticatedEmployee(request), sq))
                 .map(sq -> ResponseEntity.ok(toDTO(sq)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<List<SoQuyDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
+    public ResponseEntity<List<SoQuyDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh,
+                                                         HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<SoQuyDTO> list = soQuyRepository.findByIdChiNhanh(idChiNhanh).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -59,8 +64,10 @@ public class SoQuyController {
 
     @GetMapping("/by-direction/{direction}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<List<SoQuyDTO>> getByDirection(@PathVariable String direction) {
-        List<SoQuyDTO> list = soQuyRepository.findByDirection(direction).stream()
+    public ResponseEntity<List<SoQuyDTO>> getByDirection(@PathVariable String direction,
+                                                          HttpServletRequest request) {
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
+                .filter(sq -> direction.equals(sq.getDirection()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -68,8 +75,10 @@ public class SoQuyController {
 
     @GetMapping("/by-hang-muc/{hangMuc}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<List<SoQuyDTO>> getByHangMuc(@PathVariable String hangMuc) {
-        List<SoQuyDTO> list = soQuyRepository.findByHangMuc(hangMuc).stream()
+    public ResponseEntity<List<SoQuyDTO>> getByHangMuc(@PathVariable String hangMuc,
+                                                        HttpServletRequest request) {
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
+                .filter(sq -> hangMuc.equals(sq.getHangMuc()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -78,8 +87,9 @@ public class SoQuyController {
     @GetMapping("/by-date-range")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getByDateRange(
-            @RequestParam LocalDate from, @RequestParam LocalDate to) {
-        List<SoQuyDTO> list = soQuyRepository.findByEntryDateBetween(from, to).stream()
+            @RequestParam LocalDate from, @RequestParam LocalDate to, HttpServletRequest request) {
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
+                .filter(sq -> !sq.getEntryDate().isBefore(from) && !sq.getEntryDate().isAfter(to))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -231,6 +241,19 @@ public class SoQuyController {
         }
 
         return dto;
+    }
+
+    private List<SoQuy> findEntriesVisibleTo(HttpServletRequest request) {
+        var employee = branchAccessService.requireAuthenticatedEmployee(request);
+        return branchAccessService.isSystemWide(employee)
+                ? soQuyRepository.findAll()
+                : soQuyRepository.findByIdChiNhanh(branchAccessService.requiredOwnBranch(employee));
+    }
+
+    private boolean canReadEntry(com.erp.cuahangtienloi.entity.NhanVien employee, SoQuy entry) {
+        return branchAccessService.isSystemWide(employee)
+                || (entry.getIdChiNhanh() != null
+                && entry.getIdChiNhanh().equals(branchAccessService.requiredOwnBranch(employee)));
     }
 
 //    record SuccessResponse(String message) {}

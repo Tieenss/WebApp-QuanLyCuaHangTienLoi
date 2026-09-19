@@ -14,6 +14,7 @@ import java.util.UUID;
 @Repository
 public interface TonKhoRepository extends JpaRepository<TonKho, TonKho.TonKhoId> {
     List<TonKho> findByIdChiNhanh(UUID idChiNhanh);
+    List<TonKho> findByIdSanPham(UUID idSanPham);
     Optional<TonKho> findByIdSanPhamAndIdChiNhanh(UUID idSanPham, UUID idChiNhanh);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
