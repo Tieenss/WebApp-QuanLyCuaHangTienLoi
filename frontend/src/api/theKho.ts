@@ -57,7 +57,7 @@ export const theKhoApi = {
   },
 
   getByProductAndBranch: async (idSanPham: string, idChiNhanh: string): Promise<TheKhoDTO[]> => {
-    const response = await fetch(`${API_BASE_URL}/api/the-kho/by-product/${idSanPham}/by-branch/${idChiNhanh}`, {
+    const response = await fetch(`${API_BASE_URL}/api/the-kho/by-product/${idSanPham}/branch/${idChiNhanh}`, {
       headers: getHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch thẻ kho');

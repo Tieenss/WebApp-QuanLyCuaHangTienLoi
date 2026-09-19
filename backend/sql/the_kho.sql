@@ -246,20 +246,29 @@ DECLARE
     v_id UUID;
     v_ton_truoc INTEGER;
     v_ton_sau INTEGER;
+    v_ton_kho_ton_tai BOOLEAN;
+    v_gia_von_cu DECIMAL(12,0);
+    v_gia_von_moi DECIMAL(12,0);
 BEGIN
     -- Lấy tồn hiện tại (khoá row để tránh race)
-    SELECT so_luong_ton INTO v_ton_truoc
+    SELECT so_luong_ton, gia_von_trung_binh
+    INTO v_ton_truoc, v_gia_von_cu
     FROM ton_kho
     WHERE id_san_pham = p_id_san_pham AND id_chi_nhanh = p_id_chi_nhanh
     FOR UPDATE;
 
-    IF NOT FOUND THEN
+    -- Lưu lại kết quả của SELECT ngay lập tức. Không dùng FOUND sau khi đã
+    -- INSERT the_kho vì FOUND khi đó thuộc về câu lệnh INSERT gần nhất.
+    v_ton_kho_ton_tai := FOUND;
+
+    IF NOT v_ton_kho_ton_tai THEN
         -- Row chưa tồn tại: nếu giao dịch IN thì tạo với tồn 0, OUT thì lỗi
         IF p_so_luong < 0 THEN
             RAISE EXCEPTION 'Không thể xuất % đơn vị: SP chưa có tồn kho tại chi nhánh',
                 -p_so_luong;
         END IF;
         v_ton_truoc := 0;
+        v_gia_von_cu := 0;
     END IF;
 
     v_ton_sau := v_ton_truoc + p_so_luong;
@@ -281,15 +290,32 @@ BEGIN
     )
     RETURNING id INTO v_id;
 
-    -- Cập nhật ton_kho
-    IF NOT FOUND THEN
+    -- Tính giá vốn bình quân gia quyền. Giao dịch nhập dương làm thay đổi
+    -- bình quân; giao dịch xuất chỉ làm giảm số lượng và giữ nguyên giá vốn.
+    IF p_so_luong > 0 THEN
+        IF v_ton_sau > 0 THEN
+            v_gia_von_moi := (
+                (v_ton_truoc * COALESCE(v_gia_von_cu, 0))
+                + (p_so_luong * p_don_gia)
+            ) / v_ton_sau;
+        ELSE
+            v_gia_von_moi := COALESCE(p_don_gia, 0);
+        END IF;
+    ELSE
+        v_gia_von_moi := COALESCE(v_gia_von_cu, 0);
+    END IF;
+
+    -- Cập nhật ton_kho dựa trên trạng thái đã lưu trước INSERT the_kho.
+    IF NOT v_ton_kho_ton_tai THEN
         -- Row ton_kho chưa tồn tại → tạo mới
         INSERT INTO ton_kho (id_san_pham, id_chi_nhanh, so_luong_ton,
                             gia_von_trung_binh, lan_bien_dong_cuoi)
         VALUES (p_id_san_pham, p_id_chi_nhanh, v_ton_sau, p_don_gia, p_ngay_phat_sinh);
     ELSE
         UPDATE ton_kho
-        SET so_luong_ton = v_ton_sau
+        SET so_luong_ton = v_ton_sau,
+            gia_von_trung_binh = v_gia_von_moi,
+            lan_bien_dong_cuoi = p_ngay_phat_sinh
         WHERE id_san_pham = p_id_san_pham AND id_chi_nhanh = p_id_chi_nhanh;
     END IF;
 

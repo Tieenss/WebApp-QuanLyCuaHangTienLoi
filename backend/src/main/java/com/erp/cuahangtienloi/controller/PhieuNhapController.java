@@ -312,7 +312,9 @@ public class PhieuNhapController {
     @Transactional
     public ResponseEntity<?> pay(@PathVariable UUID id,
                                  @RequestBody(required = false) PayRequest request) {
-        java.util.Optional<PhieuNhap> found = phieuNhapRepository.findById(id);
+        // Khóa pessimistic trong suốt transaction: hai request thanh toán đồng
+        // thời không thể cùng đọc trạng thái PENDING rồi cộng tồn hai lần.
+        java.util.Optional<PhieuNhap> found = phieuNhapRepository.findByIdForUpdate(id);
         if (found.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -333,9 +335,13 @@ public class PhieuNhapController {
                 "SELECT grand_total FROM phieu_nhap WHERE id = ?", BigDecimal.class, id);
         BigDecimal paid = request != null && request.getDaThanhToan() != null
                 ? request.getDaThanhToan() : grand;
-        if (paid.compareTo(grand) > 0) {
+        if (paid.signum() < 0) {
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.err("Số tiền trả vượt giá trị phiếu"));
+                    .body(ApiResponse.err("Số tiền trả không được âm"));
+        }
+        if (paid.compareTo(grand) != 0) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.err("Phải thanh toán đủ giá trị phiếu nhập"));
         }
 
         for (ChiTietPhieuNhap ct : lines) {
@@ -415,7 +421,7 @@ public class PhieuNhapController {
         @Min(value = 1, message = "Số lượng nhận phải lớn hơn 0")
         private Integer soLuongNhan;
         @NotNull(message = "Đơn giá nhập bắt buộc nhập")
-        @DecimalMin(value = "0", message = "Đơn giá nhập phải lớn hơn hoặc bằng 0")
+        @DecimalMin(value = "0.01", message = "Đơn giá nhập phải lớn hơn 0")
         private BigDecimal donGiaNhap;
         @Min(value = 0, message = "VAT phải từ 0 đến 100")
         @Max(value = 100, message = "VAT phải từ 0 đến 100")

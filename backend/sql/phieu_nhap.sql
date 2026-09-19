@@ -293,21 +293,19 @@ RETURNS TRIGGER AS $$
 DECLARE
     v_id_phieu_nhap UUID;
     v_sub DECIMAL(15,0);
-    v_giam_gia_dong_total DECIMAL(15,0);
     v_vat DECIMAL(15,0);
 BEGIN
     v_id_phieu_nhap := COALESCE(NEW.id_phieu_nhap, OLD.id_phieu_nhap);
 
-    SELECT
-        COALESCE(SUM(don_gia * so_luong), 0),
-        COALESCE(SUM(giam_gia_dong), 0)
-    INTO v_sub, v_giam_gia_dong_total
+    -- chi_tiet_phieu_nhap dùng don_gia_nhap, so_luong_nhan và thanh_tien.
+    -- Không dùng các tên cũ don_gia/so_luong/giam_gia_dong ở đây.
+    SELECT COALESCE(SUM(thanh_tien), 0)
+    INTO v_sub
     FROM chi_tiet_phieu_nhap
     WHERE id_phieu_nhap = v_id_phieu_nhap;
 
-    -- VAT tính trên (don_gia × so_luong - giam_gia_dong) — từng dòng rồi sum
-    -- (khớp frontend buildSalesOrder cách tính: vat theo từng dòng, sum lên)
-    SELECT COALESCE(SUM(ROUND((don_gia * so_luong - giam_gia_dong) * vat_phantram / 100)), 0)
+    -- VAT tính trên thành tiền thực nhận của từng dòng.
+    SELECT COALESCE(SUM(ROUND(thanh_tien * vat_phantram / 100)), 0)
     INTO v_vat
     FROM chi_tiet_phieu_nhap
     WHERE id_phieu_nhap = v_id_phieu_nhap;
