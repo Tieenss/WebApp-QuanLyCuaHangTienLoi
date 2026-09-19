@@ -41,7 +41,6 @@ export interface PurchaseLineDTO {
 export interface CreatePurchaseWithLinesDTO {
   idChiNhanh?: string | null;
   idNcc: string;
-  idNguoiNhap?: string | null;
   ngayDatHang?: string;
   ngayDuKienGiao?: string;
   ngayNhanThucTe?: string;

@@ -3,6 +3,8 @@ package com.erp.cuahangtienloi.controller;
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuNhap;
 import com.erp.cuahangtienloi.repository.*;
+import com.erp.cuahangtienloi.service.BranchAccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,23 +25,27 @@ public class ChiTietPhieuNhapController {
     private final ChiTietPhieuNhapRepository chiTietPhieuNhapRepository;
     private final PhieuNhapRepository phieuNhapRepository;
     private final SanPhamRepository sanPhamRepository;
+    private final BranchAccessService branchAccessService;
 
     @GetMapping("/by-phieu/{idPhieuNhap}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'KE_TOAN')")
-    public ResponseEntity<List<ChiTietPhieuNhap>> getByPhieuNhap(@PathVariable UUID idPhieuNhap) {
+    public ResponseEntity<List<ChiTietPhieuNhap>> getByPhieuNhap(@PathVariable UUID idPhieuNhap, HttpServletRequest request) {
+        requireReadableHeader(idPhieuNhap, request);
         return ResponseEntity.ok(chiTietPhieuNhapRepository.findByIdPhieuNhap(idPhieuNhap));
     }
 
     @GetMapping("/by-san-pham/{idSanPham}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'KE_TOAN')")
-    public ResponseEntity<List<ChiTietPhieuNhap>> getBySanPham(@PathVariable UUID idSanPham) {
-        return ResponseEntity.ok(chiTietPhieuNhapRepository.findByIdSanPham(idSanPham));
+    public ResponseEntity<List<ChiTietPhieuNhap>> getBySanPham(@PathVariable UUID idSanPham, HttpServletRequest request) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(request);
+        return ResponseEntity.ok(chiTietPhieuNhapRepository.findByIdSanPham(idSanPham).stream()
+                .filter(ct -> canReadHeader(actor, ct.getIdPhieuNhap())).toList());
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
-    public ResponseEntity<?> create(@RequestBody ChiTietPhieuNhap request) {
-        validate(request);
+    public ResponseEntity<?> create(@RequestBody ChiTietPhieuNhap request, HttpServletRequest httpRequest) {
+        validate(request, httpRequest);
         ChiTietPhieuNhap ct = new ChiTietPhieuNhap();
         ct.setId(UUID.randomUUID());
         ct.setIdPhieuNhap(request.getIdPhieuNhap());
@@ -59,12 +65,12 @@ public class ChiTietPhieuNhapController {
 
     @PostMapping("/batch")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
-    public ResponseEntity<?> createBatch(@RequestBody List<ChiTietPhieuNhap> requests) {
+    public ResponseEntity<?> createBatch(@RequestBody List<ChiTietPhieuNhap> requests, HttpServletRequest httpRequest) {
         if (requests == null || requests.isEmpty()) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Danh sách chi tiết phiếu nhập rỗng"));
         }
         for (ChiTietPhieuNhap request : requests) {
-            validate(request);
+            validate(request, httpRequest);
             ChiTietPhieuNhap ct = new ChiTietPhieuNhap();
             ct.setId(UUID.randomUUID());
             ct.setIdPhieuNhap(request.getIdPhieuNhap());
@@ -82,13 +88,14 @@ public class ChiTietPhieuNhapController {
         return ResponseEntity.ok( ApiResponse.ok("Tạo chi tiết phiếu nhập thành công"));
     }
 
-    private void validate(ChiTietPhieuNhap request) {
+    private void validate(ChiTietPhieuNhap request, HttpServletRequest httpRequest) {
         if (request.getIdPhieuNhap() == null || !phieuNhapRepository.existsById(request.getIdPhieuNhap())) {
             throw new IllegalArgumentException("Phiếu nhập không tồn tại");
         }
         if (request.getIdSanPham() == null || !sanPhamRepository.existsById(request.getIdSanPham())) {
             throw new IllegalArgumentException("Sản phẩm không tồn tại");
         }
+        requireReadableHeader(request.getIdPhieuNhap(), httpRequest);
         com.erp.cuahangtienloi.validation.InputValidator.positive(request.getSoLuongDat(), "Số lượng đặt");
         if (request.getSoLuongNhan() != null) {
             com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getSoLuongNhan(), "Số lượng nhận");
@@ -104,20 +111,35 @@ public class ChiTietPhieuNhapController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
-    public ResponseEntity<?> delete(@PathVariable UUID id) {
-        if (chiTietPhieuNhapRepository.existsById(id)) {
-            chiTietPhieuNhapRepository.deleteById(id);
-            return ResponseEntity.ok( ApiResponse.ok("Xóa chi tiết thành công"));
-        }
-        return ResponseEntity.notFound().build();
+    public ResponseEntity<?> delete(@PathVariable UUID id, HttpServletRequest request) {
+        return chiTietPhieuNhapRepository.findById(id).map(ct -> {
+            requireReadableHeader(ct.getIdPhieuNhap(), request);
+            chiTietPhieuNhapRepository.delete(ct);
+            return ResponseEntity.ok(ApiResponse.ok("Xóa chi tiết thành công"));
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/by-phieu/{idPhieuNhap}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
-    public ResponseEntity<?> deleteByPhieuNhap(@PathVariable UUID idPhieuNhap) {
+    public ResponseEntity<?> deleteByPhieuNhap(@PathVariable UUID idPhieuNhap, HttpServletRequest request) {
+        requireReadableHeader(idPhieuNhap, request);
         List<ChiTietPhieuNhap> list = chiTietPhieuNhapRepository.findByIdPhieuNhap(idPhieuNhap);
         chiTietPhieuNhapRepository.deleteAll(list);
         return ResponseEntity.ok( ApiResponse.ok("Xóa tất cả chi tiết phiếu nhập"));
+    }
+
+    private boolean canReadHeader(com.erp.cuahangtienloi.entity.NhanVien actor, UUID idPhieuNhap) {
+        return phieuNhapRepository.findById(idPhieuNhap)
+                .map(header -> branchAccessService.canReadBranch(actor, header.getIdChiNhanh()))
+                .orElse(false);
+    }
+
+    private void requireReadableHeader(UUID idPhieuNhap, HttpServletRequest request) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(request);
+        if (!canReadHeader(actor, idPhieuNhap)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Không được xem hoặc sửa chi tiết phiếu nhập của chi nhánh khác");
+        }
     }
 
 //    record SuccessResponse(String message) {}

@@ -87,6 +87,14 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
 
   const [branchId, setBranchId] = useState<string | null>(null);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
+  const isBranchScoped = user?.role !== 'ADMIN';
+
+  useEffect(() => {
+    if (!open || !isBranchScoped) return;
+    const ownBranchId = user?.branchId ?? null;
+    setBranchId(ownBranchId);
+    form.setFieldValue('branchId', ownBranchId);
+  }, [open, isBranchScoped, user?.branchId, form]);
 
   const handleAfterClose = (): void => {
     form.resetFields();
@@ -349,7 +357,10 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
               style={{ width: 280 }}
               value={branchId}
               onChange={(val) => setBranchId(val)}
-              options={branches.map((s) => ({ value: s.id, label: s.name }))}
+              disabled={isBranchScoped}
+              options={(isBranchScoped
+                ? branches.filter((s) => s.id === user?.branchId)
+                : branches).map((s) => ({ value: s.id, label: s.name }))}
             />
           </Form.Item>
           <Form.Item

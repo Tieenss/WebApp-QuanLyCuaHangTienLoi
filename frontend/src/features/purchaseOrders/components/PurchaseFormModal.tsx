@@ -23,7 +23,7 @@ import { phieuNhapApi } from '@/api/phieuNhap';
 import { fetchBranches  } from '@/store/slices/branchSlice';
 import { fetchProducts } from '@/store/slices/productSlice';
 import { fetchSuppliers } from '@/store/slices/supplierSlice';
-import { PRODUCT_UNIT_LABEL } from '@/types';
+import { PRODUCT_UNIT_LABEL, USER_ROLE } from '@/types';
 import { BRANCH_KIND } from '@/types/branchTypes';
 import { DISTRIBUTION_CENTER_ID } from '@/config/businessRules';
 import { dayjs, today } from '@/utils/dateUtils';
@@ -122,11 +122,22 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       () => branches.filter((b) => b.kind === BRANCH_KIND.DistributionCenter),
       [branches],
   );
+  const isWarehouseKeeper = user?.role === USER_ROLE.WarehouseKeeper;
+  const ownDistributionCenter = useMemo(
+    () => khoTongBranches.find((branch) => branch.id === user?.branchId) ?? null,
+    [khoTongBranches, user?.branchId],
+  );
+  const selectableDistributionCenters = isWarehouseKeeper
+    ? (ownDistributionCenter ? [ownDistributionCenter] : [])
+    : khoTongBranches;
   useEffect(() => {
-    if (open && branchId === null && khoTongBranches.length > 0) {
+    if (!open) return;
+    if (isWarehouseKeeper) {
+      setBranchId(ownDistributionCenter?.id ?? null);
+    } else if (branchId === null && khoTongBranches.length > 0) {
       setBranchId(khoTongBranches[0].id);
     }
-  }, [open, branchId, khoTongBranches]);
+  }, [open, branchId, khoTongBranches, isWarehouseKeeper, ownDistributionCenter?.id]);
 
   /** Sản phẩm NCC đang chọn cung ứng: được gán trực tiếp. */
   const supplierProducts = useMemo(() => {
@@ -183,6 +194,15 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
     try {
       const values = await form.validateFields();
 
+      if (branchId === null) {
+        message.error('Chưa xác định được Kho Tổng nhận hàng.');
+        return;
+      }
+      if (isWarehouseKeeper && branchId !== ownDistributionCenter?.id) {
+        message.error('Thủ kho chỉ được lập phiếu nhập cho Kho Tổng được phân công.');
+        return;
+      }
+
       if (validRows.length === 0) {
         message.error('Phiếu nhập phải có ít nhất một dòng hàng hợp lệ.');
         return;
@@ -199,7 +219,6 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       const createdOrder = await phieuNhapApi.createWithLines({
         idChiNhanh: branchId,
         idNcc: values.supplierId,
-        idNguoiNhap: user?.idNhanVien ?? null,
         ngayDatHang: values.orderDate.format('YYYY-MM-DD'),
         trangThai: 'PENDING_PAYMENT',
         ghiChu: values.note?.trim() ?? '',
@@ -363,6 +382,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       afterClose={handleAfterClose}
       destroyOnHidden
       width={1000}
+      okButtonProps={{ disabled: branchId === null }}
     >
       <Alert
         type="info"
@@ -405,11 +425,12 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
                 placeholder="Chọn Kho Tổng"
                 value={branchId}
                 onChange={setBranchId}
+                disabled={isWarehouseKeeper}
                 loading={branchLoading}
                 showSearch
                 optionFilterProp="label"
                 notFoundContent="Không có Kho Tổng nào"
-                options={khoTongBranches.map((b) => ({
+                options={selectableDistributionCenters.map((b) => ({
                   value: b.id,
                   label: `${b.code} - ${b.name}`,
                 }))}

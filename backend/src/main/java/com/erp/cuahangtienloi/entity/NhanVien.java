@@ -1,5 +1,6 @@
 package com.erp.cuahangtienloi.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.UUID;
@@ -31,6 +32,7 @@ public class NhanVien {
 
     private String soDienThoai;
 
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(name = "mat_khau")
     private String matKhau;
 

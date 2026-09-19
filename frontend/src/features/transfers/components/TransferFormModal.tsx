@@ -53,9 +53,9 @@ interface TransferFormModalProps {
   /**
    * Trạng thái phiếu khi tạo:
    * - `PENDING`: yêu cầu chờ Thủ kho duyệt (StoreManager dùng).
-   * - `COMPLETED`: Thủ kho/Admin trực tiếp xuất, tồn kho chuyển ngay.
+ * - `COMPLETED`: chỉ Admin được xuất và nhận ngay.
    *
-   * Mặc định `COMPLETED` để giữ hành vi cũ khi gọi không truyền prop.
+ * Mặc định `PENDING` để không tự nhận hàng bằng quyền Thủ kho.
    */
   initialStatus?: DocumentStatus;
 }
@@ -79,7 +79,7 @@ const emptyRow = (): DraftRow => ({
 export const TransferFormModal: FC<TransferFormModalProps> = ({
   open,
   onClose,
-  initialStatus = DOCUMENT_STATUS.Completed,
+  initialStatus = DOCUMENT_STATUS.Pending,
 }) => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
@@ -143,6 +143,12 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   const [toBranchId, setToBranchId] = useState<string | null>(defaultToBranchId);
   const [fromBranchId, setFromBranchId] = useState<string>(DISTRIBUTION_CENTER_ID);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
+
+  useEffect(() => {
+    if (open && user?.role === USER_ROLE.WarehouseKeeper && user.branchId) {
+      setFromBranchId(user.branchId);
+    }
+  }, [open, user?.role, user?.branchId]);
 
   /** Dọn form sau khi modal đóng hẳn (dùng sự kiện, không dùng effect). */
   const handleAfterClose = (): void => {
@@ -247,7 +253,6 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
             maPhieu: '', // trigger DB tự sinh PX-YYYYMMDD-NNN
             idChiNhanhXuat: fromBranchId,
             idChiNhanhNhan: values.toBranchId,
-            idNguoiTao: user?.idNhanVien ?? null,
             ngayYeuCau: values.requestDate.format('YYYY-MM-DD'),
             trangThai: 'PENDING', // luôn tạo PENDING — bước tiếp theo qua API ship/receive
             ghiChu: values.note?.trim() ?? '',
@@ -276,12 +281,10 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         // 2) Thủ kho/Admin lập phiếu trực tiếp: tự chạy luôn bước xuất + nhận
         //    để DB trừ tồn kho xuất, cộng tồn kho nhận, đủ 2 dòng thẻ kho.
         if (initialStatus === DOCUMENT_STATUS.Completed) {
-          const idNhanVien = user?.idNhanVien ?? '';
           await phieuXuatKhoApi.ship(created.id, {
-            idNguoiThucHien: idNhanVien,
             lines: validRows.map((row) => ({ idSanPham: row.productId, soLuong: row.quantity })),
           });
-          await phieuXuatKhoApi.receive(created.id, { idNguoiThucHien: idNhanVien });
+          await phieuXuatKhoApi.receive(created.id, {});
         }
       } catch (e: any) {
         message.error(e?.message || 'Có lỗi khi lưu phiếu xuất');
@@ -342,7 +345,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
 
         const balance = balances.find(
           (item) =>
-            item.branchId === DISTRIBUTION_CENTER_ID &&
+            item.branchId === fromBranchId &&
             item.productId === row.productId,
         );
         if (balance === undefined) return <Text type="secondary">0</Text>;

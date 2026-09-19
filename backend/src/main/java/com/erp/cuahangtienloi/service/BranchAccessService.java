@@ -52,6 +52,33 @@ public class BranchAccessService {
         }
     }
 
+    public boolean canReadBranch(NhanVien employee, UUID branchId) {
+        return isSystemWide(employee)
+                || (employee.getIdChiNhanh() != null && employee.getIdChiNhanh().equals(branchId));
+    }
+
+    /** ADMIN/Kế toán xem toàn hệ thống; Quản lý xem nhân sự chi nhánh mình;
+     * các vai trò khác chỉ xem hồ sơ của chính mình. */
+    public boolean canReadEmployee(NhanVien actor, NhanVien target) {
+        if (isSystemWide(actor)) return true;
+        if (actor.getId().equals(target.getId())) return true;
+        return "QUAN_LY".equals(actor.getVaiTro())
+                && actor.getIdChiNhanh() != null
+                && actor.getIdChiNhanh().equals(target.getIdChiNhanh());
+    }
+
+    /** Điều chuyển có hai đầu kho: thủ kho chỉ xem đầu xuất, quản lý chỉ xem đầu nhận. */
+    public boolean canReadTransfer(NhanVien actor, UUID sourceBranchId, UUID destinationBranchId) {
+        if (isSystemWide(actor) || actor.getIdChiNhanh() == null) return isSystemWide(actor);
+        if ("THU_KHO".equals(actor.getVaiTro())) {
+            return actor.getIdChiNhanh().equals(sourceBranchId);
+        }
+        if ("QUAN_LY".equals(actor.getVaiTro())) {
+            return actor.getIdChiNhanh().equals(destinationBranchId);
+        }
+        return false;
+    }
+
     public UUID requiredOwnBranch(NhanVien employee) {
         if (employee.getIdChiNhanh() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,

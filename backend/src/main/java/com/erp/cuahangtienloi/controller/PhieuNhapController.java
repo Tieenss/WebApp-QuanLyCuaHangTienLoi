@@ -6,6 +6,7 @@ import com.erp.cuahangtienloi.entity.ChiTietPhieuNhap;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuNhap;
 import com.erp.cuahangtienloi.repository.*;
+import com.erp.cuahangtienloi.service.BranchAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -40,16 +41,16 @@ public class PhieuNhapController {
     private final com.erp.cuahangtienloi.repository.ChiTietPhieuNhapRepository chiTietPhieuNhapRepository;
     private final SanPhamRepository sanPhamRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final BranchAccessService branchAccessService;
 
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
-    // ID kho tổng - nơi nhận hàng khi tạo phiếu nhập
-    private static final java.util.UUID DEFAULT_DISTRIBUTION_CENTER_ID = java.util.UUID.fromString("a1b2c3d4-0001-0000-0000-000000000001");
-
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
-    public ResponseEntity<List<PhieuNhapDTO>> getAll() {
+    public ResponseEntity<List<PhieuNhapDTO>> getAll(HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<PhieuNhapDTO> list = phieuNhapRepository.findAll().stream()
+                .filter(pn -> branchAccessService.canReadBranch(actor, pn.getIdChiNhanh()))
                 .map(this::toDTO)
                 .toList();
         return ResponseEntity.ok(list);
@@ -57,15 +58,18 @@ public class PhieuNhapController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
-    public ResponseEntity<?> getById(@PathVariable UUID id) {
+    public ResponseEntity<?> getById(@PathVariable UUID id, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         return phieuNhapRepository.findById(id)
+                .filter(pn -> branchAccessService.canReadBranch(actor, pn.getIdChiNhanh()))
                 .map(hd -> ResponseEntity.ok(toDTO(hd)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
-    public ResponseEntity<List<PhieuNhapDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
+    public ResponseEntity<List<PhieuNhapDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh, HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<PhieuNhapDTO> list = phieuNhapRepository.findByIdChiNhanh(idChiNhanh).stream()
                 .map(this::toDTO)
                 .toList();
@@ -74,8 +78,10 @@ public class PhieuNhapController {
 
     @GetMapping("/by-ncc/{idNcc}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
-    public ResponseEntity<List<PhieuNhapDTO>> getByNcc(@PathVariable UUID idNcc) {
+    public ResponseEntity<List<PhieuNhapDTO>> getByNcc(@PathVariable UUID idNcc, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<PhieuNhapDTO> list = phieuNhapRepository.findByIdNcc(idNcc).stream()
+                .filter(pn -> branchAccessService.canReadBranch(actor, pn.getIdChiNhanh()))
                 .map(this::toDTO)
                 .toList();
         return ResponseEntity.ok(list);
@@ -83,8 +89,10 @@ public class PhieuNhapController {
 
     @GetMapping("/by-status/{trangThai}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
-    public ResponseEntity<List<PhieuNhapDTO>> getByStatus(@PathVariable String trangThai) {
+    public ResponseEntity<List<PhieuNhapDTO>> getByStatus(@PathVariable String trangThai, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<PhieuNhapDTO> list = phieuNhapRepository.findByTrangThai(trangThai).stream()
+                .filter(pn -> branchAccessService.canReadBranch(actor, pn.getIdChiNhanh()))
                 .map(this::toDTO)
                 .toList();
         return ResponseEntity.ok(list);
@@ -111,23 +119,7 @@ public class PhieuNhapController {
         pn.setIdChiNhanh(request.getIdChiNhanh());
         pn.setIdNcc(request.getIdNcc());
         // Lấy idNguoiNhap từ request - nếu null hoặc không tồn tại thì lấy NV bất kỳ
-        UUID idNguoiNhap = request.getIdNguoiNhap();
-
-        if (idNguoiNhap == null || !nhanVienRepository.existsById(idNguoiNhap)) {
-            Object attr = httpRequest.getAttribute("authenticatedIdNhanVien");
-
-            if (attr instanceof String s) {
-                try {
-                    UUID id = UUID.fromString(s);
-
-                    if (nhanVienRepository.existsById(id)) {
-                        idNguoiNhap = id;
-                    }
-                } catch (IllegalArgumentException ignored) {
-                    // UUID không hợp lệ
-                }
-            }
-        }
+        UUID idNguoiNhap = branchAccessService.requireAuthenticatedEmployee(httpRequest).getId();
         pn.setIdNguoiNhap(idNguoiNhap);
         pn.setNgayDatHang(request.getNgayDatHang() != null ? request.getNgayDatHang() : LocalDate.now());
         pn.setNgayDuKienGiao(request.getNgayDuKienGiao() != null ? request.getNgayDuKienGiao() : LocalDate.now().plusDays(3));
@@ -175,13 +167,17 @@ public class PhieuNhapController {
             return ResponseEntity.badRequest().body(ApiResponse.err("Nhà cung cấp không tồn tại"));
         }
 
-        // Kho nhận: ưu tiên request, mặc định = Kho Tổng (BR-05).
-        UUID idChiNhanh = request.getIdChiNhanh() != null
-                ? request.getIdChiNhanh()
-                : DEFAULT_DISTRIBUTION_CENTER_ID;
+        // Không fallback sang một UUID kho cố định: client phải chỉ rõ kho nhận
+        // để backend kiểm tra phạm vi chi nhánh của người đăng nhập.
+        UUID idChiNhanh = request.getIdChiNhanh();
+        if (idChiNhanh == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Thiếu kho nhận hàng"));
+        }
         if (!chiNhanhRepository.existsById(idChiNhanh)) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh nhập hàng không tồn tại"));
         }
+        branchAccessService.requireReadableBranch(
+                branchAccessService.requireAuthenticatedEmployee(httpRequest), idChiNhanh);
         for (PurchaseLine line : request.getLines()) {
             if (!sanPhamRepository.existsById(line.getIdSanPham())) {
                 return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm trong phiếu nhập không tồn tại"));
@@ -195,24 +191,8 @@ public class PhieuNhapController {
         pn.setId(UUID.randomUUID());
         pn.setIdChiNhanh(idChiNhanh);
         pn.setIdNcc(request.getIdNcc());
-        UUID idNguoiNhap = request.getIdNguoiNhap();
-
-        if (idNguoiNhap == null || !nhanVienRepository.existsById(idNguoiNhap)) {
-            Object attr = httpRequest.getAttribute("authenticatedIdNhanVien");
-
-            if (attr instanceof String s) {
-                try {
-                    UUID id = UUID.fromString(s);
-
-                    if (nhanVienRepository.existsById(id)) {
-                        idNguoiNhap = id;
-                    }
-                } catch (IllegalArgumentException ignored) {
-                    // UUID không hợp lệ
-                }
-            }
-        }
-        pn.setIdNguoiNhap(idNguoiNhap);
+        // Audit trail luôn lấy danh tính từ JWT; request không được quyền chọn người nhập.
+        pn.setIdNguoiNhap(branchAccessService.requireAuthenticatedEmployee(httpRequest).getId());
         LocalDate ngayNhap = request.getNgayDatHang() != null ? request.getNgayDatHang() : LocalDate.now();
         pn.setNgayDatHang(ngayNhap);
         pn.setNgayDuKienGiao(request.getNgayDuKienGiao() != null ? request.getNgayDuKienGiao() : ngayNhap);
@@ -311,7 +291,8 @@ public class PhieuNhapController {
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     @Transactional
     public ResponseEntity<?> pay(@PathVariable UUID id,
-                                 @RequestBody(required = false) PayRequest request) {
+                                 @RequestBody(required = false) PayRequest request,
+                                 HttpServletRequest httpRequest) {
         // Khóa pessimistic trong suốt transaction: hai request thanh toán đồng
         // thời không thể cùng đọc trạng thái PENDING rồi cộng tồn hai lần.
         java.util.Optional<PhieuNhap> found = phieuNhapRepository.findByIdForUpdate(id);
@@ -319,6 +300,8 @@ public class PhieuNhapController {
             return ResponseEntity.notFound().build();
         }
         PhieuNhap pn = found.get();
+        branchAccessService.requireReadableBranch(
+                branchAccessService.requireAuthenticatedEmployee(httpRequest), pn.getIdChiNhanh());
         if (!"PENDING_PAYMENT".equalsIgnoreCase(pn.getTrangThai())
                 && !"PENDING".equalsIgnoreCase(pn.getTrangThai())) {
             return ResponseEntity.badRequest()
@@ -375,7 +358,6 @@ public class PhieuNhapController {
         private UUID idChiNhanh;
         @NotNull(message = "Nhà cung cấp bắt buộc chọn")
         private UUID idNcc;
-        private UUID idNguoiNhap;
         private LocalDate ngayDatHang;
         private LocalDate ngayDuKienGiao;
         private LocalDate ngayNhanThucTe;
@@ -391,8 +373,6 @@ public class PhieuNhapController {
         public void setIdChiNhanh(UUID v) { this.idChiNhanh = v; }
         public UUID getIdNcc() { return idNcc; }
         public void setIdNcc(UUID v) { this.idNcc = v; }
-        public UUID getIdNguoiNhap() { return idNguoiNhap; }
-        public void setIdNguoiNhap(UUID v) { this.idNguoiNhap = v; }
         public LocalDate getNgayDatHang() { return ngayDatHang; }
         public void setNgayDatHang(LocalDate v) { this.ngayDatHang = v; }
         public LocalDate getNgayDuKienGiao() { return ngayDuKienGiao; }
@@ -444,9 +424,11 @@ public class PhieuNhapController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
-    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuNhap request) {
+    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuNhap request, HttpServletRequest httpRequest) {
         return phieuNhapRepository.findById(id)
                 .map(pn -> {
+                    branchAccessService.requireReadableBranch(
+                            branchAccessService.requireAuthenticatedEmployee(httpRequest), pn.getIdChiNhanh());
                     validatePurchaseTotals(request);
                     if (request.getMaPhieu() != null) pn.setMaPhieu(request.getMaPhieu());
                     if (request.getNgayDatHang() != null) pn.setNgayDatHang(request.getNgayDatHang());
@@ -478,12 +460,13 @@ public class PhieuNhapController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
-    public ResponseEntity<?> delete(@PathVariable UUID id) {
-        if (phieuNhapRepository.existsById(id)) {
-            phieuNhapRepository.deleteById(id);
-            return ResponseEntity.ok( ApiResponse.ok("Xóa phiếu nhập thành công"));
-        }
-        return ResponseEntity.notFound().build();
+    public ResponseEntity<?> delete(@PathVariable UUID id, HttpServletRequest httpRequest) {
+        return phieuNhapRepository.findById(id).map(pn -> {
+            branchAccessService.requireReadableBranch(
+                    branchAccessService.requireAuthenticatedEmployee(httpRequest), pn.getIdChiNhanh());
+            phieuNhapRepository.delete(pn);
+            return ResponseEntity.ok(ApiResponse.ok("Xóa phiếu nhập thành công"));
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     private PhieuNhapDTO toDTO(PhieuNhap pn) {

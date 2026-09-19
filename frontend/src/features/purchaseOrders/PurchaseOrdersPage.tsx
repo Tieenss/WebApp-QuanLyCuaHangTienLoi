@@ -108,9 +108,11 @@ export const PurchaseOrdersPage: FC = () => {
     dispatch(fetchPurchaseOrders());
   }, [dispatch]);
 
-  /** Admin và Thủ kho được lập phiếu nhập (ma trận phân quyền). */
-  const canCreate =
-    user?.role === USER_ROLE.Admin || user?.role === USER_ROLE.WarehouseKeeper;
+  /** Thủ kho chỉ lập phiếu NCC tại Kho Tổng được gán cho chính mình. */
+  const assignedBranch = branches.find((branch) => branch.id === user?.branchId);
+  const canCreate = user?.role === USER_ROLE.Admin
+    || (user?.role === USER_ROLE.WarehouseKeeper
+      && assignedBranch?.kind === 'DISTRIBUTION_CENTER');
   const [isFormOpen, setFormOpen] = useState(false);
 
   /** Chỉ Kế toán (và Admin) được bấm "Thanh toán" trả NCC. */

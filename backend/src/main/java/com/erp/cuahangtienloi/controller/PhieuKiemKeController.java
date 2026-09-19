@@ -5,6 +5,7 @@ import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietKiemKe;
 import com.erp.cuahangtienloi.entity.PhieuKiemKe;
 import com.erp.cuahangtienloi.repository.*;
+import com.erp.cuahangtienloi.service.BranchAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -12,6 +13,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -34,24 +36,31 @@ public class PhieuKiemKeController {
     private final NhanVienRepository nhanVienRepository;
     private final ChiTietKiemKeRepository chiTietKiemKeRepository;
     private final SanPhamRepository sanPhamRepository;
+    private final BranchAccessService branchAccessService;
+    private final JdbcTemplate jdbcTemplate;
 
     @GetMapping
-    public ResponseEntity<List<PhieuKiemKeDTO>> getAll() {
+    public ResponseEntity<List<PhieuKiemKeDTO>> getAll(HttpServletRequest request) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<PhieuKiemKeDTO> list = phieuKiemKeRepository.findAll().stream()
+                .filter(pkk -> branchAccessService.canReadBranch(actor, pkk.getIdChiNhanh()))
                 .map(this::toDTO)
                 .toList();
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getById(@PathVariable UUID id) {
+    public ResponseEntity<?> getById(@PathVariable UUID id, HttpServletRequest request) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(request);
         return phieuKiemKeRepository.findById(id)
+                .filter(pkk -> branchAccessService.canReadBranch(actor, pkk.getIdChiNhanh()))
                 .map(hd -> ResponseEntity.ok(toDTO(hd)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
-    public ResponseEntity<List<PhieuKiemKeDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
+    public ResponseEntity<List<PhieuKiemKeDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh, HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<PhieuKiemKeDTO> list = phieuKiemKeRepository.findByIdChiNhanh(idChiNhanh).stream()
                 .map(this::toDTO)
                 .toList();
@@ -59,8 +68,10 @@ public class PhieuKiemKeController {
     }
 
     @GetMapping("/by-status/{trangThai}")
-    public ResponseEntity<List<PhieuKiemKeDTO>> getByStatus(@PathVariable String trangThai) {
+    public ResponseEntity<List<PhieuKiemKeDTO>> getByStatus(@PathVariable String trangThai, HttpServletRequest request) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<PhieuKiemKeDTO> list = phieuKiemKeRepository.findByTrangThai(trangThai).stream()
+                .filter(pkk -> branchAccessService.canReadBranch(actor, pkk.getIdChiNhanh()))
                 .map(this::toDTO)
                 .toList();
         return ResponseEntity.ok(list);
@@ -71,6 +82,7 @@ public class PhieuKiemKeController {
         if (request.getIdChiNhanh() == null || !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
         }
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(httpRequest), request.getIdChiNhanh());
         PhieuKiemKe pkk = new PhieuKiemKe();
         pkk.setId(UUID.randomUUID());
         // Sinh mã ở Java để response trả về đúng mã ngay, tránh Hibernate
@@ -78,16 +90,12 @@ public class PhieuKiemKeController {
         pkk.setMaPhieu(sinhMaPhieuKiemKe(
                 request.getNgayKiemKe() != null ? request.getNgayKiemKe() : LocalDate.now()));
         pkk.setIdChiNhanh(request.getIdChiNhanh());
-        UUID idNguoiTao = request.getIdNguoiTao();
-
-        if (idNguoiTao == null || !nhanVienRepository.existsById(idNguoiTao)) {
-            idNguoiTao = resolveAuthenticatedIdNhanVien(httpRequest);
-        }
+        UUID idNguoiTao = resolveAuthenticatedIdNhanVien(httpRequest);
         pkk.setIdNguoiTao(idNguoiTao);
-        pkk.setIdNguoiDuyet(request.getIdNguoiDuyet());
+        pkk.setIdNguoiDuyet(null);
         pkk.setNgayKiemKe(request.getNgayKiemKe() != null ? request.getNgayKiemKe() : LocalDate.now());
-        pkk.setNgayCanBang(request.getNgayCanBang());
-        pkk.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : "DANG_KIEM_KE");
+        pkk.setNgayCanBang(null);
+        pkk.setTrangThai("DANG_KIEM_KE");
         pkk.setGhiChu(request.getGhiChu());
         pkk.setNgayTao(LocalDateTime.now());
         pkk.setNgayCapNhat(LocalDateTime.now());
@@ -130,6 +138,7 @@ public class PhieuKiemKeController {
         if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
         }
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(httpRequest), request.getIdChiNhanh());
         for (ChiTietKiemKe line : request.getLines()) {
             if (line.getIdSanPham() == null || !sanPhamRepository.existsById(line.getIdSanPham())) {
                 return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm kiểm kê không tồn tại"));
@@ -144,11 +153,7 @@ public class PhieuKiemKeController {
         pkk.setId(UUID.randomUUID());
         pkk.setMaPhieu(null); // trigger DB tự sinh mã KK-YYYYMMDD-NNN
         pkk.setIdChiNhanh(request.getIdChiNhanh());
-        UUID idNguoiTao = request.getIdNguoiTao();
-
-        if (idNguoiTao == null || !nhanVienRepository.existsById(idNguoiTao)) {
-            idNguoiTao = resolveAuthenticatedIdNhanVien(httpRequest);
-        }
+        UUID idNguoiTao = resolveAuthenticatedIdNhanVien(httpRequest);
         pkk.setIdNguoiTao(idNguoiTao);
         pkk.setNgayKiemKe(request.getNgayKiemKe() != null ? request.getNgayKiemKe() : LocalDate.now());
         pkk.setTrangThai("DANG_KIEM_KE");
@@ -184,7 +189,6 @@ public class PhieuKiemKeController {
     public static class CreateStocktakeRequest {
         @NotNull(message = "Chi nhánh bắt buộc chọn")
         private UUID idChiNhanh;
-        private UUID idNguoiTao;
         private LocalDate ngayKiemKe;
         private String ghiChu;
         @NotEmpty(message = "Phiếu kiểm kê phải có ít nhất một sản phẩm")
@@ -193,8 +197,6 @@ public class PhieuKiemKeController {
 
         public UUID getIdChiNhanh() { return idChiNhanh; }
         public void setIdChiNhanh(UUID idChiNhanh) { this.idChiNhanh = idChiNhanh; }
-        public UUID getIdNguoiTao() { return idNguoiTao; }
-        public void setIdNguoiTao(UUID idNguoiTao) { this.idNguoiTao = idNguoiTao; }
         public LocalDate getNgayKiemKe() { return ngayKiemKe; }
         public void setNgayKiemKe(LocalDate ngayKiemKe) { this.ngayKiemKe = ngayKiemKe; }
         public String getGhiChu() { return ghiChu; }
@@ -205,14 +207,27 @@ public class PhieuKiemKeController {
 
     @PutMapping("/{id}")
     @Transactional
-    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuKiemKe request) {
+    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuKiemKe request, HttpServletRequest httpRequest) {
         return phieuKiemKeRepository.findById(id)
                 .map(pkk -> {
+                    var actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
+                    branchAccessService.requireReadableBranch(actor, pkk.getIdChiNhanh());
                     if (request.getMaPhieu() != null) pkk.setMaPhieu(request.getMaPhieu());
-                    if (request.getIdChiNhanh() != null) pkk.setIdChiNhanh(request.getIdChiNhanh());
-                    if (request.getIdNguoiDuyet() != null) pkk.setIdNguoiDuyet(request.getIdNguoiDuyet());
-                    if (request.getNgayCanBang() != null) pkk.setNgayCanBang(request.getNgayCanBang());
-                    if (request.getTrangThai() != null) pkk.setTrangThai(request.getTrangThai());
+                    if (request.getIdChiNhanh() != null && !request.getIdChiNhanh().equals(pkk.getIdChiNhanh())) {
+                        if (!"ADMIN".equals(actor.getVaiTro())) {
+                            throw new org.springframework.web.server.ResponseStatusException(
+                                    org.springframework.http.HttpStatus.FORBIDDEN,
+                                    "Chỉ Admin được đổi chi nhánh của phiếu kiểm kê");
+                        }
+                        if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+                        }
+                        pkk.setIdChiNhanh(request.getIdChiNhanh());
+                    }
+                    if (request.getTrangThai() != null || request.getNgayCanBang() != null) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err(
+                                "Không đổi trạng thái hoặc cân bằng qua PUT; hãy dùng endpoint /balance"));
+                    }
                     if (request.getGhiChu() != null) pkk.setGhiChu(request.getGhiChu());
                     pkk.setNgayCapNhat(LocalDateTime.now());
                     phieuKiemKeRepository.save(pkk);
@@ -221,13 +236,36 @@ public class PhieuKiemKeController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable UUID id) {
-        if (phieuKiemKeRepository.existsById(id)) {
-            phieuKiemKeRepository.deleteById(id);
-            return ResponseEntity.ok( ApiResponse.ok("Xóa phiếu kiểm kê thành công"));
+    /**
+     * Cân bằng tồn kho trong một transaction: DB khóa phiếu, đổi trạng thái,
+     * ghi thẻ kho ADJUSTMENT và điều chỉnh tồn qua fn_can_bang_kiem_ke.
+     */
+    @PostMapping("/{id}/balance")
+    @Transactional
+    public ResponseEntity<?> balance(@PathVariable UUID id, HttpServletRequest httpRequest) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
+        PhieuKiemKe pkk = phieuKiemKeRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Không tìm thấy phiếu kiểm kê"));
+        branchAccessService.requireReadableBranch(actor, pkk.getIdChiNhanh());
+        if (!"DANG_KIEM_KE".equals(pkk.getTrangThai())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err(
+                    "Chỉ cân bằng được phiếu đang kiểm kê"));
         }
-        return ResponseEntity.notFound().build();
+
+        jdbcTemplate.query(
+                "SELECT fn_can_bang_kiem_ke(?::uuid, ?::uuid, CURRENT_DATE, ?::varchar, NULL::text)",
+                rs -> { }, id, actor.getId(), actor.getHoTen());
+        return ResponseEntity.ok(toDTO(phieuKiemKeRepository.findById(id).orElseThrow()));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable UUID id, HttpServletRequest httpRequest) {
+        return phieuKiemKeRepository.findById(id).map(pkk -> {
+            branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(httpRequest), pkk.getIdChiNhanh());
+            phieuKiemKeRepository.delete(pkk);
+            return ResponseEntity.ok(ApiResponse.ok("Xóa phiếu kiểm kê thành công"));
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     private UUID resolveAuthenticatedIdNhanVien(HttpServletRequest request) {

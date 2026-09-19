@@ -6,6 +6,8 @@ import com.erp.cuahangtienloi.entity.TaiKhoan;
 import com.erp.cuahangtienloi.repository.ChiNhanhRepository;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import com.erp.cuahangtienloi.repository.TaiKhoanRepository;
+import com.erp.cuahangtienloi.service.BranchAccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,24 +29,30 @@ public class NhanVienController {
     private final NhanVienRepository nhanVienRepository;
     private final ChiNhanhRepository chiNhanhRepository;
     private final TaiKhoanRepository taiKhoanRepository;
+    private final BranchAccessService branchAccessService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
-    public ResponseEntity<List<NhanVien>> getAll() {
-        return ResponseEntity.ok(nhanVienRepository.findAll());
+    public ResponseEntity<List<NhanVien>> getAll(HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
+        return ResponseEntity.ok(nhanVienRepository.findAll().stream()
+                .filter(nv -> branchAccessService.canReadEmployee(actor, nv)).toList());
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
-    public ResponseEntity<?> getById(@PathVariable UUID id) {
+    public ResponseEntity<?> getById(@PathVariable UUID id, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         return nhanVienRepository.findById(id)
+                .filter(nv -> branchAccessService.canReadEmployee(actor, nv))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/by-chi-nhanh/{idChiNhanh}")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
-    public ResponseEntity<List<NhanVien>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
+    public ResponseEntity<List<NhanVien>> getByChiNhanh(@PathVariable UUID idChiNhanh, HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<NhanVien> list = nhanVienRepository.findAll().stream()
                 .filter(nv -> idChiNhanh.equals(nv.getIdChiNhanh()))
                 .toList();
@@ -53,8 +61,10 @@ public class NhanVienController {
 
     @GetMapping("/active")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
-    public ResponseEntity<List<NhanVien>> getActive() {
+    public ResponseEntity<List<NhanVien>> getActive(HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<NhanVien> list = nhanVienRepository.findAll().stream()
+                .filter(nv -> branchAccessService.canReadEmployee(actor, nv))
                 .filter(nv -> nv.getTrangThai() != null && !"INACTIVE".equals(nv.getTrangThai()))
                 .toList();
         return ResponseEntity.ok(list);

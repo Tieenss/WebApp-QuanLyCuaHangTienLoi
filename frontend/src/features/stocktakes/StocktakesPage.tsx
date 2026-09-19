@@ -11,6 +11,7 @@ import { BRAND } from '@/config/brand';
 import { phieuKiemKeApi, chiTietKiemKeApi } from '@/api/phieuKiemKe';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { fetchProducts } from '@/store/slices/productSlice';
+import { fetchStock } from '@/store/slices/stockSlice';
 import {
   DOCUMENT_STATUS,
   DOCUMENT_STATUS_LABEL,
@@ -46,6 +47,13 @@ export const StocktakesPage: FC = () => {
   const [stocktakes, setStocktakes] = useState<Stocktake[]>([]);
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState<Record<string, StocktakeLine[]>>({});
+  const isBranchScoped = user?.role !== 'ADMIN';
+
+  useEffect(() => {
+    if (isBranchScoped && user?.branchId) {
+      setBranchFilter(user.branchId);
+    }
+  }, [isBranchScoped, user?.branchId]);
 
   /** Map trạng thái DB sang enum frontend. */
   const mapTrangThai = (db: string | undefined): DocumentStatus => {
@@ -220,7 +228,7 @@ export const StocktakesPage: FC = () => {
   }, [stocktakes, details]);
 
   const filters: ToolbarFilter[] = [
-    {
+    ...(isBranchScoped ? [] : [{
       key: 'branch',
       placeholder: 'Chi nhánh',
       value: branchFilter,
@@ -230,7 +238,7 @@ export const StocktakesPage: FC = () => {
         label: branch.name,
       })),
       span: 6,
-    },
+    }]),
     {
       key: 'status',
       placeholder: 'Trạng thái',
@@ -344,15 +352,7 @@ export const StocktakesPage: FC = () => {
       width: 160,
       fixed: 'right',
       render: (_: unknown, stocktake: Stocktake) =>
-        canApprove(stocktake) ? (
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => handleApprove(stocktake)}
-          >
-            Duyệt
-          </Button>
-        ) : canBalance(stocktake) ? (
+        canBalance(stocktake) ? (
           <Button
             type="primary"
             size="small"
@@ -510,39 +510,8 @@ export const StocktakesPage: FC = () => {
   };
 
   const canBalance = (stocktake: Stocktake): boolean => {
-    return stocktake.status === DOCUMENT_STATUS.Approved;
-  };
-
-  const canApprove = (stocktake: Stocktake): boolean => {
-    const canApproveRole = user?.role === 'ADMIN' || user?.role === 'THU_KHO' || user?.role === 'QUAN_LY';
-    return stocktake.status === DOCUMENT_STATUS.Pending && canApproveRole;
-  };
-
-  const handleApprove = async (stocktake: Stocktake): Promise<void> => {
-    try {
-      await phieuKiemKeApi.update(stocktake.id, {
-        trangThai: 'DA_DUYET',
-        ...(user?.idNhanVien
-            ? { idNguoiDuyet: user.idNhanVien }
-            : {}),
-      });
-
-      setStocktakes((prev) =>
-          prev.map((s) =>
-              s.id === stocktake.id
-                  ? {
-                    ...s,
-                    status: DOCUMENT_STATUS.Approved,
-                    approvedBy: user?.fullName ?? 'Chưa xác định',
-                  }
-                  : s,
-          ),
-      );
-
-      message.success(`Đã duyệt phiếu ${stocktake.code}`);
-    } catch (e: any) {
-      message.error('Lỗi duyệt phiếu: ' + (e?.message || e));
-    }
+    const allowedRole = user?.role === 'ADMIN' || user?.role === 'THU_KHO' || user?.role === 'QUAN_LY';
+    return stocktake.status === DOCUMENT_STATUS.Pending && allowedRole;
   };
 
   const handleBalance = (stocktake: Stocktake): void => {
@@ -552,18 +521,9 @@ export const StocktakesPage: FC = () => {
   const confirmBalance = async (): Promise<void> => {
     if (!balanceModal) return;
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      await phieuKiemKeApi.update(balanceModal.id, {
-        trangThai: 'DA_CAN_BANG',
-        ngayCanBang: today,
-      });
-      setStocktakes((prev) =>
-        prev.map((s) =>
-          s.id === balanceModal.id
-            ? { ...s, status: DOCUMENT_STATUS.Balanced }
-            : s,
-        ),
-      );
+      await phieuKiemKeApi.balance(balanceModal.id);
+      await loadStocktakes();
+      dispatch(fetchStock());
       message.success(`Đã cân bằng kho cho phiếu ${balanceModal.code}`);
       setBalanceModal(null);
     } catch (e: any) {

@@ -50,6 +50,7 @@ export const TransfersPage: FC = () => {
   const [statusFilter, setStatusFilter] = useState<DocumentStatus | null>(null);
 
   const isStoreManager = user?.role === USER_ROLE.StoreManager;
+  const isWarehouseKeeper = user?.role === USER_ROLE.WarehouseKeeper;
   const isApprover = user?.role === USER_ROLE.Admin || user?.role === USER_ROLE.WarehouseKeeper;
   // const branchScope = isStoreManager ? user?.branchId ?? null : null;
 
@@ -90,14 +91,13 @@ export const TransfersPage: FC = () => {
   }, [transfers.length]);
 
   const scoped = useMemo(() => {
-    const allowed = user?.allowedBranchIds ?? [];
     const list = enrichedTransfers.filter((t) => {
       if (isStoreManager && t.toBranchId !== user?.branchId) return false;
-      if (allowed.length > 0 && !allowed.includes(t.toBranchId)) return false;
+      if (isWarehouseKeeper && t.fromBranchId !== user?.branchId) return false;
       return true;
     });
     return list;
-  }, [enrichedTransfers, isStoreManager, user]);
+  }, [enrichedTransfers, isStoreManager, isWarehouseKeeper, user?.branchId]);
 
   const filtered = useMemo(
     () =>
@@ -171,7 +171,7 @@ export const TransfersPage: FC = () => {
         'Content-Type': 'application/json',
         ...{},
       },
-      body: JSON.stringify({ idNguoiDuyet: user.idNhanVien, lyDo: `Từ chối bởi ${user.fullName}` }),
+      body: JSON.stringify({ lyDo: `Từ chối bởi ${user.fullName}` }),
     })
       .then((r) => {
         if (!r.ok) throw new Error('Lỗi từ chối');
@@ -186,9 +186,7 @@ export const TransfersPage: FC = () => {
   const handleReceive = async (transfer: StockTransfer): Promise<void> => {
     if (user === null) return;
     try {
-      await phieuXuatKhoApi.receive(transfer.id, {
-        idNguoiThucHien: user.idNhanVien ?? '',
-      });
+      await phieuXuatKhoApi.receive(transfer.id, {});
       message.success(
         `Đã nhận hàng phiếu ${transfer.code}. Tồn kho chi nhánh đã tăng theo số thực nhận.`,
       );
@@ -476,7 +474,7 @@ export const TransfersPage: FC = () => {
       <TransferFormModal
         open={isFormOpen}
         onClose={() => setFormOpen(false)}
-        initialStatus={isStoreManager ? DOCUMENT_STATUS.Pending : DOCUMENT_STATUS.Completed}
+        initialStatus={user?.role === USER_ROLE.Admin ? DOCUMENT_STATUS.Completed : DOCUMENT_STATUS.Pending}
       />
       <ShipModal
         open={shipTarget !== null}

@@ -82,7 +82,7 @@ export const phieuKiemKeApi = {
     }
     return response.json();
   },
-  /** Cập nhật phiếu (duyệt / cân bằng / huỷ) — persist xuống backend. */
+  /** Chỉ cập nhật metadata phiếu; không được dùng để đổi trạng thái kho. */
   update: async (id: string, data: Partial<PhieuKiemKeDTO>): Promise<PhieuKiemKeDTO> => {
     const response = await fetch(`${API_BASE_URL}/api/phieu-kiem-ke/${id}`, {
       method: 'PUT',
@@ -92,6 +92,18 @@ export const phieuKiemKeApi = {
     if (!response.ok) {
       const err = await response.json();
       throw new Error(err.message || 'Failed to update');
+    }
+    return response.json();
+  },
+  /** Cân bằng tồn kho, ghi thẻ kho ADJUSTMENT và đổi trạng thái trong một transaction. */
+  balance: async (id: string): Promise<PhieuKiemKeDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-kiem-ke/${id}/balance`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => null);
+      throw new Error(err?.message || 'Không thể cân bằng phiếu kiểm kê');
     }
     return response.json();
   },

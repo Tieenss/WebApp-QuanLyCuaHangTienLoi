@@ -6,6 +6,8 @@ import com.erp.cuahangtienloi.entity.ChamCong;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.repository.ChamCongRepository;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
+import com.erp.cuahangtienloi.service.BranchAccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,6 +34,7 @@ public class ChamCongController {
 
     private final ChamCongRepository chamCongRepository;
     private final NhanVienRepository nhanVienRepository;
+    private final BranchAccessService branchAccessService;
 
     /**
  * Khoảng thời gian mặc định của mỗi ca (giờ).
@@ -58,8 +61,10 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<ChamCongDTO>> getAll() {
+    public ResponseEntity<List<ChamCongDTO>> getAll(HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<ChamCongDTO> list = chamCongRepository.findAll().stream()
+                .filter(cc -> canRead(actor, cc.getIdNhanVien()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -67,15 +72,18 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
 
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> getById(@PathVariable UUID id) {
+    public ResponseEntity<?> getById(@PathVariable UUID id, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         return chamCongRepository.findById(id)
+                .filter(cc -> canRead(actor, cc.getIdNhanVien()))
                 .map(cc -> ResponseEntity.ok(toDTO(cc)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/by-employee/{idNhanVien}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<ChamCongDTO>> getByNhanVien(@PathVariable UUID idNhanVien) {
+    public ResponseEntity<List<ChamCongDTO>> getByNhanVien(@PathVariable UUID idNhanVien, HttpServletRequest request) {
+        requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(request), idNhanVien);
         List<ChamCongDTO> list = chamCongRepository.findByIdNhanVien(idNhanVien).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -84,8 +92,10 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
 
     @GetMapping("/by-date/{workDate}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<ChamCongDTO>> getByDate(@PathVariable LocalDate workDate) {
+    public ResponseEntity<List<ChamCongDTO>> getByDate(@PathVariable LocalDate workDate, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<ChamCongDTO> list = chamCongRepository.findByWorkDate(workDate).stream()
+                .filter(cc -> canRead(actor, cc.getIdNhanVien()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -96,7 +106,8 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     public ResponseEntity<List<ChamCongDTO>> getByNhanVienAndDateRange(
             @PathVariable UUID idNhanVien,
             @PathVariable LocalDate from,
-            @PathVariable LocalDate to) {
+            @PathVariable LocalDate to, HttpServletRequest request) {
+        requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(request), idNhanVien);
         List<ChamCongDTO> list = chamCongRepository
                 .findByIdNhanVienAndWorkDateBetween(idNhanVien, from, to).stream()
                 .map(this::toDTO)
@@ -112,9 +123,11 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChamCongDTO>> getByDateRange(
             @RequestParam("from") LocalDate start,
-            @RequestParam("to") LocalDate end) {
+            @RequestParam("to") LocalDate end, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<ChamCongDTO> list = chamCongRepository
                 .findByWorkDateBetween(start, end).stream()
+                .filter(cc -> canRead(actor, cc.getIdNhanVien()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -122,13 +135,14 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> create(@RequestBody ChamCong request) {
+    public ResponseEntity<?> create(@RequestBody ChamCong request, HttpServletRequest httpRequest) {
         if (request.getIdNhanVien() == null || !nhanVienRepository.existsById(request.getIdNhanVien())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên không tồn tại"));
         }
         if (request.getWorkDate() == null) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Ngày làm việc không được để trống"));
         }
+        requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), request.getIdNhanVien());
         validateTimeAndAmounts(request);
         ChamCong cc = new ChamCong();
         cc.setId(UUID.randomUUID());
@@ -155,9 +169,10 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
-    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody ChamCong request) {
+    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody ChamCong request, HttpServletRequest httpRequest) {
         return chamCongRepository.findById(id)
                 .map(cc -> {
+                    requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), cc.getIdNhanVien());
                     validateTimeAndAmounts(request);
                     if (request.getWorkDate() != null) cc.setWorkDate(request.getWorkDate());
                     if (request.getCaLamViec() != null) cc.setCaLamViec(request.getCaLamViec());
@@ -214,12 +229,13 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     @Transactional
     public ResponseEntity<?> scheduleForEmployee(
             @PathVariable UUID idNhanVien,
-            @RequestParam(required = false) String workDate) {
+            @RequestParam(required = false) String workDate, HttpServletRequest httpRequest) {
         Optional<NhanVien> optNv = nhanVienRepository.findById(idNhanVien);
         if (optNv.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         NhanVien nv = optNv.get();
+        requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), nv.getId());
         LocalDate date = (workDate != null && !workDate.isBlank()) ? LocalDate.parse(workDate) : LocalDate.now();
         String ca = nv.getCaMacDinh();
         if (ca == null || ca.isBlank()) {
@@ -257,10 +273,11 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     @PostMapping("/{id}/clock-in")
     @PreAuthorize("isAuthenticated()")
     @Transactional
-    public ResponseEntity<?> clockIn(@PathVariable UUID id) {
+    public ResponseEntity<?> clockIn(@PathVariable UUID id, HttpServletRequest httpRequest) {
         Optional<ChamCong> opt = chamCongRepository.findById(id);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ChamCong cc = opt.get();
+        requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), cc.getIdNhanVien());
         if (cc.getClockInAt() != null) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Đã check-in trước đó"));
         }
@@ -283,10 +300,11 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     @PostMapping("/{id}/clock-out")
     @PreAuthorize("isAuthenticated()")
     @Transactional
-    public ResponseEntity<?> clockOut(@PathVariable UUID id) {
+    public ResponseEntity<?> clockOut(@PathVariable UUID id, HttpServletRequest httpRequest) {
         Optional<ChamCong> opt = chamCongRepository.findById(id);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ChamCong cc = opt.get();
+        requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), cc.getIdNhanVien());
         if (cc.getClockInAt() == null) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Chưa check-in"));
         }
@@ -318,10 +336,11 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     public ResponseEntity<?> scheduleRange(
             @PathVariable UUID idNhanVien,
             @RequestParam("from") String fromDate,
-            @RequestParam("to") String toDate) {
+            @RequestParam("to") String toDate, HttpServletRequest httpRequest) {
         Optional<NhanVien> optNv = nhanVienRepository.findById(idNhanVien);
         if (optNv.isEmpty()) return ResponseEntity.notFound().build();
         NhanVien nv = optNv.get();
+        requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), nv.getId());
         String ca = nv.getCaMacDinh();
         if (ca == null || ca.isBlank()) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên chưa có ca mặc định"));
@@ -379,6 +398,19 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         }
 
         return dto;
+    }
+
+    private boolean canRead(NhanVien actor, UUID employeeId) {
+        return employeeId != null && nhanVienRepository.findById(employeeId)
+                .map(target -> branchAccessService.canReadEmployee(actor, target))
+                .orElse(false);
+    }
+
+    private void requireReadableEmployee(NhanVien actor, UUID employeeId) {
+        if (!canRead(actor, employeeId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Không được xem hoặc sửa chấm công của nhân viên này");
+        }
     }
 
 //    record SuccessResponse(String message) {}

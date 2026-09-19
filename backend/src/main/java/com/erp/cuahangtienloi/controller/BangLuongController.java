@@ -6,6 +6,8 @@ import com.erp.cuahangtienloi.entity.BangLuong;
 import com.erp.cuahangtienloi.entity.ChamCong;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.repository.*;
+import com.erp.cuahangtienloi.service.BranchAccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,6 +37,7 @@ public class BangLuongController {
     private final NhanVienRepository nhanVienRepository;
     private final ChiNhanhRepository chiNhanhRepository;
     private final ChamCongRepository chamCongRepository;
+    private final BranchAccessService branchAccessService;
 
     /**
      * Tự động tổng hợp bảng lương 1 tháng cho TẤT CẢ nhân viên từ dữ liệu chấm công.
@@ -143,8 +146,10 @@ public class BangLuongController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<List<BangLuongDTO>> getAll() {
+    public ResponseEntity<List<BangLuongDTO>> getAll(HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<BangLuongDTO> list = bangLuongRepository.findAll().stream()
+                .filter(bl -> branchAccessService.canReadBranch(actor, bl.getIdChiNhanh()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -152,16 +157,20 @@ public class BangLuongController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<?> getById(@PathVariable UUID id) {
+    public ResponseEntity<?> getById(@PathVariable UUID id, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         return bangLuongRepository.findById(id)
+                .filter(bl -> branchAccessService.canReadBranch(actor, bl.getIdChiNhanh()))
                 .map(bl -> ResponseEntity.ok(toDTO(bl)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/by-employee/{idNhanVien}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<List<BangLuongDTO>> getByNhanVien(@PathVariable UUID idNhanVien) {
+    public ResponseEntity<List<BangLuongDTO>> getByNhanVien(@PathVariable UUID idNhanVien, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<BangLuongDTO> list = bangLuongRepository.findByIdNhanVien(idNhanVien).stream()
+                .filter(bl -> branchAccessService.canReadBranch(actor, bl.getIdChiNhanh()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -169,8 +178,10 @@ public class BangLuongController {
 
     @GetMapping("/by-month/{thangNam}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<List<BangLuongDTO>> getByThangNam(@PathVariable String thangNam) {
+    public ResponseEntity<List<BangLuongDTO>> getByThangNam(@PathVariable String thangNam, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<BangLuongDTO> list = bangLuongRepository.findByThangNam(thangNam).stream()
+                .filter(bl -> branchAccessService.canReadBranch(actor, bl.getIdChiNhanh()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -179,7 +190,8 @@ public class BangLuongController {
     @GetMapping("/by-branch/{idChiNhanh}/month/{thangNam}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<BangLuongDTO>> getByChiNhanhAndThangNam(
-            @PathVariable UUID idChiNhanh, @PathVariable String thangNam) {
+            @PathVariable UUID idChiNhanh, @PathVariable String thangNam, HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<BangLuongDTO> list = bangLuongRepository
                 .findByIdChiNhanhAndThangNam(idChiNhanh, thangNam).stream()
                 .map(this::toDTO)
@@ -189,8 +201,10 @@ public class BangLuongController {
 
     @GetMapping("/by-status/{trangThai}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<List<BangLuongDTO>> getByStatus(@PathVariable String trangThai) {
+    public ResponseEntity<List<BangLuongDTO>> getByStatus(@PathVariable String trangThai, HttpServletRequest request) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         List<BangLuongDTO> list = bangLuongRepository.findByTrangThai(trangThai).stream()
+                .filter(bl -> branchAccessService.canReadBranch(actor, bl.getIdChiNhanh()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
@@ -235,9 +249,11 @@ public class BangLuongController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody BangLuong request) {
+    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody BangLuong request, HttpServletRequest httpRequest) {
         return bangLuongRepository.findById(id)
                 .map(bl -> {
+                    branchAccessService.requireReadableBranch(
+                            branchAccessService.requireAuthenticatedEmployee(httpRequest), bl.getIdChiNhanh());
                     validateAmounts(request);
                     if (request.getTongGioLam() != null) bl.setTongGioLam(request.getTongGioLam());
                     if (request.getOvertimeHours() != null) bl.setOvertimeHours(request.getOvertimeHours());
