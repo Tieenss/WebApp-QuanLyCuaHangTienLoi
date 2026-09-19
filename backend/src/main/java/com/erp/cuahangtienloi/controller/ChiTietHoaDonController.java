@@ -2,13 +2,19 @@ package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietHoaDon;
+import com.erp.cuahangtienloi.entity.HoaDon;
+import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.repository.ChiTietHoaDonRepository;
 import com.erp.cuahangtienloi.repository.HoaDonRepository;
+import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import com.erp.cuahangtienloi.repository.SanPhamRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,15 +30,21 @@ public class ChiTietHoaDonController {
     private final ChiTietHoaDonRepository chiTietHoaDonRepository;
     private final SanPhamRepository sanPhamRepository;
     private final HoaDonRepository hoaDonRepository;
+    private final NhanVienRepository nhanVienRepository;
 
     @GetMapping("/by-hoa-don/{idHoaDon}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
-    public ResponseEntity<List<ChiTietHoaDon>> getByHoaDon(@PathVariable UUID idHoaDon) {
+    public ResponseEntity<List<ChiTietHoaDon>> getByHoaDon(@PathVariable UUID idHoaDon,
+                                                            HttpServletRequest request) {
+        HoaDon invoice = hoaDonRepository.findById(idHoaDon).orElse(null);
+        if (invoice == null || !canReadInvoice(requireAuthenticatedEmployee(request), invoice)) {
+            return ResponseEntity.notFound().build();
+        }
         return ResponseEntity.ok(chiTietHoaDonRepository.findByIdHoaDon(idHoaDon));
     }
 
     @GetMapping("/by-san-pham/{idSanPham}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     public ResponseEntity<List<ChiTietHoaDon>> getBySanPham(@PathVariable UUID idSanPham) {
         return ResponseEntity.ok(chiTietHoaDonRepository.findByIdSanPham(idSanPham));
     }
@@ -97,6 +109,31 @@ public class ChiTietHoaDonController {
         if (request.getVatPhantram() != null && (request.getVatPhantram() < 0 || request.getVatPhantram() > 100)) {
             throw new IllegalArgumentException("VAT phải từ 0 đến 100");
         }
+    }
+
+    private NhanVien requireAuthenticatedEmployee(HttpServletRequest request) {
+        Object attr = request.getAttribute("authenticatedIdNhanVien");
+        if (attr instanceof String value) {
+            try {
+                return nhanVienRepository.findById(UUID.fromString(value))
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                                "Nhân viên đăng nhập không tồn tại"));
+            } catch (IllegalArgumentException ignored) {
+                // Trả 401 bên dưới nếu attribute không phải UUID hợp lệ.
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                "Tài khoản chưa liên kết nhân viên");
+    }
+
+    private boolean canReadInvoice(NhanVien actor, HoaDon invoice) {
+        return switch (actor.getVaiTro()) {
+            case "ADMIN", "KE_TOAN" -> true;
+            case "QUAN_LY" -> actor.getIdChiNhanh() != null
+                    && actor.getIdChiNhanh().equals(invoice.getIdChiNhanh());
+            case "THU_NGAN" -> actor.getId().equals(invoice.getIdThuNgan());
+            default -> false;
+        };
     }
 
     @DeleteMapping("/{id}")

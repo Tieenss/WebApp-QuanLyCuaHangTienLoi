@@ -4,7 +4,6 @@ import {
   CASH_CATEGORY,
   CASH_FLOW_DIRECTION,
   DOCUMENT_STATUS,
-  PAYMENT_IS_CASH,
   PAYMENT_METHOD,
   type CashEntry,
   type CashFlowDirection,
@@ -12,7 +11,6 @@ import {
 } from '@/types';
 import { soQuyApi, type SoQuyDTO } from '@/api/soQuy';
 import { payrollPaid } from './payrollSlice';
-import { saleCompleted } from './posSlice';
 import { purchaseReceived } from './purchaseSlice';
 import { orderRefunded } from './salesOrderSlice';
 import { compareDateDescWithId } from '@/utils/formatters';
@@ -284,31 +282,6 @@ export const cashbookSlice = createSlice({
       .addCase(fetchCashbook.rejected, (state) => {
         state.loading = false;
       });
-
-    /**
-     * Bước 4 của transaction bán hàng: phiếu THU hạng mục BAN_HANG.
-     *
-     * Hình thức thanh toán của phiếu quỹ lấy đúng theo hoá đơn, để cột "Tiền
-     * mặt tại quầy" trên trang Sổ quỹ phản ánh đúng số tiền trong két.
-     */
-    builder.addCase(saleCompleted, (state, action) => {
-      const { order } = action.payload;
-
-      insertEntry(state, {
-        direction: CASH_FLOW_DIRECTION.Receipt,
-        category: CASH_CATEGORY.SalesRevenue,
-        branchId: order.branchId,
-        entryDate: order.soldAt.slice(0, 10),
-        amount: order.grandTotal,
-        paymentMethod: order.paymentMethod,
-        counterparty: PAYMENT_IS_CASH[order.paymentMethod]
-          ? 'Khách lẻ (tiền mặt)'
-          : 'Khách lẻ (không dùng tiền mặt)',
-        referenceCode: order.code,
-        description: `Doanh thu hoá đơn ${order.code} · ${order.lines.length} mặt hàng`,
-        createdBy: order.cashierName,
-      });
-    });
 
     /**
      * Kế toán duyệt chi lương → phiếu CHI hạng mục TRA_LUONG cho mỗi nhân viên.

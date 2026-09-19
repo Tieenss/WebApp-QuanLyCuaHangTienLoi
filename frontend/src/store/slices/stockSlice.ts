@@ -16,7 +16,6 @@ import { tonKhoApi, type TonKhoDTO } from '@/api/tonKho';
 import { theKhoApi, type TheKhoDTO } from '@/api/theKho';
 
 import { purchaseReceived } from './purchaseSlice';
-import { saleCompleted } from './posSlice';
 import { transferShipped } from './transferSlice';
 import { orderRefunded, orderCancelled } from './salesOrderSlice';
 
@@ -231,29 +230,10 @@ const applyMovement = (
   return true;
 };
 
-/** Trừ tồn kho + ghi thẻ kho cho một hoá đơn bán lẻ. */
-const applySale = (state: StockState, order: SalesOrder): void => {
-  order.lines.forEach((line, index) => {
-    applyMovement(state, {
-      branchId: order.branchId,
-      branchName: order.branchName,
-      productId: line.productId,
-      // Xuất bán: số lượng âm theo quy ước `the_kho.so_luong`.
-      quantityChange: -line.quantity,
-      type: LEDGER_TYPE.SaleOut,
-      referenceCode: order.code,
-      performedBy: `${order.cashierName} (${order.cashierId})`,
-      note: 'Xuất bán qua quầy POS',
-      occurredAt: order.soldAt,
-      sequence: index,
-    });
-  });
-};
-
 /**
  * Hoàn tồn cho một hoá đơn bị REFUNDED.
  *
- * Phép tính ngược lại của `applySale`: cộng lại số lượng từng dòng và ghi
+ * Cộng lại số lượng từng dòng và ghi
  * một dòng thẻ kho `SALE_RETURN` (số dương) tại cùng chi nhánh đã bán. Đây
  * là nguồn sự thật duy nhất để cập nhật tồn — KHÔNG tự tính từ `grandTotal`
  * hay trừ `paidAmount` như một số hệ thống cũ vẫn làm.
@@ -473,11 +453,6 @@ export const stockSlice = createSlice({
         state.loading = false;
         state.error = action.error.message || 'Lỗi tải tồn kho';
       });
-
-    // Bước 2 và 3 của transaction bán hàng: trừ tồn kho + ghi thẻ kho.
-    builder.addCase(saleCompleted, (state, action) => {
-      applySale(state, action.payload.order);
-    });
 
     // Bước 2 và 3 của transaction nhập kho: cộng tồn Kho Tổng + ghi thẻ kho,
     // kèm tính lại giá vốn bình quân gia quyền.

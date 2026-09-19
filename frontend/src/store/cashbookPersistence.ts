@@ -4,7 +4,6 @@ import {
   addCapitalInjection,
   addManualEntry,
 } from './slices/cashbookSlice';
-import { saleCompleted } from './slices/posSlice';
 import { payrollPaid } from './slices/payrollSlice';
 import { purchaseReceived } from './slices/purchaseSlice';
 import { orderRefunded } from './slices/salesOrderSlice';
@@ -68,25 +67,6 @@ cashbookPersistence.startListening({
       doiTuong: action.payload.counterparty,
       dienGiai: action.payload.description,
       maChungTuLienQuan: action.payload.referenceCode ?? undefined,
-    });
-  },
-});
-
-cashbookPersistence.startListening({
-  type: saleCompleted.type,
-  effect: async (action: any, api) => {
-    const state = api.getState() as RootState;
-    const { order } = action.payload;
-    void postEntry({
-      ...buildBase(state),
-      direction: 'RECEIPT',
-      hangMuc: 'BAN_HANG',
-      soTien: order.grandTotal,
-      entryDate: order.soldAt.slice(0, 10),
-      hinhThucTt: order.paymentMethod,
-      doiTuong: 'Khách lẻ',
-      dienGiai: `Doanh thu hoá đơn ${order.code}`,
-      maChungTuLienQuan: order.code,
     });
   },
 });

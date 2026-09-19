@@ -15,4 +15,6 @@ public interface SoQuyRepository extends JpaRepository<SoQuy, UUID> {
     List<SoQuy> findByDirection(String direction);
     List<SoQuy> findByHangMuc(String hangMuc);
     List<SoQuy> findByEntryDateBetween(LocalDate from, LocalDate to);
+    boolean existsByMaChungTuLienQuanAndDirectionAndHangMuc(
+            String maChungTuLienQuan, String direction, String hangMuc);
 }

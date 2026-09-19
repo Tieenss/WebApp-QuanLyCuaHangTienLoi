@@ -37,7 +37,6 @@ import {
   setTenderedAmount,
   updateLineQuantity,
 } from '@/store/slices/posSlice';
-import { orderSaved } from '@/store/slices/salesOrderSlice';
 import {
   PAYMENT_IS_CASH,
   PAYMENT_METHOD,
@@ -46,7 +45,8 @@ import {
   type PaymentMethod,
   type ShiftCode,
 } from '@/types';
-import { stockOf } from '@/store/slices/stockSlice';
+import { fetchStock, stockOf } from '@/store/slices/stockSlice';
+import { fetchCashbook } from '@/store/slices/cashbookSlice';
 import { nowIso } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 
@@ -150,7 +150,9 @@ export const CartPanel: FC = () => {
 
     // Thu ngân đang đăng nhập; nếu là quản lý thì lấy người trực ca tại quầy.
     const fallbackCashier = cashiersOfBranch(branchId)[0];
-    const cashierId = user?.id ?? fallbackCashier?.id ?? 'unknown';
+    // `hoa_don.id_thu_ngan` là khóa tới nhan_vien.id, không phải tai_khoan.id.
+    // Dùng đúng ID này để Lịch sử hóa đơn của thu ngân lọc được đơn vừa bán.
+    const cashierId = user?.idNhanVien ?? fallbackCashier?.id ?? 'unknown';
     const cashierName = user?.fullName ?? fallbackCashier?.fullName ?? 'Thu ngân';
 
     // Giá vốn lấy tại thời điểm bán để báo cáo lợi nhuận không bị lệch về sau.
@@ -169,15 +171,12 @@ const sale = buildSalesOrder({
     });
     if (sale === null) return;
 
-    dispatch(saleCompleted(sale));
-
-    // Persist hoá đơn xuống DB trong 1 transaction (hoa_don + chi_tiet_hoa_don),
-    // rồi thay hoá đơn local bằng bản ghi thật (mã HD do backend sinh) để
-    // "Lịch sử hoá đơn" hiển thị đúng dữ liệu đã lưu.
+    // Không cập nhật Redux trước: checkout backend phải commit cả hóa đơn,
+    // tồn kho, thẻ kho và sổ quỹ trước khi UI thay đổi.
     void (async () => {
       try {
         const created = await apiFetch(
-          `${API_BASE_URL}/api/hoa-don/with-lines`,
+          `${API_BASE_URL}/api/hoa-don/checkout`,
           {
             method: 'POST',
             headers: {
@@ -186,25 +185,17 @@ const sale = buildSalesOrder({
             },
             body: JSON.stringify({
               idChiNhanh: sale.order.branchId,
-              idThuNgan: user?.idNhanVien ?? cashierId,
               caLamViec: sale.order.shiftCode,
-              ngayBan: sale.order.soldAt,
               hinhThucTt: sale.order.paymentMethod,
               sdtThanhVien: sale.order.memberPhone || undefined,
-              subTotal: sale.order.subTotal,
-              giamGia: sale.order.discountTotal,
-              vatTotal: sale.order.vatTotal,
-              grandTotal: sale.order.grandTotal,
+              // Giảm giá là dữ liệu nghiệp vụ nhập tay; giá, VAT, thành tiền
+              // và giá vốn đều do backend tính từ DB.
+              giamGia: posState.orderDiscount,
               tienKhachDua: sale.tendered,
-              tienThoi: sale.order.changeAmount,
               lines: sale.order.lines.map((line) => ({
                 idSanPham: line.productId,
                 soLuong: line.quantity,
-                donGia: line.unitPrice,
                 giamGiaDong: line.lineDiscount,
-                vatPhantram: line.vatPercent,
-                thanhTien: line.lineTotal,
-                donGiaVon: line.unitCost,
               })),
             }),
           },
@@ -212,23 +203,34 @@ const sale = buildSalesOrder({
         if (!created.ok) {
           const err = await created.json().catch(() => null);
           console.warn('Không lưu được hoá đơn xuống DB:', err);
+          message.error(err?.message ?? err?.error ?? 'Thanh toán thất bại. Giỏ hàng chưa thay đổi.');
           return;
         }
         const saved = await created.json();
-        dispatch(
-          orderSaved({
-            localId: sale.order.id,
-            order: {
-              ...sale.order,
-              id: saved.id,
-              code: saved.maHoaDon ?? sale.order.code,
-              branchName: saved.tenChiNhanh ?? '',
-              cashierName: saved.tenThuNgan ?? sale.order.cashierName,
-            },
-          }),
-        );
+        dispatch(saleCompleted({
+          ...sale,
+          order: {
+            ...sale.order,
+            id: saved.id,
+            code: saved.maHoaDon ?? sale.order.code,
+            branchId: saved.idChiNhanh ?? sale.order.branchId,
+            branchName: saved.tenChiNhanh ?? '',
+            cashierId: saved.idThuNgan ?? sale.order.cashierId,
+            cashierName: saved.tenThuNgan ?? sale.order.cashierName,
+            subTotal: Number(saved.subTotal ?? sale.order.subTotal),
+            discountTotal: Number(saved.giamGia ?? sale.order.discountTotal),
+            vatTotal: Number(saved.vatTotal ?? sale.order.vatTotal),
+            grandTotal: Number(saved.grandTotal ?? sale.order.grandTotal),
+            tenderedAmount: Number(saved.tienKhachDua ?? sale.tendered),
+            changeAmount: Number(saved.tienThoi ?? sale.order.changeAmount),
+          },
+          tendered: Number(saved.tienKhachDua ?? sale.tendered),
+        }));
+        dispatch(fetchStock());
+        dispatch(fetchCashbook());
       } catch (e) {
         console.warn('Không lưu được hoá đơn xuống DB:', e);
+        message.error('Không thể kết nối máy chủ. Giỏ hàng chưa thay đổi.');
       }
     })();
   };
