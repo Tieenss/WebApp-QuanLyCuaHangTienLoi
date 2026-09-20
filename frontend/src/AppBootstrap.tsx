@@ -25,7 +25,7 @@ export const AppBootstrap: FC = () => {
       dispatch(fetchEmployees());
       dispatch(fetchProducts());
       dispatch(fetchStock());
-      dispatch(fetchAttendance());
+      dispatch(fetchAttendance({}));
       dispatch(syncPosBranch(authUser.branchId));
     }
   }, [dispatch, authUser]);

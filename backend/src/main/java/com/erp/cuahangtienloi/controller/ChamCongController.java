@@ -134,7 +134,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody ChamCong request, HttpServletRequest httpRequest) {
         if (request.getIdNhanVien() == null || !nhanVienRepository.existsById(request.getIdNhanVien())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên không tồn tại"));
@@ -157,8 +157,8 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         cc.setOvertimeHours(request.getOvertimeHours() != null ? request.getOvertimeHours() : BigDecimal.ZERO);
         cc.setBreakHours(request.getBreakHours() != null ? request.getBreakHours() : BigDecimal.ZERO);
         cc.setTongGioLam(request.getTongGioLam());
-        cc.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : "PRESENT");
-        cc.setDaThanhToan(request.getDaThanhToan() != null ? request.getDaThanhToan() : false);
+        cc.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : "SCHEDULED");
+        cc.setDaThanhToan(false);
         cc.setGhiChu(request.getGhiChu());
         cc.setNgayTao(LocalDateTime.now());
         cc.setNgayCapNhat(LocalDateTime.now());
@@ -173,6 +173,9 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         return chamCongRepository.findById(id)
                 .map(cc -> {
                     requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), cc.getIdNhanVien());
+                    if (Boolean.TRUE.equals(cc.getDaThanhToan())) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Không sửa chấm công đã được thanh toán"));
+                    }
                     validateTimeAndAmounts(request);
                     if (request.getWorkDate() != null) cc.setWorkDate(request.getWorkDate());
                     if (request.getCaLamViec() != null) cc.setCaLamViec(request.getCaLamViec());
@@ -185,7 +188,10 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
                     if (request.getBreakHours() != null) cc.setBreakHours(request.getBreakHours());
                     if (request.getTongGioLam() != null) cc.setTongGioLam(request.getTongGioLam());
                     if (request.getTrangThai() != null) cc.setTrangThai(request.getTrangThai());
-                    if (request.getDaThanhToan() != null) cc.setDaThanhToan(request.getDaThanhToan());
+                    if (request.getDaThanhToan() != null) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err(
+                                "Trạng thái thanh toán chỉ được cập nhật khi duyệt chi lương"));
+                    }
                     if (request.getGhiChu() != null) cc.setGhiChu(request.getGhiChu());
                     cc.setNgayCapNhat(LocalDateTime.now());
                     chamCongRepository.save(cc);
@@ -212,7 +218,11 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
-        if (chamCongRepository.existsById(id)) {
+        Optional<ChamCong> attendance = chamCongRepository.findById(id);
+        if (attendance.isPresent()) {
+            if (Boolean.TRUE.equals(attendance.get().getDaThanhToan())) {
+                return ResponseEntity.badRequest().body(ApiResponse.err("Không xóa chấm công đã được thanh toán"));
+            }
             chamCongRepository.deleteById(id);
             return ResponseEntity.ok( ApiResponse.ok("Xóa chấm công thành công"));
         }
@@ -257,7 +267,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         cc.setCheckOutAt(plannedCheckOut(date, ca));
         cc.setOvertimeHours(BigDecimal.ZERO);
         cc.setBreakHours(BigDecimal.ZERO);
-        cc.setTrangThai("PRESENT");
+        cc.setTrangThai("SCHEDULED");
         cc.setDaThanhToan(false);
         cc.setNgayTao(LocalDateTime.now());
         cc.setNgayCapNhat(LocalDateTime.now());
@@ -278,12 +288,19 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ChamCong cc = opt.get();
         requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), cc.getIdNhanVien());
+        if (!cc.getWorkDate().equals(LocalDate.now())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chỉ được check-in ca của hôm nay"));
+        }
+        if (Boolean.TRUE.equals(cc.getDaThanhToan()) || "ABSENT".equals(cc.getTrangThai()) || "LEAVE".equals(cc.getTrangThai())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Ca này không thể check-in"));
+        }
         if (cc.getClockInAt() != null) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Đã check-in trước đó"));
         }
 
         LocalDateTime now = LocalDateTime.now();
         cc.setClockInAt(now);
+        cc.setTrangThai("PRESENT");
         if (cc.getCheckInAt() != null && now.isAfter(cc.getCheckInAt())) {
             long minutes = Duration.between(cc.getCheckInAt(), now).toMinutes();
             cc.setDiTrePhut((int) Math.min(minutes, Integer.MAX_VALUE));
@@ -305,6 +322,12 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ChamCong cc = opt.get();
         requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), cc.getIdNhanVien());
+        if (!cc.getWorkDate().equals(LocalDate.now())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chỉ được check-out ca của hôm nay"));
+        }
+        if (Boolean.TRUE.equals(cc.getDaThanhToan())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Ca này đã được thanh toán"));
+        }
         if (cc.getClockInAt() == null) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Chưa check-in"));
         }
@@ -322,6 +345,11 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         BigDecimal tong = BigDecimal.valueOf(Math.max(0, minutes - breakHours.longValue() * 60L))
                 .divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP);
         cc.setTongGioLam(tong);
+        if (cc.getCheckOutAt() != null && now.isAfter(cc.getCheckOutAt())) {
+            long overtimeMinutes = Duration.between(cc.getCheckOutAt(), now).toMinutes();
+            cc.setOvertimeHours(BigDecimal.valueOf(Math.max(0, overtimeMinutes))
+                    .divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP));
+        }
         chamCongRepository.save(cc);
         return ResponseEntity.ok(toDTO(cc));
     }
@@ -331,7 +359,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
      * Nếu chưa có record cho ca hôm nay → tự động sinh lịch.
      */
     @PostMapping("/schedule-range/{idNhanVien}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    @PreAuthorize("isAuthenticated()")
     @Transactional
     public ResponseEntity<?> scheduleRange(
             @PathVariable UUID idNhanVien,
@@ -364,7 +392,7 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
             cc.setCheckOutAt(plannedCheckOut(d, ca));
             cc.setOvertimeHours(BigDecimal.ZERO);
             cc.setBreakHours(BigDecimal.ZERO);
-            cc.setTrangThai("PRESENT");
+            cc.setTrangThai("SCHEDULED");
             cc.setDaThanhToan(false);
             cc.setNgayTao(LocalDateTime.now());
             cc.setNgayCapNhat(LocalDateTime.now());
@@ -394,7 +422,11 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
 
         if (cc.getIdNhanVien() != null) {
             nhanVienRepository.findById(cc.getIdNhanVien())
-                    .ifPresent(nv -> dto.setTenNhanVien(nv.getHoTen()));
+                    .ifPresent(nv -> {
+                        dto.setTenNhanVien(nv.getHoTen());
+                        dto.setMaNhanVien(nv.getMaNhanVien());
+                        dto.setIdChiNhanh(nv.getIdChiNhanh());
+                    });
         }
 
         return dto;

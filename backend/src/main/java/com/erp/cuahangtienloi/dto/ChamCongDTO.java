@@ -11,6 +11,8 @@ public class ChamCongDTO {
     private UUID id;
     private UUID idNhanVien;
     private String tenNhanVien;
+    private String maNhanVien;
+    private UUID idChiNhanh;
     private LocalDate workDate;
     private String caLamViec;
     private LocalDateTime checkInAt;

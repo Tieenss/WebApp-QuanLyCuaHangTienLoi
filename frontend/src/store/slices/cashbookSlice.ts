@@ -10,7 +10,6 @@ import {
   type PayrollRow,
 } from '@/types';
 import { soQuyApi, type SoQuyDTO } from '@/api/soQuy';
-import { payrollPaid } from './payrollSlice';
 import { purchaseReceived } from './purchaseSlice';
 import { orderRefunded } from './salesOrderSlice';
 import { compareDateDescWithId } from '@/utils/formatters';
@@ -222,8 +221,8 @@ export const cashbookSlice = createSlice({
     /**
      * Kế toán duyệt chi lương — một phiếu CHI cho mỗi nhân viên.
      *
-     * Giữ lại làm action độc lập cho trường hợp cần lập phiếu tay; luồng chính
-     * đi qua `payrollPaid` ở `extraReducers` bên dưới.
+     * Chỉ dùng cho trường hợp lập phiếu tay; luồng duyệt lương chính được ghi
+     * nguyên tử ở backend để tránh tạo trùng chứng từ trên trình duyệt.
      */
     addPayrollPayments: (
       state,
@@ -282,17 +281,6 @@ export const cashbookSlice = createSlice({
       .addCase(fetchCashbook.rejected, (state) => {
         state.loading = false;
       });
-
-    /**
-     * Kế toán duyệt chi lương → phiếu CHI hạng mục TRA_LUONG cho mỗi nhân viên.
-     * Cùng lúc `payrollSlice` chuyển bảng lương sang `DA_THANH_TOAN`.
-     */
-    builder.addCase(payrollPaid, (state, action) => {
-      const entryDate = action.payload.paidAt.slice(0, 10);
-      for (const row of action.payload.rows) {
-        insertPayrollEntry(state, row, entryDate, action.payload.approvedBy);
-      }
-    });
 
     /**
      * Bước 4 của transaction nhập kho: phiếu CHI hạng mục NHAP_HANG.

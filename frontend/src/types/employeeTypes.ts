@@ -77,6 +77,7 @@ export type EmployeeFormValues = Omit<Employee, 'id' | 'avatarText' | 'branchNam
  * `checkOutAt` để trống nghĩa là nhân viên chưa kết thúc ca.
  */
 export const ATTENDANCE_STATUS = {
+  Scheduled: 'SCHEDULED',
   Present: 'PRESENT',
   Late: 'LATE',
   Absent: 'ABSENT',
@@ -86,6 +87,7 @@ export const ATTENDANCE_STATUS = {
 export type AttendanceStatus = (typeof ATTENDANCE_STATUS)[keyof typeof ATTENDANCE_STATUS];
 
 export const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
+  SCHEDULED: 'Chưa chấm công',
   PRESENT: 'Đủ giờ',
   LATE: 'Đi muộn',
   ABSENT: 'Vắng không phép',
@@ -93,6 +95,7 @@ export const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
 };
 
 export const ATTENDANCE_STATUS_COLOR: Record<AttendanceStatus, string> = {
+  SCHEDULED: 'default',
   PRESENT: 'green',
   LATE: 'gold',
   ABSENT: 'red',

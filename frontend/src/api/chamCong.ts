@@ -5,6 +5,8 @@ export interface ChamCongDTO {
   id: string;
   idNhanVien: string;
   tenNhanVien?: string;
+  maNhanVien?: string;
+  idChiNhanh?: string | null;
   workDate: string;
   caLamViec: string;
   checkInAt?: string;

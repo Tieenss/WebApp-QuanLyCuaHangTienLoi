@@ -1,4 +1,4 @@
-import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
+import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   PAYROLL_STATUS,
@@ -11,9 +11,6 @@ import {
   type UserRole,
 } from '@/types';
 import { bangLuongApi, type BangLuongDTO } from '@/api/bangLuong';
-import { nowIso } from '@/utils/dateUtils';
-import { API_BASE_URL } from '@/config/api';
-import { apiFetch } from '@/api/http';
 
 /**
  * Module 11 — Duyệt lương 2 tầng.
@@ -26,11 +23,7 @@ import { apiFetch } from '@/api/http';
  * nên bắt đầu ngay ở `DA_XAC_NHAN`.
  *
  * Nguyên tắc vàng của đặc tả: "Không ai tự duyệt lương cho chính mình" — cài
- * đặt tại `canApprovePayment`, và reducer kiểm tra lại lần nữa để state không
- * bị ghi sai nếu được gọi từ nơi khác.
- *
- * MVP thao tác trực tiếp trên state (không gọi API), nên slice này đóng vai trò
- * một in-memory repository.
+ * đặt tại backend và được phản ánh ở UI qua các async thunk bên dưới.
  */
 
 export interface PayrollState {
@@ -54,9 +47,9 @@ const initialState: PayrollState = {
 const mapDtoToPayrollRow = (dto: BangLuongDTO): PayrollRow => ({
   id: dto.id,
   employeeId: dto.idNhanVien,
-  employeeCode: '',
+  employeeCode: dto.maNhanVien ?? '',
   employeeName: dto.tenNhanVien ?? '',
-  role: (dto.loaiHopDong === 'FULL_TIME' ? 'QUAN_LY' : 'THU_NGAN') as UserRole,
+  role: (dto.vaiTro || (dto.loaiHopDong === 'FULL_TIME' ? 'QUAN_LY' : 'THU_NGAN')) as UserRole,
   branchId: dto.idChiNhanh,
   branchName: dto.tenChiNhanh ?? '',
   period: dto.thangNam,
@@ -79,26 +72,13 @@ const mapDtoToPayrollRow = (dto: BangLuongDTO): PayrollRow => ({
   paidAt: dto.ngayThanhToan ?? null,
 });
 
-/** Tải bảng lương từ backend (kèm enrich vai trò từ danh sách nhân viên). */
+/** Tải bảng lương theo scope; SELF không gọi API nhân sự để tránh lộ dữ liệu. */
 export const fetchPayroll = createAsyncThunk(
   'payroll/fetchAll',
-  async (_, { rejectWithValue }) => {
+  async (scope: 'SELF' | 'SCOPED' = 'SCOPED', { rejectWithValue }) => {
     try {
-      const [list, nvList] = await Promise.all([
-        bangLuongApi.getAll(),
-        apiFetch(`${API_BASE_URL}/api/nhan-vien`).then((r) => r.json() as Promise<Array<{ id: string; vaiTro?: string; maNhanVien?: string; hoTen?: string }>>),
-      ]);
-
-      const roleById = new Map(nvList.map((nv) => [nv.id, nv.vaiTro]));
-      const codeById = new Map(nvList.map((nv) => [nv.id, nv.maNhanVien]));
-
-      return list.map((dto) => {
-        const row = mapDtoToPayrollRow(dto);
-        const role = roleById.get(dto.idNhanVien);
-        if (role) row.role = role as UserRole;
-        row.employeeCode = codeById.get(dto.idNhanVien) ?? '';
-        return row;
-      });
+      const list = scope === 'SELF' ? await bangLuongApi.getMine() : await bangLuongApi.getAll();
+      return list.map(mapDtoToPayrollRow);
     } catch (e: any) {
       return rejectWithValue(e?.message || 'Lỗi tải bảng lương');
     }
@@ -116,28 +96,43 @@ export const updatePayroll = createAsyncThunk(
   },
 );
 
+export const confirmPayrollHours = createAsyncThunk(
+  'payroll/confirmHours',
+  async (id: string, { rejectWithValue }) => {
+    try { return mapDtoToPayrollRow(await bangLuongApi.confirmHours(id)); }
+    catch (e: any) { return rejectWithValue(e?.message || 'Lỗi xác nhận giờ làm'); }
+  },
+);
+
+export const approvePayrollPayment = createAsyncThunk(
+  'payroll/approvePayment',
+  async (id: string, { rejectWithValue }) => {
+    try { return mapDtoToPayrollRow(await bangLuongApi.approvePayment(id)); }
+    catch (e: any) { return rejectWithValue(e?.message || 'Lỗi duyệt chi lương'); }
+  },
+);
+
+export const approvePayrollPaymentBatch = createAsyncThunk(
+  'payroll/approvePaymentBatch',
+  async (ids: string[], { rejectWithValue }) => {
+    try { return (await bangLuongApi.approvePaymentBatch(ids)).map(mapDtoToPayrollRow); }
+    catch (e: any) { return rejectWithValue(e?.message || 'Lỗi duyệt chi các bảng lương đã chọn'); }
+  },
+);
+
 /** Tự tổng hợp bảng lương tháng từ dữ liệu chấm công, rồi tải lại. */
 export const generatePayroll = createAsyncThunk(
   'payroll/generate',
   async (thangNam: string, { rejectWithValue, dispatch }) => {
     try {
       await bangLuongApi.generate(thangNam);
-      await dispatch(fetchPayroll()).unwrap();
+      await dispatch(fetchPayroll('SCOPED')).unwrap();
       return thangNam;
     } catch (e: any) {
       return rejectWithValue(e?.message || 'Lỗi tạo bảng lương');
     }
   },
 );
-
-/** Người thực hiện hành động, truyền từ component vì slice không đọc state auth. */
-interface Actor {
-  /** `nhan_vien.id` của người đang đăng nhập. */
-  actorId: string;
-  /** Chuỗi hiển thị dạng "Họ Tên (NV-0002)". */
-  actorName: string;
-  actorRole: UserRole;
-}
 
 /**
  * Quản lý chi nhánh có được xác nhận giờ cho dòng này không (Tầng 1).
@@ -172,36 +167,15 @@ export const canApprovePayment = (
   actorId: string,
   actorRole: UserRole,
 ): boolean => {
-  if (row.status !== PAYROLL_STATUS.Confirmed) return false;
+  const needsConfirmation = requiresHourConfirmation(row.role);
+  if (needsConfirmation && row.status !== PAYROLL_STATUS.Confirmed) return false;
+  if (!needsConfirmation && row.status !== PAYROLL_STATUS.PendingConfirm && row.status !== PAYROLL_STATUS.Confirmed) return false;
   // Nguyên tắc vàng: không ai tự duyệt lương cho chính mình.
   if (row.employeeId === actorId) return false;
 
   if (actorRole === USER_ROLE.Admin) return true;
   return actorRole === paymentApproverRole(row.role);
 };
-
-/**
- * Tầng 2 — Duyệt chi lương. Action dùng chung cho cả transaction.
- *
- * Theo `luong_nghiep_vu.md` mục 4.2, duyệt chi phải làm 2 việc cùng lúc:
- * chuyển bảng lương sang `DA_THANH_TOAN` **và** tạo phiếu chi sổ quỹ
- * (CHI / TRA_LUONG) cho từng nhân viên. Hai việc thuộc 2 slice khác nhau nên
- * dùng chung một action như cách `saleCompleted` xử lý giao dịch POS:
- *
- * - `payrollSlice`   → đổi trạng thái, ghi người duyệt và thời điểm
- * - `cashbookSlice`  → sinh phiếu chi cho mỗi dòng
- *
- * Component lọc trước bằng `canApprovePayment` rồi truyền danh sách dòng đủ
- * điều kiện, vì reducer của cashbook không đọc được state payroll để tự kiểm.
- */
-export const payrollPaid = createAction<{
-  /** Các dòng đã được kiểm quyền, sẵn sàng chuyển sang đã thanh toán. */
-  rows: PayrollRow[];
-  /** Người duyệt, dạng "Họ Tên (NV-0002)". */
-  approvedBy: string;
-  /** Thời điểm duyệt, ISO string. */
-  paidAt: string;
-}>('payroll/paid');
 
 /**
  * Tính lại tiền lương sau khi Quản lý điều chỉnh giờ làm.
@@ -282,32 +256,6 @@ export const payrollSlice = createSlice({
       state.error = null;
     },
 
-    /** Tầng 1 — Quản lý chi nhánh xác nhận giờ làm của thu ngân. */
-    confirmHours: (
-      state,
-      action: PayloadAction<Actor & { id: string; actorBranchId: string | null }>,
-    ) => {
-      const row = state.rows.find((item) => item.id === action.payload.id);
-      if (!row) return;
-
-      if (
-        !canConfirmHours(
-          row,
-          action.payload.actorId,
-          action.payload.actorRole,
-          action.payload.actorBranchId,
-        )
-      ) {
-        state.error = 'Bạn không có quyền xác nhận giờ làm cho bảng lương này.';
-        return;
-      }
-
-      row.status = PAYROLL_STATUS.Confirmed;
-      row.confirmedBy = action.payload.actorName;
-      row.confirmedAt = nowIso();
-      state.error = null;
-    },
-
     clearPayrollError: (state) => {
       state.error = null;
     },
@@ -334,28 +282,34 @@ export const payrollSlice = createSlice({
       .addCase(updatePayroll.rejected, (state, action) => {
         state.error = (action.payload as string) || 'Lỗi cập nhật bảng lương';
       })
+      .addCase(confirmPayrollHours.fulfilled, (state, action) => {
+        const idx = state.rows.findIndex((r) => r.id === action.payload.id);
+        if (idx !== -1) state.rows[idx] = action.payload;
+      })
+      .addCase(confirmPayrollHours.rejected, (state, action) => {
+        state.error = (action.payload as string) || 'Lỗi xác nhận giờ làm';
+      })
+      .addCase(approvePayrollPayment.fulfilled, (state, action) => {
+        const idx = state.rows.findIndex((r) => r.id === action.payload.id);
+        if (idx !== -1) state.rows[idx] = action.payload;
+      })
+      .addCase(approvePayrollPayment.rejected, (state, action) => {
+        state.error = (action.payload as string) || 'Lỗi duyệt chi lương';
+      })
+      .addCase(approvePayrollPaymentBatch.fulfilled, (state, action) => {
+        for (const payroll of action.payload) {
+          const idx = state.rows.findIndex((row) => row.id === payroll.id);
+          if (idx !== -1) state.rows[idx] = payroll;
+        }
+      })
+      .addCase(approvePayrollPaymentBatch.rejected, (state, action) => {
+        state.error = (action.payload as string) || 'Lỗi duyệt chi các bảng lương đã chọn';
+      })
       .addCase(generatePayroll.fulfilled, (state) => {
         state.error = null;
       })
       .addCase(generatePayroll.rejected, (state, action) => {
         state.error = (action.payload as string) || 'Lỗi tạo bảng lương';
-      })
-      /**
-       * Chuyển các dòng đã duyệt sang `DA_THANH_TOAN`.
-       *
-       * Component đã lọc bằng `canApprovePayment` trước khi dispatch, nhưng vẫn
-       * kiểm lại ở đây — action công khai nên có thể được gọi từ nơi khác.
-       */
-      .addCase(payrollPaid, (state, action) => {
-        for (const paidRow of action.payload.rows) {
-          const row = state.rows.find((item) => item.id === paidRow.id);
-          if (!row || row.status !== PAYROLL_STATUS.Confirmed) continue;
-
-          row.status = PAYROLL_STATUS.Paid;
-          row.paidBy = action.payload.approvedBy;
-          row.paidAt = action.payload.paidAt;
-        }
-        state.error = null;
       });
   },
 });
@@ -365,7 +319,6 @@ export const {
   closeHourAdjust,
   adjustHours,
   resetHourAdjust,
-  confirmHours,
   clearPayrollError,
 } = payrollSlice.actions;
 

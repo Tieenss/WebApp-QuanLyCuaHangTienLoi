@@ -21,7 +21,7 @@ import { phieuNhapApi, type PhieuNhapDTO } from '@/api/phieuNhap';
  *   4. Tạo phiếu chi sổ quỹ CHI / NHAP_HANG         → `cashbookSlice`
  *
  * Cùng mô hình "một action, nhiều slice lắng nghe" như `saleCompleted` và
- * `payrollPaid`: Redux Toolkit chạy hết reducer của một dispatch rồi mới thông
+ * Redux Toolkit chạy hết reducer của một dispatch rồi mới thông
  * báo cho UI, nên không có trạng thái trung gian nào lộ ra.
  */
 

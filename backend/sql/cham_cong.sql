@@ -67,9 +67,9 @@ CREATE TABLE IF NOT EXISTS cham_cong (
     -- NULL nếu chưa check-out (chưa chốt ca).
     tong_gio_lam    DECIMAL(5,2) CHECK (tong_gio_lam IS NULL OR tong_gio_lam >= 0),
 
-    -- Trạng thái chấm công: PRESENT/LATE/ABSENT/LEAVE.
-    trang_thai      VARCHAR(20)  NOT NULL DEFAULT 'PRESENT'
-                   CHECK (trang_thai IN ('PRESENT', 'LATE', 'ABSENT', 'LEAVE')),
+    -- Trạng thái chấm công: SCHEDULED/PRESENT/LATE/ABSENT/LEAVE.
+    trang_thai      VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULED'
+                   CHECK (trang_thai IN ('SCHEDULED', 'PRESENT', 'LATE', 'ABSENT', 'LEAVE')),
 
     -- Cờ đánh dấu đã thanh toán lương cho ca này chưa.
     -- Khi `bang_luong` được duyệt chi → cập nhật is_paid=TRUE cho tất cả
@@ -88,16 +88,15 @@ CREATE TABLE IF NOT EXISTS cham_cong (
     -- Đảm bảo check_out > check_in (planned phải hợp lệ).
     CONSTRAINT chk_check_out_after_in CHECK (check_out_at > check_in_at),
 
-    -- Nếu đã check-out thực tế thì phải có cả clock_in và clock_out; thời
-    -- gian thực tế phải > thời gian kế hoạch. Nếu chưa check-out thực tế thì
-    -- 2 cột này NULL.
+    -- Cho phép ca chưa chấm công, đã check-in hoặc đã check-out. Chỉ khi có
+    -- check-out thì mới yêu cầu thời gian thực tế hợp lệ.
     CONSTRAINT chk_clock_consistency CHECK (
         (clock_in_at IS NULL AND clock_out_at IS NULL)
         OR
+        (clock_in_at IS NOT NULL AND clock_out_at IS NULL)
+        OR
         (clock_in_at IS NOT NULL AND clock_out_at IS NOT NULL
-         AND clock_out_at > clock_in_at
-         AND clock_in_at >= check_in_at - INTERVAL '1 hour'  -- cho phép trễ tối đa 1h
-         AND clock_out_at <= check_out_at + INTERVAL '6 hours')  -- cho phép OT tối đa 6h
+         AND clock_out_at > clock_in_at)
     )
 );
 
