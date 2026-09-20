@@ -103,11 +103,10 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
   };
 
   const availableProducts = useMemo(
-    () =>
-      sellableProducts.filter(
-        (product) => branchId && stockOf(balances, branchId, product.id) > 0,
-      ),
-    [sellableProducts, balances, branchId],
+    // Kiểm kê phải cho phép đếm cả SKU sổ sách đang bằng 0: thực tế vẫn có
+    // thể còn hàng và cần ghi nhận chênh lệch dương.
+    () => (branchId ? sellableProducts : []),
+    [sellableProducts, branchId],
   );
 
   const usedProductIds = useMemo(
@@ -304,7 +303,8 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
           branchId: values.branchId,
           branchName: branch?.name ?? '',
           countDate: values.countDate.format('YYYY-MM-DD'),
-          status: DOCUMENT_STATUS.Pending,
+          createdById: user?.idNhanVien ?? undefined,
+          status: DOCUMENT_STATUS.Draft,
           lines: validRows.map((row) => ({
             ...row,
             id: `stl-new-${row.key}`,

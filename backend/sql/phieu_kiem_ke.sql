@@ -64,10 +64,11 @@ CREATE TABLE IF NOT EXISTS phieu_kiem_ke (
 
     -- ===== TRẠNG THÁI =====
     -- DANG_KIEM_KE: đang đếm, có thể thêm/sửa lines
+    -- CHO_DUYET: đã chốt số đếm, chờ Admin/Kế toán cân bằng
     -- DA_CAN_BANG:  đã cân bằng xong, tồn kho đã cập nhật, KHÔNG sửa được
     -- CANCELLED:    huỷ phiếu (kiểm kê nhầm ngày, sai chi nhánh)
     trang_thai      VARCHAR(20)  NOT NULL DEFAULT 'DANG_KIEM_KE'
-                   CHECK (trang_thai IN ('DANG_KIEM_KE', 'DA_CAN_BANG', 'CANCELLED')),
+                   CHECK (trang_thai IN ('DANG_KIEM_KE', 'CHO_DUYET', 'DA_CAN_BANG', 'CANCELLED')),
 
     -- CHECK khi DA_CAN_BANG thì PHẢI có ngay_can_bang + id_nguoi_duyet
     CONSTRAINT chk_can_bang_co_ngay_va_nguoi CHECK (
@@ -251,8 +252,8 @@ BEGIN
         RAISE EXCEPTION 'Không tìm thấy phiếu kiểm kê %', p_id_phieu;
     END IF;
 
-    IF v_phieu.trang_thai != 'DANG_KIEM_KE' THEN
-        RAISE EXCEPTION 'Phiếu phải ở trạng thái DANG_KIEM_KE. Hiện tại: %',
+    IF v_phieu.trang_thai != 'CHO_DUYET' THEN
+        RAISE EXCEPTION 'Phiếu phải ở trạng thái CHO_DUYET. Hiện tại: %',
             v_phieu.trang_thai;
     END IF;
 

@@ -244,6 +244,8 @@ export interface Stocktake {
   branchId: ID;
   branchName: string;
   countDate: string;
+  /** ID nhân viên tạo phiếu, dùng để quyết định quyền gửi duyệt/cân bằng trên UI. */
+  createdById?: ID;
   status: DocumentStatus;
   lines: StocktakeLine[];
   totalItemsCounted: number;

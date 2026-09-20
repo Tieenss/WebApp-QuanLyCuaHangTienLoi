@@ -28,7 +28,7 @@ import java.util.UUID;
 @RequestMapping("/api/phieu-kiem-ke")
 @RequiredArgsConstructor
 //@CrossOrigin(origins = "*")
-@PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+@PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY', 'KE_TOAN')")
 public class PhieuKiemKeController {
 
     private final PhieuKiemKeRepository phieuKiemKeRepository;
@@ -78,6 +78,7 @@ public class PhieuKiemKeController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody PhieuKiemKe request, HttpServletRequest httpRequest) {
         if (request.getIdChiNhanh() == null || !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
@@ -127,6 +128,7 @@ public class PhieuKiemKeController {
      * phiếu mồ côi trong DB.
      */
     @PostMapping("/with-lines")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     @Transactional
     public ResponseEntity<?> createWithLines(@Valid @RequestBody CreateStocktakeRequest request, HttpServletRequest httpRequest) {
         if (request.getIdChiNhanh() == null) {
@@ -206,12 +208,14 @@ public class PhieuKiemKeController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     @Transactional
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody PhieuKiemKe request, HttpServletRequest httpRequest) {
         return phieuKiemKeRepository.findById(id)
                 .map(pkk -> {
                     var actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
                     branchAccessService.requireReadableBranch(actor, pkk.getIdChiNhanh());
+                    requireEditable(pkk);
                     if (request.getMaPhieu() != null) pkk.setMaPhieu(request.getMaPhieu());
                     if (request.getIdChiNhanh() != null && !request.getIdChiNhanh().equals(pkk.getIdChiNhanh())) {
                         if (!"ADMIN".equals(actor.getVaiTro())) {
@@ -237,10 +241,38 @@ public class PhieuKiemKeController {
     }
 
     /**
+     * Khóa nội dung phiếu và chuyển sang chờ người có thẩm quyền cân bằng.
+     * Người tạo phiếu (hoặc Admin) là người được gửi duyệt.
+     */
+    @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    @Transactional
+    public ResponseEntity<?> submit(@PathVariable UUID id, HttpServletRequest httpRequest) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
+        PhieuKiemKe pkk = phieuKiemKeRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Không tìm thấy phiếu kiểm kê"));
+        branchAccessService.requireReadableBranch(actor, pkk.getIdChiNhanh());
+        requireEditable(pkk);
+        if (!"ADMIN".equals(actor.getVaiTro()) && !actor.getId().equals(pkk.getIdNguoiTao())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Chỉ người tạo phiếu mới được gửi duyệt");
+        }
+        if (chiTietKiemKeRepository.findByIdPhieuKiemKe(id).isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Phiếu kiểm kê phải có ít nhất một dòng"));
+        }
+        pkk.setTrangThai("CHO_DUYET");
+        pkk.setNgayCapNhat(LocalDateTime.now());
+        phieuKiemKeRepository.save(pkk);
+        return ResponseEntity.ok(toDTO(pkk));
+    }
+
+    /**
      * Cân bằng tồn kho trong một transaction: DB khóa phiếu, đổi trạng thái,
      * ghi thẻ kho ADJUSTMENT và điều chỉnh tồn qua fn_can_bang_kiem_ke.
      */
     @PostMapping("/{id}/balance")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     @Transactional
     public ResponseEntity<?> balance(@PathVariable UUID id, HttpServletRequest httpRequest) {
         var actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
@@ -248,9 +280,17 @@ public class PhieuKiemKeController {
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "Không tìm thấy phiếu kiểm kê"));
         branchAccessService.requireReadableBranch(actor, pkk.getIdChiNhanh());
-        if (!"DANG_KIEM_KE".equals(pkk.getTrangThai())) {
+        if (!"CHO_DUYET".equals(pkk.getTrangThai())) {
             return ResponseEntity.badRequest().body(ApiResponse.err(
-                    "Chỉ cân bằng được phiếu đang kiểm kê"));
+                    "Chỉ cân bằng được phiếu đang chờ duyệt"));
+        }
+        boolean isAdmin = "ADMIN".equals(actor.getVaiTro());
+        boolean isAccountantApprovingAnotherPerson = "KE_TOAN".equals(actor.getVaiTro())
+                && !actor.getId().equals(pkk.getIdNguoiTao());
+        if (!isAdmin && !isAccountantApprovingAnotherPerson) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Chỉ Admin hoặc Kế toán duyệt phiếu của người khác mới được cân bằng kho");
         }
 
         jdbcTemplate.query(
@@ -259,10 +299,35 @@ public class PhieuKiemKeController {
         return ResponseEntity.ok(toDTO(phieuKiemKeRepository.findById(id).orElseThrow()));
     }
 
+    /** Hủy mềm phiếu chưa cân bằng để giữ lại dấu vết kiểm kê. */
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    @Transactional
+    public ResponseEntity<?> cancel(@PathVariable UUID id, HttpServletRequest httpRequest) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
+        PhieuKiemKe pkk = phieuKiemKeRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Không tìm thấy phiếu kiểm kê"));
+        branchAccessService.requireReadableBranch(actor, pkk.getIdChiNhanh());
+        if ("DA_CAN_BANG".equals(pkk.getTrangThai()) || "CANCELLED".equals(pkk.getTrangThai())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Không thể hủy phiếu đã cân bằng hoặc đã hủy"));
+        }
+        if (!"ADMIN".equals(actor.getVaiTro()) && !actor.getId().equals(pkk.getIdNguoiTao())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Chỉ người tạo hoặc Admin được hủy phiếu kiểm kê");
+        }
+        pkk.setTrangThai("CANCELLED");
+        pkk.setNgayCapNhat(LocalDateTime.now());
+        phieuKiemKeRepository.save(pkk);
+        return ResponseEntity.ok(toDTO(pkk));
+    }
+
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> delete(@PathVariable UUID id, HttpServletRequest httpRequest) {
         return phieuKiemKeRepository.findById(id).map(pkk -> {
             branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(httpRequest), pkk.getIdChiNhanh());
+            requireEditable(pkk);
             phieuKiemKeRepository.delete(pkk);
             return ResponseEntity.ok(ApiResponse.ok("Xóa phiếu kiểm kê thành công"));
         }).orElse(ResponseEntity.notFound().build());
@@ -284,6 +349,14 @@ public class PhieuKiemKeController {
         }
 
         return null;
+    }
+
+    private void requireEditable(PhieuKiemKe pkk) {
+        if (!"DANG_KIEM_KE".equals(pkk.getTrangThai())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "Phiếu kiểm kê đã gửi duyệt, đã cân bằng hoặc đã hủy nên không thể sửa");
+        }
     }
 
     private PhieuKiemKeDTO toDTO(PhieuKiemKe pkk) {

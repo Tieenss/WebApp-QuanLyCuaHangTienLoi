@@ -97,6 +97,7 @@ const WAREHOUSE_OPS = [USER_ROLE.Admin, USER_ROLE.WarehouseKeeper, USER_ROLE.Acc
 /** Nhóm xem được tồn kho: Admin toàn bộ, Thủ kho Kho Tổng, Quản lý chi nhánh mình. */
 const STOCK_VIEW = [
   USER_ROLE.Admin,
+  USER_ROLE.Accountant,
   USER_ROLE.WarehouseKeeper,
   USER_ROLE.StoreManager,
 ] as const;

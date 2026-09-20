@@ -21,7 +21,7 @@ import java.util.UUID;
 @RequestMapping("/api/chi-tiet-kiem-ke")
 @RequiredArgsConstructor
 //@CrossOrigin(origins = "*")
-@PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+@PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY', 'KE_TOAN')")
 public class ChiTietKiemKeController {
 
     private final ChiTietKiemKeRepository chiTietKiemKeRepository;
@@ -97,6 +97,7 @@ public class ChiTietKiemKeController {
             throw new IllegalArgumentException("Sản phẩm không tồn tại");
         }
         requireReadableHeader(request.getIdPhieuKiemKe(), httpRequest);
+        requireEditableHeader(request.getIdPhieuKiemKe());
         com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getTonHeThong(), "Tồn hệ thống");
         com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getTonThucTe(), "Tồn thực tế");
         com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getDonGiaVon(), "Đơn giá vốn");
@@ -107,6 +108,7 @@ public class ChiTietKiemKeController {
     public ResponseEntity<?> delete(@PathVariable UUID id, HttpServletRequest request) {
         return chiTietKiemKeRepository.findById(id).map(ct -> {
             requireReadableHeader(ct.getIdPhieuKiemKe(), request);
+            requireEditableHeader(ct.getIdPhieuKiemKe());
             chiTietKiemKeRepository.delete(ct);
             return ResponseEntity.ok(ApiResponse.ok("Xóa chi tiết thành công"));
         }).orElse(ResponseEntity.notFound().build());
@@ -116,6 +118,7 @@ public class ChiTietKiemKeController {
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> deleteByPhieuKiemKe(@PathVariable UUID idPhieuKiemKe, HttpServletRequest request) {
         requireReadableHeader(idPhieuKiemKe, request);
+        requireEditableHeader(idPhieuKiemKe);
         List<ChiTietKiemKe> list = chiTietKiemKeRepository.findByIdPhieuKiemKe(idPhieuKiemKe);
         chiTietKiemKeRepository.deleteAll(list);
         return ResponseEntity.ok( ApiResponse.ok("Xóa tất cả chi tiết kiểm kê"));
@@ -133,6 +136,16 @@ public class ChiTietKiemKeController {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.FORBIDDEN, "Không được xem hoặc sửa chi tiết kiểm kê của chi nhánh khác");
         }
+    }
+
+    private void requireEditableHeader(UUID idPhieuKiemKe) {
+        phieuKiemKeRepository.findById(idPhieuKiemKe).ifPresent(header -> {
+            if (!"DANG_KIEM_KE".equals(header.getTrangThai())) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT,
+                        "Phiếu kiểm kê không còn ở trạng thái đang kiểm kê nên không thể sửa chi tiết");
+            }
+        });
     }
 
 //    record SuccessResponse(String message) {}
