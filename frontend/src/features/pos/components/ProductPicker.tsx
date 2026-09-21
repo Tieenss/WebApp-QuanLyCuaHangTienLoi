@@ -21,7 +21,6 @@ import {
   setActiveCategory,
   setSearchKeyword,
 } from '@/store/slices/posSlice';
-import { stockOf } from '@/store/slices/stockSlice';
 import { formatVND } from '@/utils/formatters';
 import { matchKeyword, normalizeSearch } from '@/utils/formatters';
 
@@ -38,12 +37,14 @@ export const ProductPicker: FC = () => {
   const { message } = AntdApp.useApp();
   const barcodeRef = useRef<string>('');
 
-  const { branchId, activeCategoryId, searchKeyword } = useAppSelector(
+  const {
+    activeCategoryId,
+    searchKeyword,
+    availabilityByProductId,
+  } = useAppSelector(
     (state) => state.pos,
   );
   const cartLines = useAppSelector((state) => state.pos.lines);
-  /** Tồn kho hiện hành — cập nhật ngay sau mỗi lần bán. */
-  const balances = useAppSelector((state) => state.stock.balances);
   const products = useAppSelector((state) => state.product.products);
   const categories = useAppSelector((state) => state.category.categories);
 
@@ -91,12 +92,12 @@ export const ProductPicker: FC = () => {
           const relevanceDiff = score(a) - score(b);
           if (relevanceDiff !== 0) return relevanceDiff;
 
-          const stockA = stockOf(balances, branchId, a.id);
-          const stockB = stockOf(balances, branchId, b.id);
+          const stockA = availabilityByProductId[a.id] ?? 0;
+          const stockB = availabilityByProductId[b.id] ?? 0;
           const availabilityDiff = Number(stockB > 0) - Number(stockA > 0);
           return availabilityDiff || stockB - stockA || a.name.localeCompare(b.name);
         }),
-    [sellableProducts, activeCategoryId, searchKeyword, balances, branchId],
+    [sellableProducts, activeCategoryId, searchKeyword, availabilityByProductId],
   );
 
   /** Tuỳ chọn danh mục, kèm mục "Tất cả" ở đầu. */
@@ -122,11 +123,17 @@ export const ProductPicker: FC = () => {
       message.error(`Không tìm thấy sản phẩm với mã vạch ${code}`);
       return;
     }
+    const available = availabilityByProductId[product.id] ?? 0;
+    const isMadeToOrder = product.categoryId === CATEGORY_ID.MadeToOrder;
+    if (available <= 0 && !isMadeToOrder) {
+      message.error(`Sản phẩm "${product.name}" đã hết hàng.`);
+      return;
+    }
 
     dispatch(
       addToCart({
         product,
-        availableStock: stockOf(balances, branchId, product.id),
+        availableStock: available,
       }),
     );
     message.success(`Đã thêm: ${product.name}`);
@@ -190,7 +197,7 @@ export const ProductPicker: FC = () => {
         ) : (
           <div className="pos-product-grid">
               {visibleProducts.map((product) => {
-                const available = stockOf(balances, branchId, product.id);
+                const available = availabilityByProductId[product.id] ?? 0;
               // Hàng pha chế tại quầy không quản tồn nên vẫn bán được khi tồn 0.
               const isMadeToOrder = product.categoryId === CATEGORY_ID.MadeToOrder;
               const isOutOfStock = available <= 0 && !isMadeToOrder;

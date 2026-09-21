@@ -8,6 +8,7 @@ import { fetchEmployees } from '@/store/slices/employeeSlice';
 import { fetchProducts } from '@/store/slices/productSlice';
 import { fetchAttendance } from '@/store/slices/attendanceSlice';
 import { syncPosBranch } from '@/store/slices/posSlice';
+import { USER_ROLE } from '@/types';
 
 /**
  * Load dữ liệu dùng chung (master data) 1 lần khi app khởi động.
@@ -24,7 +25,14 @@ export const AppBootstrap: FC = () => {
       dispatch(fetchBranches());
       dispatch(fetchEmployees());
       dispatch(fetchProducts());
-      dispatch(fetchStock());
+      // Thu ngân tải tồn kho qua endpoint theo chi nhánh tại màn POS; không
+      // gọi endpoint quản trị kho/toàn bộ thẻ kho.
+      const canLoadManagementStock = authUser.role === USER_ROLE.Admin
+        || authUser.role === USER_ROLE.StoreManager
+        || authUser.role === USER_ROLE.WarehouseKeeper;
+      if (canLoadManagementStock) {
+        dispatch(fetchStock());
+      }
       dispatch(fetchAttendance({}));
       dispatch(syncPosBranch(authUser.branchId));
     }

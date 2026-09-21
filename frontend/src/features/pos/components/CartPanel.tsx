@@ -42,10 +42,11 @@ import {
   PAYMENT_METHOD,
   PAYMENT_METHOD_LABEL,
   SHIFT_CODE,
+  USER_ROLE,
   type PaymentMethod,
   type ShiftCode,
 } from '@/types';
-import { fetchStock, stockOf } from '@/store/slices/stockSlice';
+import { fetchPosAvailability } from '@/store/slices/posSlice';
 import { fetchCashbook } from '@/store/slices/cashbookSlice';
 import { nowIso } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
@@ -86,7 +87,6 @@ export const CartPanel: FC = () => {
 
   const { user } = useAppSelector((state) => state.auth);
   const posState = useAppSelector((state) => state.pos);
-  const balances = useAppSelector((state) => state.stock.balances);
   const products = useAppSelector((state) => state.product.products);
   const employees = useAppSelector((state) => state.employee.employees);
   const {
@@ -96,6 +96,7 @@ export const CartPanel: FC = () => {
     paymentMethod,
     tenderedAmount,
     memberPhone,
+    availabilityByProductId,
   } = posState;
 
   const productById = (id: string) => products.find((p) => p.id === id);
@@ -115,12 +116,12 @@ export const CartPanel: FC = () => {
   /** Kiểm tra tồn kho tại thời điểm thanh toán (BR-01). */
   const hasOutOfStockLines = useMemo(() => {
     return lines.some((line) => {
-      const currentStock = stockOf(balances, branchId, line.productId);
-      if (currentStock > 0) return false;
+      const currentStock = availabilityByProductId[line.productId] ?? 0;
       const product = productById(line.productId);
-      return product?.categoryId !== CATEGORY_ID.MadeToOrder;
+      if (product?.categoryId === CATEGORY_ID.MadeToOrder) return false;
+      return currentStock < line.quantity;
     });
-  }, [lines, balances, branchId]);
+  }, [lines, availabilityByProductId, products]);
 
   /**
    * Chốt hoá đơn — một dispatch duy nhất cho cả 4 bước của transaction:
@@ -137,13 +138,13 @@ export const CartPanel: FC = () => {
     }
     if (hasOutOfStockLines) {
       const outOfStockLine = lines.find((line) => {
-        const currentStock = stockOf(balances, branchId, line.productId);
-        if (currentStock > 0) return false;
+        const currentStock = availabilityByProductId[line.productId] ?? 0;
         const product = productById(line.productId);
-        return product?.categoryId !== CATEGORY_ID.MadeToOrder;
+        if (product?.categoryId === CATEGORY_ID.MadeToOrder) return false;
+        return currentStock < line.quantity;
       });
       message.error(
-        `Sản phẩm "${outOfStockLine?.productName}" đã hết hàng, không thể thanh toán.`,
+        `Sản phẩm "${outOfStockLine?.productName}" không đủ tồn kho, không thể thanh toán.`,
       );
       return;
     }
@@ -226,8 +227,12 @@ const sale = buildSalesOrder({
           },
           tendered: Number(saved.tienKhachDua ?? sale.tendered),
         }));
-        dispatch(fetchStock());
-        dispatch(fetchCashbook());
+        // Thu ngân chỉ đọc tồn của quầy đang bán. Làm mới ngay sau checkout
+        // để lưới sản phẩm, giỏ hàng và lần bán kế tiếp cùng dùng số liệu mới.
+        dispatch(fetchPosAvailability(branchId));
+        // Sổ quỹ không thuộc phạm vi đọc của Thu ngân; backend đã tạo phiếu
+        // thu nguyên tử trong checkout. Quản lý vẫn làm mới dữ liệu quản trị.
+        if (user?.role !== USER_ROLE.Cashier) dispatch(fetchCashbook());
       } catch (e) {
         console.warn('Không lưu được hoá đơn xuống DB:', e);
         message.error('Không thể kết nối máy chủ. Giỏ hàng chưa thay đổi.');

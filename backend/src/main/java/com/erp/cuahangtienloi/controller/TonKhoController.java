@@ -52,7 +52,7 @@ public class TonKhoController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<List<TonKhoDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh,
                                                            HttpServletRequest request) {
         branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);

@@ -27,6 +27,18 @@ export const tonKhoApi = {
     return response.json();
   },
 
+  /**
+   * Tồn kho một chi nhánh. Backend kiểm tra chi nhánh trong JWT, vì vậy UI
+   * không thể dùng path này để đọc kho của chi nhánh khác.
+   */
+  getByBranch: async (branchId: string): Promise<TonKhoDTO[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/ton-kho/by-branch/${branchId}`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error(`Không tải được tồn kho chi nhánh (HTTP ${response.status})`);
+    return response.json();
+  },
+
   getAvailableForTransfer: async (): Promise<TonKhoDTO[]> => {
     const response = await fetch(`${API_BASE_URL}/api/ton-kho/available-for-transfer`, {
       headers: getHeaders(),
