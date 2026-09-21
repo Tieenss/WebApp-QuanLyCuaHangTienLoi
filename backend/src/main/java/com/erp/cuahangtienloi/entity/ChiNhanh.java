@@ -54,20 +54,11 @@ public class ChiNhanh {
     @Column(name = "ngay_khai_truong")
     private LocalDate ngayKhaiTruong;
 
-    @Column(name = "trang_thai")
-    private String trangThai;
-
     @Column(name = "loai", nullable = false)
     private String loai;
 
-    @Column(name = "loai_chi_nhanh")
-    private String loaiChiNhanh;
-
     @Column(name = "id_quan_ly")
     private UUID idQuanLy;
-
-    @Column(name = "ten_quan_ly")
-    private String tenQuanLy;
 
     @Column(name = "dang_hoat_dong")
     private Boolean dangHoatDong;

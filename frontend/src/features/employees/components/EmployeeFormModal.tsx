@@ -55,9 +55,11 @@ export const EmployeeFormModal: FC = () => {
   // Lọc chi nhánh theo vai trò: THU_KHO chỉ được chọn Kho tổng
   const filterBranchesByRole = (role: string) => {
     if (role === 'THU_KHO') {
-      return branches.filter((b) => b.kind === BRANCH_KIND.DistributionCenter);
+      return branches.filter((b) => b.status === RECORD_STATUS.Active
+        && b.kind === BRANCH_KIND.DistributionCenter);
     }
-    return branches.filter((b) => b.kind === BRANCH_KIND.Store);
+    return branches.filter((b) => b.status === RECORD_STATUS.Active
+      && b.kind === BRANCH_KIND.Store);
   };
 
   useEffect(() => {
@@ -171,7 +173,10 @@ export const EmployeeFormModal: FC = () => {
               label="Vai trò hệ thống"
               rules={[{ required: true, message: 'Chọn vai trò.' }]}
             >
-              <Select options={ROLE_OPTIONS} />
+              <Select
+                options={ROLE_OPTIONS}
+                onChange={() => form.setFieldValue('branchId', undefined)}
+              />
             </Form.Item>
           </Col>
         </Row>

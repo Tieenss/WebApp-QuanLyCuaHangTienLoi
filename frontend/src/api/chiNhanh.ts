@@ -16,13 +16,9 @@ export interface ChiNhanhDTO {
   dienTichM2?: number;
   doanhThuThang?: number;
   ngayKhaiTruong?: string;
-  trangThai?: string;
-  /** Column `loai` — NOT NULL, có giá trị cho seed data. */
+  /** Loại điểm bán: KHO_TONG hoặc CUA_HANG_BAN_LE. */
   loai?: string;
-  /** Column `loai_chi_nhanh` — nullable, seed data không set → null. */
-  loaiChiNhanh?: string;
   idQuanLy?: string;
-  tenQuanLy?: string;
   dangHoatDong?: boolean;
   nguoiTao?: string;
   nguoiCapNhat?: string;
@@ -93,12 +89,13 @@ export const chiNhanhApi = {
     return response.json();
   },
 
-  delete: async (id: string): Promise<void> => {
+  delete: async (id: string): Promise<ChiNhanhDTO> => {
     const response = await fetch(`${API_BASE_URL}/api/chi-nhanh/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
-    if (!response.ok) throw new Error('Failed to delete');
+    if (!response.ok) throw await parseApiError(response, 'Không thể ngừng hoạt động chi nhánh');
+    return response.json();
   },
 
   assignQuanLy: async (id: string, idQuanLy: string): Promise<ChiNhanhDTO> => {
@@ -106,10 +103,16 @@ export const chiNhanhApi = {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...getHeaders() },
     });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to assign');
-    }
+    if (!response.ok) throw await parseApiError(response, 'Không thể bổ nhiệm người phụ trách');
+    return response.json();
+  },
+
+  clearQuanLy: async (id: string): Promise<ChiNhanhDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/chi-nhanh/${id}/quan-ly`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw await parseApiError(response, 'Không thể bỏ người phụ trách');
     return response.json();
   },
 };

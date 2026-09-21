@@ -11,4 +11,7 @@ public interface ChiNhanhRepository extends JpaRepository<ChiNhanh, UUID> {
     Optional<ChiNhanh> findByMaChiNhanh(String maChiNhanh);
 
     Optional<ChiNhanh> findFirstByLoai(String loai);
+
+    boolean existsByIdQuanLyAndIdNot(UUID idQuanLy, UUID id);
+    Optional<ChiNhanh> findByIdQuanLy(UUID idQuanLy);
 }

@@ -35,6 +35,17 @@ public final class InputValidator {
         }
     }
 
+    public static String requirePhone(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " không được để trống");
+        }
+        String normalized = value.replaceAll("\\s+", "");
+        if (!PHONE.matcher(normalized).matches()) {
+            throw new IllegalArgumentException(fieldName + " không hợp lệ");
+        }
+        return normalized;
+    }
+
     public static void optionalEmail(String value) {
         if (value != null && !value.isBlank() && !EMAIL.matcher(value.trim()).matches()) {
             throw new IllegalArgumentException("Email không đúng định dạng");

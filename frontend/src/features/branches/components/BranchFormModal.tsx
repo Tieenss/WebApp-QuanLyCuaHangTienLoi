@@ -11,10 +11,13 @@ import {
 } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
+  assignBranchManager,
+  clearBranchManager,
   createBranch,
   setBranchModalOpen,
   updateBranchThunk,
 } from '@/store/slices/branchSlice';
+import { fetchEmployees } from '@/store/slices/employeeSlice';
 import {
   BRANCH_KIND,
   BRANCH_KIND_LABEL,
@@ -41,8 +44,10 @@ const STATUS_OPTIONS = [
   { value: 'Inactive', label: 'Ngừng hoạt động' },
 ];
 
+type BranchEditorValues = BranchFormValues & { managerId?: string };
+
 export const BranchFormModal: FC = () => {
-  const [form] = Form.useForm<BranchFormValues>();
+  const [form] = Form.useForm<BranchEditorValues>();
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
 
@@ -50,11 +55,15 @@ export const BranchFormModal: FC = () => {
     (state) => state.branch,
   );
   const isEditing = selectedBranch !== null;
+  const employees = useAppSelector((state) => state.employee.employees);
+  const selectedKind = Form.useWatch('kind', form);
+  const selectedStatus = Form.useWatch('status', form);
 
   useEffect(() => {
     if (!isModalOpen) return;
+    dispatch(fetchEmployees());
     if (selectedBranch !== null) {
-      form.setFieldsValue(selectedBranch);
+      form.setFieldsValue({ ...selectedBranch, managerId: selectedBranch.managerId });
       return;
     }
     form.resetFields();
@@ -68,9 +77,17 @@ export const BranchFormModal: FC = () => {
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      const payload = { ...values, phone: values.phone.replace(/\s+/g, '') };
+      const { managerId, ...branchValues } = values;
+      const payload = { ...branchValues, phone: branchValues.phone.replace(/\s+/g, '') };
       if (isEditing && selectedBranch) {
         await dispatch(updateBranchThunk({ id: selectedBranch.id, values: payload })).unwrap();
+        if (managerId !== selectedBranch.managerId) {
+          if (managerId) {
+            await dispatch(assignBranchManager({ branchId: selectedBranch.id, employeeId: managerId })).unwrap();
+          } else {
+            await dispatch(clearBranchManager(selectedBranch.id)).unwrap();
+          }
+        }
         message.success('Đã cập nhật thông tin chi nhánh.');
       } else {
         await dispatch(createBranch(payload)).unwrap();
@@ -173,7 +190,7 @@ export const BranchFormModal: FC = () => {
           <Col xs={24} md={12}>
             <Form.Item
               name="phone"
-              label="Điện thoại"
+              label="SĐT liên hệ chi nhánh"
               normalize={(value: string | undefined) => value?.replace(/\s+/g, '')}
               rules={[
                 { required: true, message: 'Vui lòng nhập điện thoại.' },
@@ -187,13 +204,33 @@ export const BranchFormModal: FC = () => {
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
-            <Form.Item
-              name="managerName"
-              label="Quản lý"
-              rules={[{ required: true, message: 'Vui lòng nhập tên quản lý.' }]}
-            >
-              <Input placeholder="Tên quản lý" />
-            </Form.Item>
+            {isEditing ? (
+              <Form.Item
+                name="managerId"
+                label={selectedKind === BRANCH_KIND.DistributionCenter
+                  ? 'Người phụ trách kho' : 'Quản lý phụ trách'}
+              >
+                <Select
+                  allowClear
+                  disabled={selectedStatus === RECORD_STATUS.Inactive}
+                  placeholder="Chọn người phụ trách"
+                  options={employees
+                    .filter((employee) => employee.status === RECORD_STATUS.Active)
+                    .filter((employee) => employee.branchId === selectedBranch?.id)
+                    .filter((employee) => selectedKind === BRANCH_KIND.DistributionCenter
+                      ? employee.role === 'THU_KHO'
+                      : employee.role === 'QUAN_LY')
+                    .map((employee) => ({
+                      value: employee.id,
+                      label: `${employee.code} - ${employee.fullName}`,
+                    }))}
+                />
+              </Form.Item>
+            ) : (
+              <Form.Item label="Người phụ trách">
+                <Input value="Thiết lập sau khi tạo chi nhánh" disabled />
+              </Form.Item>
+            )}
           </Col>
         </Row>
 

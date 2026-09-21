@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
+import com.erp.cuahangtienloi.entity.ChiNhanh;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.TaiKhoan;
 import com.erp.cuahangtienloi.repository.ChiNhanhRepository;
@@ -106,19 +107,13 @@ public class NhanVienController {
         nv.setCaMacDinh(request.getCaMacDinh() != null ? request.getCaMacDinh() : "MORNING");
         nv.setLuongTheoGio(request.getLuongTheoGio());
         nv.setLuongCung(request.getLuongCung());
-        // Xử lý rule chk_vai_tro_chi_nhanh: ADMIN/KE_TOAN phải NULL, các vai trò khác phải có chi nhánh
         String vaiTro = request.getVaiTro();
-        if ("ADMIN".equals(vaiTro) || "KE_TOAN".equals(vaiTro)) {
-            nv.setIdChiNhanh(null);
-        } else {
-            if (request.getIdChiNhanh() == null) {
-                return ResponseEntity.badRequest().body( ApiResponse.err("Vai trò " + vaiTro + " bắt buộc phải có chi nhánh"));
-            }
-            if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
-                return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
-            }
-            nv.setIdChiNhanh(request.getIdChiNhanh());
+        String branchError = branchAssignmentError(vaiTro, request.getIdChiNhanh());
+        if (branchError != null) {
+            return ResponseEntity.badRequest().body(ApiResponse.err(branchError));
         }
+        nv.setIdChiNhanh("ADMIN".equals(vaiTro) || "KE_TOAN".equals(vaiTro)
+                ? null : request.getIdChiNhanh());
         nv.setTrangThai(request.getTrangThai() != null ? request.getTrangThai() : "ACTIVE");
         nv.setSoTaiKhoan(request.getSoTaiKhoan());
         nv.setTenNganHang(request.getTenNganHang());
@@ -168,28 +163,27 @@ public class NhanVienController {
                     if (request.getCaMacDinh() != null) nv.setCaMacDinh(request.getCaMacDinh());
                     if (request.getLuongTheoGio() != null) nv.setLuongTheoGio(request.getLuongTheoGio());
                     if (request.getLuongCung() != null) nv.setLuongCung(request.getLuongCung());
-                    // Chỉ thẩm định quan hệ vai trò/chi nhánh khi một trong hai field được thay đổi.
-                    if (request.getVaiTro() != null) {
-                        String newRole = request.getVaiTro();
-                        if ("ADMIN".equals(newRole) || "KE_TOAN".equals(newRole)) {
-                            nv.setIdChiNhanh(null);
-                        } else if (request.getIdChiNhanh() != null) {
-                            if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
-                                return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
-                            }
-                            nv.setIdChiNhanh(request.getIdChiNhanh());
-                        } else if (nv.getIdChiNhanh() == null) {
-                            return ResponseEntity.badRequest().body(ApiResponse.err("Vai trò này bắt buộc phải có chi nhánh"));
+                    String effectiveRole = request.getVaiTro() != null ? request.getVaiTro() : nv.getVaiTro();
+                    UUID effectiveBranchId = ("ADMIN".equals(effectiveRole) || "KE_TOAN".equals(effectiveRole))
+                            ? null
+                            : (request.getIdChiNhanh() != null ? request.getIdChiNhanh() : nv.getIdChiNhanh());
+                    if (request.getVaiTro() != null || request.getIdChiNhanh() != null) {
+                        String branchError = branchAssignmentError(effectiveRole, effectiveBranchId);
+                        if (branchError != null) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err(branchError));
                         }
-                    } else if (request.getIdChiNhanh() != null) {
-                        if ("ADMIN".equals(nv.getVaiTro()) || "KE_TOAN".equals(nv.getVaiTro())) {
-                            return ResponseEntity.badRequest().body(ApiResponse.err("ADMIN và KẾ TOÁN không thuộc chi nhánh"));
-                        }
-                        if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
-                            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
-                        }
-                        nv.setIdChiNhanh(request.getIdChiNhanh());
                     }
+                    ChiNhanh primaryBranch = chiNhanhRepository.findByIdQuanLy(nv.getId()).orElse(null);
+                    if (primaryBranch != null) {
+                        String responsibilityError = responsibilityEligibilityError(
+                                primaryBranch, effectiveRole, effectiveBranchId,
+                                request.getTrangThai() != null ? request.getTrangThai() : nv.getTrangThai());
+                        if (responsibilityError != null) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err(
+                                    "Không thể sửa nhân viên đang là người phụ trách: " + responsibilityError));
+                        }
+                    }
+                    nv.setIdChiNhanh(effectiveBranchId);
                     if (request.getTrangThai() != null) nv.setTrangThai(request.getTrangThai());
                     if (request.getNguoiCapNhat() != null) nv.setNguoiCapNhat(request.getNguoiCapNhat());
                     nv.setNgayCapNhat(LocalDateTime.now());
@@ -209,11 +203,43 @@ public class NhanVienController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
+        if (chiNhanhRepository.findByIdQuanLy(id).isPresent()) {
+            return ResponseEntity.badRequest().body(ApiResponse.err(
+                    "Không thể xóa người phụ trách; hãy thay thế hoặc bỏ phân công trước"));
+        }
         if (nhanVienRepository.existsById(id)) {
             nhanVienRepository.deleteById(id);
             return ResponseEntity.ok( ApiResponse.ok("Xóa nhân viên thành công"));
         }
         return ResponseEntity.notFound().build();
+    }
+
+    private String branchAssignmentError(String role, UUID branchId) {
+        if ("ADMIN".equals(role) || "KE_TOAN".equals(role)) return null;
+        if (branchId == null) return "Vai trò " + role + " bắt buộc phải có chi nhánh";
+
+        ChiNhanh branch = chiNhanhRepository.findById(branchId).orElse(null);
+        if (branch == null) return "Chi nhánh không tồn tại";
+        if (!Boolean.TRUE.equals(branch.getDangHoatDong())) {
+            return "Không thể gán nhân viên vào chi nhánh ngừng hoạt động";
+        }
+        if ("THU_KHO".equals(role) && !"KHO_TONG".equals(branch.getLoai())) {
+            return "THU_KHO chỉ được gán vào Kho tổng";
+        }
+        if (("QUAN_LY".equals(role) || "THU_NGAN".equals(role))
+                && !"CUA_HANG_BAN_LE".equals(branch.getLoai())) {
+            return role + " chỉ được gán vào Cửa hàng bán lẻ";
+        }
+        return null;
+    }
+
+    private String responsibilityEligibilityError(
+            ChiNhanh branch, String role, UUID branchId, String status) {
+        if ("INACTIVE".equals(status)) return "người phụ trách phải đang hoạt động";
+        if (!branch.getId().equals(branchId)) return "người phụ trách phải làm việc tại chi nhánh này";
+        String expectedRole = "KHO_TONG".equals(branch.getLoai()) ? "THU_KHO" : "QUAN_LY";
+        if (!expectedRole.equals(role)) return "vai trò không còn phù hợp với loại điểm";
+        return null;
     }
 
 //    record ErrorResponse(String message) {}

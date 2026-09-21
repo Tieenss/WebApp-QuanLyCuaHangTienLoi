@@ -56,12 +56,13 @@ export const BranchesPage: FC = () => {
     dispatch(fetchEmployees());
   }, [dispatch]);
 
-  // Enrich branches: đếm số NV thực tế theo idChiNhanh
+  // Người phụ trách là quan hệ id_quan_ly -> nhan_vien, không lưu tên tự do ở chi_nhanh.
   const enrichedBranches = useMemo(
     () =>
       branches.map((b) => ({
         ...b,
         employeeCount: employees.filter((e) => e.branchId === b.id).length,
+        managerName: employees.find((e) => e.id === b.managerId)?.fullName || 'Chưa phân công',
       })),
     [branches, employees],
   );
@@ -87,7 +88,7 @@ export const BranchesPage: FC = () => {
         const matchStatus = statusFilter === null || branch.status === statusFilter;
         return matchSearch && matchRegion && matchKind && matchStatus;
       }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.openedAt)),
-    [branches, search, regionFilter, kindFilter, statusFilter],
+    [enrichedBranches, search, regionFilter, kindFilter, statusFilter],
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
@@ -242,7 +243,7 @@ export const BranchesPage: FC = () => {
       ),
     },
     {
-      title: 'Quản lý',
+      title: 'Người phụ trách',
       dataIndex: 'managerName',
       width: 160,
       render: (value: string) => <Text className="branch-text-12-5">{value}</Text>,
@@ -312,9 +313,9 @@ export const BranchesPage: FC = () => {
             onClick={() => handleEdit(row)}
           />
           <Popconfirm
-            title="Xoá chi nhánh?"
-            description={`Xoá "${row.name}" khỏi danh sách?`}
-            okText="Xoá"
+            title="Ngừng hoạt động chi nhánh?"
+            description={`Ngừng hoạt động "${row.name}"? Lịch sử và dữ liệu vẫn được giữ lại.`}
+            okText="Ngừng hoạt động"
             cancelText="Huỷ"
             okButtonProps={{ danger: true }}
             onConfirm={() => handleDelete(row.id)}
