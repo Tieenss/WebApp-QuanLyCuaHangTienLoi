@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -36,6 +37,7 @@ public class PhieuKiemKeController {
     private final NhanVienRepository nhanVienRepository;
     private final ChiTietKiemKeRepository chiTietKiemKeRepository;
     private final SanPhamRepository sanPhamRepository;
+    private final TonKhoRepository tonKhoRepository;
     private final BranchAccessService branchAccessService;
     private final JdbcTemplate jdbcTemplate;
 
@@ -141,12 +143,9 @@ public class PhieuKiemKeController {
             return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
         }
         branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(httpRequest), request.getIdChiNhanh());
-        for (ChiTietKiemKe line : request.getLines()) {
+        for (CreateStocktakeLineRequest line : request.getLines()) {
             if (line.getIdSanPham() == null || !sanPhamRepository.existsById(line.getIdSanPham())) {
                 return ResponseEntity.badRequest().body(ApiResponse.err("Sản phẩm kiểm kê không tồn tại"));
-            }
-            if (line.getTonThucTe() == null || line.getTonThucTe() < 0) {
-                return ResponseEntity.badRequest().body(ApiResponse.err("Tồn thực tế phải lớn hơn hoặc bằng 0"));
             }
         }
 
@@ -167,17 +166,28 @@ public class PhieuKiemKeController {
 
         // 2. Tạo các dòng chi tiết
         List<ChiTietKiemKe> lines = new ArrayList<>();
-        for (ChiTietKiemKe line : request.getLines()) {
+        for (CreateStocktakeLineRequest line : request.getLines()) {
+            var tonKho = tonKhoRepository.findByIdSanPhamAndIdChiNhanh(
+                    line.getIdSanPham(), request.getIdChiNhanh()).orElse(null);
+            int tonHeThong = tonKho != null && tonKho.getSoLuongTon() != null
+                    ? tonKho.getSoLuongTon() : 0;
+            BigDecimal donGiaVon = tonKho != null && tonKho.getGiaVonTrungBinh() != null
+                    ? tonKho.getGiaVonTrungBinh() : BigDecimal.ZERO;
+            int soLuongLech = line.getTonThucTe() - tonHeThong;
+            if (soLuongLech != 0 && (line.getLyDoLech() == null || line.getLyDoLech().isBlank())) {
+                return ResponseEntity.badRequest().body(
+                        ApiResponse.err("Phải nhập nguyên nhân cho sản phẩm có chênh lệch tồn kho"));
+            }
             ChiTietKiemKe ct = new ChiTietKiemKe();
             ct.setId(UUID.randomUUID());
             ct.setIdPhieuKiemKe(savedHeader.getId());
             ct.setIdSanPham(line.getIdSanPham());
-            ct.setTonHeThong(line.getTonHeThong());
+            ct.setTonHeThong(tonHeThong);
             ct.setTonThucTe(line.getTonThucTe());
-            ct.setSoLuongLech(line.getSoLuongLech());
+            ct.setSoLuongLech(soLuongLech);
             ct.setLyDoLech(line.getLyDoLech());
-            ct.setDonGiaVon(line.getDonGiaVon());
-            ct.setGiaTriLech(line.getGiaTriLech());
+            ct.setDonGiaVon(donGiaVon);
+            ct.setGiaTriLech(donGiaVon.multiply(BigDecimal.valueOf(soLuongLech)));
             ct.setNgayTao(LocalDateTime.now());
             lines.add(ct);
         }
@@ -195,7 +205,7 @@ public class PhieuKiemKeController {
         private String ghiChu;
         @NotEmpty(message = "Phiếu kiểm kê phải có ít nhất một sản phẩm")
         @Valid
-        private List<ChiTietKiemKe> lines;
+        private List<CreateStocktakeLineRequest> lines;
 
         public UUID getIdChiNhanh() { return idChiNhanh; }
         public void setIdChiNhanh(UUID idChiNhanh) { this.idChiNhanh = idChiNhanh; }
@@ -203,8 +213,25 @@ public class PhieuKiemKeController {
         public void setNgayKiemKe(LocalDate ngayKiemKe) { this.ngayKiemKe = ngayKiemKe; }
         public String getGhiChu() { return ghiChu; }
         public void setGhiChu(String ghiChu) { this.ghiChu = ghiChu; }
-        public List<ChiTietKiemKe> getLines() { return lines; }
-        public void setLines(List<ChiTietKiemKe> lines) { this.lines = lines; }
+        public List<CreateStocktakeLineRequest> getLines() { return lines; }
+        public void setLines(List<CreateStocktakeLineRequest> lines) { this.lines = lines; }
+    }
+
+    /** Chỉ nhận dữ liệu thực tế người dùng được quyền nhập; backend tự tính phần còn lại. */
+    public static class CreateStocktakeLineRequest {
+        @NotNull(message = "Sản phẩm kiểm kê bắt buộc chọn")
+        private UUID idSanPham;
+        @NotNull(message = "Tồn thực tế bắt buộc nhập")
+        @Min(value = 0, message = "Tồn thực tế phải lớn hơn hoặc bằng 0")
+        private Integer tonThucTe;
+        private String lyDoLech;
+
+        public UUID getIdSanPham() { return idSanPham; }
+        public void setIdSanPham(UUID idSanPham) { this.idSanPham = idSanPham; }
+        public Integer getTonThucTe() { return tonThucTe; }
+        public void setTonThucTe(Integer tonThucTe) { this.tonThucTe = tonThucTe; }
+        public String getLyDoLech() { return lyDoLech; }
+        public void setLyDoLech(String lyDoLech) { this.lyDoLech = lyDoLech; }
     }
 
     @PutMapping("/{id}")

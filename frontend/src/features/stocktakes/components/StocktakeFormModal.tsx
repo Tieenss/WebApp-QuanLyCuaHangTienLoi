@@ -30,8 +30,12 @@ interface StocktakeFormValues {
   note: string;
 }
 
-interface DraftRow extends StocktakeLine {
+interface DraftRow extends Omit<StocktakeLine, 'countedQuantity' | 'varianceQuantity' | 'varianceValue'> {
   key: string;
+  /** null là giá trị người dùng vừa nhập không hợp lệ hoặc chưa nhập. */
+  countedQuantity: number | null;
+  varianceQuantity: number | null;
+  varianceValue: number | null;
 }
 
 interface StocktakeFormModalProps {
@@ -140,16 +144,19 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
     );
   };
 
-  const handleCountedChange = (key: string, countedQty: number): void => {
+  const handleCountedChange = (key: string, countedQty: number | null): void => {
     setRows((prev) =>
       prev.map((row) =>
         row.key === key
           ? {
               ...row,
               countedQuantity: countedQty,
-              varianceQuantity: countedQty - row.systemQuantity,
+              varianceQuantity:
+                countedQty === null ? null : countedQty - row.systemQuantity,
               varianceValue:
-                (countedQty - row.systemQuantity) * row.unitCost,
+                countedQty === null
+                  ? null
+                  : (countedQty - row.systemQuantity) * row.unitCost,
             }
           : row,
       ),
@@ -206,11 +213,13 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
       dataIndex: 'countedQuantity',
       align: 'center',
       width: 120,
-      render: (val: number, record: DraftRow) => (
+      render: (val: number | null, record: DraftRow) => (
         <InputNumber
           min={0}
+          precision={0}
           value={val}
-          onChange={(v) => handleCountedChange(record.key, v ?? 0)}
+          status={val === null ? 'error' : undefined}
+          onChange={(v) => handleCountedChange(record.key, v)}
           style={{ width: '100%' }}
         />
       ),
@@ -220,12 +229,12 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
       dataIndex: 'varianceQuantity',
       align: 'center',
       width: 80,
-      render: (val: number) => (
+      render: (val: number | null) => (
         <Text
           strong
-          className={`numeric-cell ${val < 0 ? 'qty-loss' : val > 0 ? 'qty-gain' : ''}`}
+          className={`numeric-cell ${val !== null && val < 0 ? 'qty-loss' : val !== null && val > 0 ? 'qty-gain' : ''}`}
         >
-          {val > 0 ? `+${val}` : val}
+          {val === null ? '—' : val > 0 ? `+${val}` : val}
         </Text>
       ),
     },
@@ -234,7 +243,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
       dataIndex: 'reason',
       width: 200,
       render: (val: string, record: DraftRow) =>
-        record.varianceQuantity !== 0 ? (
+        record.varianceQuantity !== null && record.varianceQuantity !== 0 ? (
           <Select
             placeholder="Chọn nguyên nhân"
             value={val || undefined}
@@ -267,8 +276,21 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
       const validRows = rows.filter((row) => row.productId !== '');
       if (validRows.length === 0) return;
 
+      const invalidCount = validRows.find(
+        (row) =>
+          row.countedQuantity === null ||
+          !Number.isInteger(row.countedQuantity) ||
+          row.countedQuantity < 0,
+      );
+      if (invalidCount) {
+        message.error(
+          `Số đếm thực tế của sản phẩm "${invalidCount.productName || invalidCount.sku}" phải là số nguyên lớn hơn hoặc bằng 0.`,
+        );
+        return;
+      }
+
       const missingReason = validRows.find(
-        (row) => row.varianceQuantity !== 0 && !row.reason,
+        (row) => row.varianceQuantity !== null && row.varianceQuantity !== 0 && !row.reason,
       );
       if (missingReason) {
         message.error(
@@ -277,7 +299,12 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
         return;
       }
 
-      const varianceLines = validRows.filter((row) => row.varianceQuantity !== 0);
+      const completeRows = validRows as Array<DraftRow & {
+        countedQuantity: number;
+        varianceQuantity: number;
+        varianceValue: number;
+      }>;
+      const varianceLines = completeRows.filter((row) => row.varianceQuantity !== 0);
       const branch = branchById(values.branchId);
 
       try {
@@ -286,14 +313,10 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
           idChiNhanh: values.branchId,
           ngayKiemKe: values.countDate.format('YYYY-MM-DD'),
           ghiChu: values.note,
-          lines: validRows.map((row) => ({
+          lines: completeRows.map((row) => ({
             idSanPham: row.productId,
-            tonHeThong: row.systemQuantity,
             tonThucTe: row.countedQuantity,
-            soLuongLech: row.varianceQuantity,
             lyDoLech: row.reason,
-            donGiaVon: row.unitCost,
-            giaTriLech: row.varianceValue,
           })),
         });
 
@@ -305,7 +328,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
           countDate: values.countDate.format('YYYY-MM-DD'),
           createdById: user?.idNhanVien ?? undefined,
           status: DOCUMENT_STATUS.Draft,
-          lines: validRows.map((row) => ({
+          lines: completeRows.map((row) => ({
             ...row,
             id: `stl-new-${row.key}`,
           })),

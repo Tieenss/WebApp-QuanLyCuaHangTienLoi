@@ -30,6 +30,13 @@ export interface ChiTietKiemKeDTO {
   giaTriLech: number;
 }
 
+/** Dữ liệu người dùng nhập khi lập phiếu; các giá trị chênh lệch do backend tự tính. */
+export interface CreateStocktakeLineRequest {
+  idSanPham: string;
+  tonThucTe: number;
+  lyDoLech?: string;
+}
+
 const getHeaders = (): HeadersInit => {
   return getAuthHeaders();
 };
@@ -69,7 +76,7 @@ export const phieuKiemKeApi = {
     idChiNhanh: string;
     ngayKiemKe: string;
     ghiChu?: string;
-    lines: ChiTietKiemKeDTO[];
+    lines: CreateStocktakeLineRequest[];
   }): Promise<PhieuKiemKeDTO> => {
     const response = await fetch(`${API_BASE_URL}/api/phieu-kiem-ke/with-lines`, {
       method: 'POST',
