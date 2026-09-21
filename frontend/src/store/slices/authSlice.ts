@@ -6,6 +6,7 @@ import {
 } from '@/config/brand';
 import {
   SYSTEM_WIDE_ROLES,
+  normalizeRecordStatus,
   type AuthUser,
   type ChangePasswordFormValues,
   type LoginFormValues,
@@ -46,7 +47,14 @@ const readPersistedSession = (): PersistedSession | null => {
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed === 'object' && parsed !== null && 'user' in parsed && 'activeBranchId' in parsed) {
-      return parsed as PersistedSession;
+      const session = parsed as PersistedSession;
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          status: normalizeRecordStatus(session.user.status),
+        },
+      };
     }
     return null;
   } catch {
