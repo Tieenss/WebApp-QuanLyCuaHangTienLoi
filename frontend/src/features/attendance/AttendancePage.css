@@ -5,6 +5,10 @@
 
 /* ── Tab chấm công ───────────────────────────────────────────────── */
 
+.attendance-load-alert {
+  margin: 10px 0;
+}
+
 /* Tên nhân viên — dòng chính hiển thị block. */
 .att-name {
   display: block;

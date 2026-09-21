@@ -34,6 +34,7 @@ export interface PayrollState {
   error: string | null;
   /** Trạng thái tải dữ liệu từ backend. */
   loading: boolean;
+  savingAdjustment: boolean;
 }
 
 const initialState: PayrollState = {
@@ -41,6 +42,7 @@ const initialState: PayrollState = {
   adjustingId: null,
   error: null,
   loading: false,
+  savingAdjustment: false,
 };
 
 /** Map từ backend DTO sang frontend PayrollRow. */
@@ -59,7 +61,7 @@ const mapDtoToPayrollRow = (dto: BangLuongDTO): PayrollRow => ({
   adjustedHours: dto.gioDieuChinh ?? null,
   adjustReason: dto.lyDoDieuChinh ?? '',
   overtimeHours: dto.overtimeHours,
-  baseSalary: dto.luongCung,
+  baseSalary: dto.luongCungThucTe ?? dto.luongCung,
   shiftPay: dto.tienCongTheoGio,
   overtimePay: dto.tienOt,
   bonus: dto.thuong,
@@ -73,11 +75,16 @@ const mapDtoToPayrollRow = (dto: BangLuongDTO): PayrollRow => ({
 });
 
 /** Tải bảng lương theo scope; SELF không gọi API nhân sự để tránh lộ dữ liệu. */
+export interface PayrollFetchOptions {
+  scope?: 'SELF' | 'SCOPED';
+  period?: string;
+}
+
 export const fetchPayroll = createAsyncThunk(
   'payroll/fetchAll',
-  async (scope: 'SELF' | 'SCOPED' = 'SCOPED', { rejectWithValue }) => {
+  async ({ scope = 'SCOPED', period }: PayrollFetchOptions = {}, { rejectWithValue }) => {
     try {
-      const list = scope === 'SELF' ? await bangLuongApi.getMine() : await bangLuongApi.getAll();
+      const list = scope === 'SELF' ? await bangLuongApi.getMine(period) : await bangLuongApi.getAll(period);
       return list.map(mapDtoToPayrollRow);
     } catch (e: any) {
       return rejectWithValue(e?.message || 'Lỗi tải bảng lương');
@@ -93,6 +100,17 @@ export const updatePayroll = createAsyncThunk(
   async ({ id, data }: { id: string; data: Partial<BangLuongDTO> }) => {
     const dto = await bangLuongApi.update(id, data);
     return mapDtoToPayrollRow(dto);
+  },
+);
+
+export const adjustPayrollHours = createAsyncThunk(
+  'payroll/adjustHours',
+  async ({ id, hours, reason }: { id: string; hours: number; reason: string }, { rejectWithValue }) => {
+    try {
+      return mapDtoToPayrollRow(await bangLuongApi.adjustHours(id, hours, reason));
+    } catch (e: any) {
+      return rejectWithValue(e?.message || 'Lỗi lưu điều chỉnh giờ');
+    }
   },
 );
 
@@ -126,7 +144,7 @@ export const generatePayroll = createAsyncThunk(
   async (thangNam: string, { rejectWithValue, dispatch }) => {
     try {
       await bangLuongApi.generate(thangNam);
-      await dispatch(fetchPayroll('SCOPED')).unwrap();
+      await dispatch(fetchPayroll({ period: thangNam })).unwrap();
       return thangNam;
     } catch (e: any) {
       return rejectWithValue(e?.message || 'Lỗi tạo bảng lương');
@@ -281,6 +299,20 @@ export const payrollSlice = createSlice({
       })
       .addCase(updatePayroll.rejected, (state, action) => {
         state.error = (action.payload as string) || 'Lỗi cập nhật bảng lương';
+      })
+      .addCase(adjustPayrollHours.pending, (state) => {
+        state.savingAdjustment = true;
+        state.error = null;
+      })
+      .addCase(adjustPayrollHours.fulfilled, (state, action) => {
+        const idx = state.rows.findIndex((r) => r.id === action.payload.id);
+        if (idx !== -1) state.rows[idx] = action.payload;
+        state.savingAdjustment = false;
+        state.adjustingId = null;
+      })
+      .addCase(adjustPayrollHours.rejected, (state, action) => {
+        state.savingAdjustment = false;
+        state.error = (action.payload as string) || 'Lỗi lưu điều chỉnh giờ';
       })
       .addCase(confirmPayrollHours.fulfilled, (state, action) => {
         const idx = state.rows.findIndex((r) => r.id === action.payload.id);

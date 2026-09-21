@@ -90,36 +90,25 @@ public class BangLuongController {
             List<ChamCong> records = chamCongRepository
                     .findByIdNhanVienAndWorkDateBetween(nv.getId(), firstDay, lastDay);
 
-            BigDecimal tongGio = BigDecimal.ZERO;
-            BigDecimal tongOt = BigDecimal.ZERO;
-            int soCa = 0;
-            boolean isPartTime = "PART_TIME".equals(nv.getLoaiHopDong());
-            for (ChamCong cc : records) {
-                if (!"PRESENT".equals(cc.getTrangThai()) && !"LATE".equals(cc.getTrangThai())) {
-                    continue;
-                }
-                if (cc.getTongGioLam() != null) {
-                    // Giờ thực tế đã chấm công (check-in/out) — dùng cho mọi loại hợp đồng.
-                    tongGio = tongGio.add(cc.getTongGioLam());
-                } else if (!isPartTime && cc.getCheckInAt() != null && cc.getCheckOutAt() != null) {
-                    // FULL_TIME: fallback theo giờ ca chuẩn khi chưa check-out.
-                    // PART_TIME: chỉ trả lương theo giờ thực tế chấm, không fallback.
-                    long minutes = java.time.Duration.between(cc.getCheckInAt(), cc.getCheckOutAt()).toMinutes();
-                    tongGio = tongGio.add(BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP));
-                }
-                if (cc.getOvertimeHours() != null) tongOt = tongOt.add(cc.getOvertimeHours());
-                soCa++;
-            }
+            // Một ca chỉ là nguồn lương khi đã checkout và chốt số giờ. Không
+            // tạm trả lương theo giờ kế hoạch cho ca đang mở, vì số đó có thể
+            // khác giờ thực tế hoặc bị bỏ quên checkout.
+            PayrollMetrics metrics = summarizeCompletedAttendance(records);
+            BigDecimal tongGio = metrics.totalHours();
+            BigDecimal tongOt = metrics.overtimeHours();
+            int soCa = metrics.completedShifts();
 
             if (soCa == 0 && tongGio.signum() == 0) continue; // không có ca làm → bỏ qua
 
             BigDecimal luongTheoGio = BigDecimal.valueOf(nv.getLuongTheoGio() != null ? nv.getLuongTheoGio() : 0);
             BigDecimal luongCung = BigDecimal.valueOf(nv.getLuongCung() != null ? nv.getLuongCung() : 0);
-            BigDecimal tienOt = tongOt.multiply(luongTheoGio).multiply(BigDecimal.valueOf(1.5));
+            BigDecimal tienOt = money(tongOt.multiply(luongTheoGio).multiply(BigDecimal.valueOf(1.5)));
             BigDecimal tienCongTheoGio = "PART_TIME".equals(nv.getLoaiHopDong())
-                    ? tongGio.multiply(luongTheoGio)
+                    // tongGio đã gồm OT. Chỉ trả lương thường cho phần không
+                    // phải OT, để OT không bị cộng cả lương thường lẫn 150%.
+                    ? money(metrics.regularHours().multiply(luongTheoGio))
                     : BigDecimal.ZERO;
-            BigDecimal tongTien = luongCung.add(tienCongTheoGio).add(tienOt);
+            BigDecimal tongTien = money(luongCung.add(tienCongTheoGio).add(tienOt));
 
             BangLuong bl = new BangLuong();
             bl.setId(UUID.randomUUID());
@@ -150,9 +139,13 @@ public class BangLuongController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
-    public ResponseEntity<List<BangLuongDTO>> getAll(HttpServletRequest request) {
+    public ResponseEntity<List<BangLuongDTO>> getAll(
+            @RequestParam(required = false) String period, HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
-        List<BangLuongDTO> list = bangLuongRepository.findAll().stream()
+        List<BangLuong> source = period == null || period.isBlank()
+                ? bangLuongRepository.findAll()
+                : bangLuongRepository.findByThangNam(requirePeriod(period));
+        List<BangLuongDTO> list = source.stream()
                 .filter(bl -> branchAccessService.canReadBranch(actor, bl.getIdChiNhanh()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -162,9 +155,12 @@ public class BangLuongController {
     /** Nhân viên chỉ xem bảng lương của chính mình, không cần quyền xem nhân sự. */
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<BangLuongDTO>> getMine(HttpServletRequest request) {
+    public ResponseEntity<List<BangLuongDTO>> getMine(
+            @RequestParam(required = false) String period, HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
+        String requestedPeriod = period == null || period.isBlank() ? null : requirePeriod(period);
         return ResponseEntity.ok(bangLuongRepository.findByIdNhanVien(actor.getId()).stream()
+                .filter(bl -> requestedPeriod == null || bl.getThangNam().equals(requestedPeriod))
                 .map(this::toDTO)
                 .collect(Collectors.toList()));
     }
@@ -298,6 +294,57 @@ public class BangLuongController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Điều chỉnh giờ là thao tác nghiệp vụ riêng: lưu vết lý do và luôn tính
+     * lại các thành phần lương tại server, không tin số tiền do trình duyệt gửi.
+     */
+    @PatchMapping("/{id}/hours-adjustment")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    @Transactional
+    public ResponseEntity<?> adjustHours(@PathVariable UUID id,
+                                         @RequestBody HourAdjustmentRequest request,
+                                         HttpServletRequest httpRequest) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
+        BangLuong payroll = bangLuongRepository.findById(id).orElse(null);
+        if (payroll == null) return ResponseEntity.notFound().build();
+        NhanVien employee = nhanVienRepository.findById(payroll.getIdNhanVien()).orElse(null);
+        if (employee == null) return ResponseEntity.badRequest().body(ApiResponse.err("Nhân viên không tồn tại"));
+        if (!"CHO_XAC_NHAN".equals(payroll.getTrangThai())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chỉ điều chỉnh bảng lương đang chờ xác nhận"));
+        }
+        if (!"THU_NGAN".equals(employee.getVaiTro())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chỉ điều chỉnh giờ cho bảng lương Thu ngân"));
+        }
+        if (actor.getId().equals(employee.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.err("Không được tự điều chỉnh lương của mình"));
+        }
+        if (!"ADMIN".equals(actor.getVaiTro()) &&
+                (!"QUAN_LY".equals(actor.getVaiTro()) || !branchAccessService.canReadBranch(actor, payroll.getIdChiNhanh()))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.err("Không có quyền điều chỉnh bảng lương này"));
+        }
+        if (request == null || request.hours() == null || request.hours().signum() < 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Số giờ điều chỉnh không hợp lệ"));
+        }
+        String reason = request.reason() == null ? "" : request.reason().trim();
+        if (reason.length() < 8) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Lý do điều chỉnh phải có ít nhất 8 ký tự"));
+        }
+        BigDecimal overtime = valueOrZero(payroll.getOvertimeHours());
+        if (request.hours().compareTo(overtime) < 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Giờ điều chỉnh không thể nhỏ hơn giờ tăng ca đã chốt"));
+        }
+        if (request.hours().compareTo(valueOrZero(payroll.getTongGioLam()).add(BigDecimal.valueOf(24))) > 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Giờ điều chỉnh không được vượt giờ hệ thống quá 24 giờ"));
+        }
+
+        payroll.setGioDieuChinh(request.hours().setScale(2, java.math.RoundingMode.HALF_UP));
+        payroll.setLyDoDieuChinh(reason);
+        recalculatePayrollAmounts(payroll);
+        payroll.setNgayCapNhat(LocalDateTime.now());
+        bangLuongRepository.save(payroll);
+        return ResponseEntity.ok(toDTO(payroll));
+    }
+
     /** Tầng 1: chỉ Quản lý cùng chi nhánh (hoặc Admin) xác nhận lương Thu ngân. */
     @PostMapping("/{id}/confirm-hours")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
@@ -419,13 +466,17 @@ public class BangLuongController {
         chamCongRepository.findByIdNhanVienAndWorkDateBetween(
                         payroll.getIdNhanVien(), payrollMonth.atDay(1), payrollMonth.atEndOfMonth())
                 .stream()
-                .filter(cc -> "PRESENT".equals(cc.getTrangThai()) || "LATE".equals(cc.getTrangThai()))
+                .filter(cc -> ("PRESENT".equals(cc.getTrangThai()) || "LATE".equals(cc.getTrangThai()))
+                        && cc.getClockOutAt() != null && cc.getTongGioLam() != null)
                 .forEach(cc -> cc.setDaThanhToan(true));
         chamCongRepository.flush();
         return toDTO(payroll);
     }
 
     public record BatchApproveRequest(List<UUID> ids) {}
+    public record HourAdjustmentRequest(BigDecimal hours, String reason) {}
+    private record PayrollMetrics(BigDecimal totalHours, BigDecimal overtimeHours,
+                                  BigDecimal regularHours, int completedShifts) {}
 
     private void validateAmounts(BangLuong request) {
         nonNegative(request.getTongGioLam(), "Tổng giờ làm");
@@ -440,6 +491,63 @@ public class BangLuongController {
         nonNegative(request.getThuong(), "Thưởng");
         nonNegative(request.getKhauTru(), "Khấu trừ");
         nonNegative(request.getTongTienLuong(), "Tổng tiền lương");
+    }
+
+    private String requirePeriod(String period) {
+        try {
+            YearMonth.parse(period, DateTimeFormatter.ofPattern("MM-yyyy"));
+            return period;
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tháng không hợp lệ, dùng MM-YYYY");
+        }
+    }
+
+    private PayrollMetrics summarizeCompletedAttendance(List<ChamCong> records) {
+        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal overtime = BigDecimal.ZERO;
+        int shifts = 0;
+        for (ChamCong record : records) {
+            if (!("PRESENT".equals(record.getTrangThai()) || "LATE".equals(record.getTrangThai()))
+                    || record.getClockOutAt() == null || record.getTongGioLam() == null) {
+                continue;
+            }
+            total = total.add(valueOrZero(record.getTongGioLam()));
+            overtime = overtime.add(valueOrZero(record.getOvertimeHours()));
+            shifts++;
+        }
+        BigDecimal regular = total.subtract(overtime).max(BigDecimal.ZERO);
+        return new PayrollMetrics(total, overtime, regular, shifts);
+    }
+
+    private void recalculatePayrollAmounts(BangLuong payroll) {
+        BigDecimal effectiveHours = payroll.getGioDieuChinh() == null
+                ? valueOrZero(payroll.getTongGioLam())
+                : payroll.getGioDieuChinh();
+        BigDecimal regularHours = effectiveHours.subtract(valueOrZero(payroll.getOvertimeHours()))
+                .max(BigDecimal.ZERO);
+        BigDecimal hourlyWage = valueOrZero(payroll.getLuongTheoGio());
+        BigDecimal shiftPay = "PART_TIME".equals(payroll.getLoaiHopDong())
+                ? money(regularHours.multiply(hourlyWage))
+                : BigDecimal.ZERO;
+        BigDecimal overtimePay = money(valueOrZero(payroll.getOvertimeHours())
+                .multiply(hourlyWage).multiply(BigDecimal.valueOf(1.5)));
+        BigDecimal netPay = money(valueOrZero(payroll.getLuongCungThucTe()).add(shiftPay).add(overtimePay)
+                .add(valueOrZero(payroll.getThuong()))
+                .subtract(valueOrZero(payroll.getKhauTru())));
+        if (netPay.signum() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tổng tiền lương không được âm");
+        }
+        payroll.setTienCongTheoGio(shiftPay);
+        payroll.setTienOt(overtimePay);
+        payroll.setTongTienLuong(netPay);
+    }
+
+    private BigDecimal valueOrZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return value.setScale(0, java.math.RoundingMode.HALF_UP);
     }
 
     @DeleteMapping("/{id}")

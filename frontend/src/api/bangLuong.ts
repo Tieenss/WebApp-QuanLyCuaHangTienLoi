@@ -42,16 +42,18 @@ const getHeaders = (): HeadersInit => {
 };
 
 export const bangLuongApi = {
-  getAll: async (): Promise<BangLuongDTO[]> => {
-    const response = await fetch(`${API_BASE_URL}/api/bang-luong`, {
+  getAll: async (period?: string): Promise<BangLuongDTO[]> => {
+    const query = period ? `?period=${encodeURIComponent(period)}` : '';
+    const response = await fetch(`${API_BASE_URL}/api/bang-luong${query}`, {
       headers: getHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch bảng lương');
     return response.json();
   },
 
-  getMine: async (): Promise<BangLuongDTO[]> => {
-    const response = await fetch(`${API_BASE_URL}/api/bang-luong/me`, {
+  getMine: async (period?: string): Promise<BangLuongDTO[]> => {
+    const query = period ? `?period=${encodeURIComponent(period)}` : '';
+    const response = await fetch(`${API_BASE_URL}/api/bang-luong/me${query}`, {
       headers: getHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch bảng lương của bạn');
@@ -119,6 +121,18 @@ export const bangLuongApi = {
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to update');
+    return response.json();
+  },
+
+  adjustHours: async (id: string, hours: number, reason: string): Promise<BangLuongDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/bang-luong/${id}/hours-adjustment`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getHeaders() },
+      body: JSON.stringify({ hours, reason }),
+    });
+    if (!response.ok) {
+      throw new Error((await response.json().catch(() => null))?.message || 'Không thể lưu điều chỉnh giờ');
+    }
     return response.json();
   },
 

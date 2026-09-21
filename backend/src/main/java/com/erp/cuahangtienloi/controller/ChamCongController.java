@@ -51,7 +51,7 @@ private LocalDateTime plannedCheckIn(LocalDate workDate, String caLamViec) {
     return LocalDateTime.of(workDate, java.time.LocalTime.of(h[0] % 24, 0));
 }
 
-private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
+    private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
     int[] h = SHIFT_HOURS.getOrDefault(caLamViec, new int[]{8, 17});
     int endHour = h[1];
     // Ca đêm kết thúc 06:00 ngày hôm sau
@@ -68,6 +68,12 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
+    }
+
+    /** `workDate` là ngày bắt đầu ca. Ca đêm được phép checkout vào ngày hôm sau. */
+    private boolean isCheckoutDate(ChamCong cc, LocalDate date) {
+        if (date.equals(cc.getWorkDate())) return true;
+        return "NIGHT".equals(cc.getCaLamViec()) && date.equals(cc.getWorkDate().plusDays(1));
     }
 
     @GetMapping("/{id}")
@@ -322,8 +328,8 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
         ChamCong cc = opt.get();
         requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(httpRequest), cc.getIdNhanVien());
-        if (!cc.getWorkDate().equals(LocalDate.now())) {
-            return ResponseEntity.badRequest().body(ApiResponse.err("Chỉ được check-out ca của hôm nay"));
+        if (!isCheckoutDate(cc, LocalDate.now())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chỉ được check-out trong ngày của ca làm việc"));
         }
         if (Boolean.TRUE.equals(cc.getDaThanhToan())) {
             return ResponseEntity.badRequest().body(ApiResponse.err("Ca này đã được thanh toán"));
@@ -339,10 +345,14 @@ private LocalDateTime plannedCheckOut(LocalDate workDate, String caLamViec) {
         cc.setClockOutAt(now);
         cc.setNgayCapNhat(LocalDateTime.now());
 
-        // Tổng giờ làm = clockOut - clockIn - break (giờ)
+        // Tổng giờ làm = clockOut - clockIn - break (giờ). Dùng phút để không
+        // làm mất giờ nghỉ lẻ, ví dụ 0.5 giờ = 30 phút.
         long minutes = Duration.between(cc.getClockInAt(), now).toMinutes();
         BigDecimal breakHours = cc.getBreakHours() != null ? cc.getBreakHours() : BigDecimal.ZERO;
-        BigDecimal tong = BigDecimal.valueOf(Math.max(0, minutes - breakHours.longValue() * 60L))
+        long breakMinutes = breakHours.multiply(BigDecimal.valueOf(60))
+                .setScale(0, java.math.RoundingMode.HALF_UP)
+                .longValue();
+        BigDecimal tong = BigDecimal.valueOf(Math.max(0, minutes - breakMinutes))
                 .divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP);
         cc.setTongGioLam(tong);
         if (cc.getCheckOutAt() != null && now.isAfter(cc.getCheckOutAt())) {

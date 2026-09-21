@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS cham_cong (
                                 ON UPDATE CASCADE,
 
     -- Ngày làm việc dạng YYYY-MM-DD. Lưu riêng (không derive từ check_in_at) để:
-    --   1. Ca đêm bắt đầu 22:00 hôm trước nhưng work_date = hôm sau.
+    --   1. Ca đêm lấy ngày BẮT ĐẦU ca (22:00 của work_date), dù checkout
+    --      vào 06:00 ngày hôm sau.
     --   2. Dễ query theo ngày/tháng cho bảng lương.
     work_date       DATE         NOT NULL,
 
@@ -220,7 +221,9 @@ BEGIN
         RETURN NULL;
     END IF;
     RETURN ROUND(
-        (EXTRACT(EPOCH FROM p_clock_out - p_clock_in) / 3600.0) - p_break + p_ot,
+        -- Khoảng clock_out - clock_in đã bao gồm OT nếu có. Không cộng p_ot
+        -- lần nữa, tránh trả trùng giờ OT.
+        (EXTRACT(EPOCH FROM p_clock_out - p_clock_in) / 3600.0) - p_break,
         2
     );
 END;
@@ -232,8 +235,8 @@ COMMENT ON TABLE cham_cong IS
     '`bang_luong` (tổng hợp theo tháng) và báo cáo nhân sự.';
 
 COMMENT ON COLUMN cham_cong.work_date IS
-    'Ngày làm việc dạng YYYY-MM-DD. Lưu riêng để xử lý ca đêm (bắt đầu 22:00 '
-    'hôm trước nhưng work_date = hôm sau, khi giờ ra là 06:00 sáng hôm sau).';
+    'Ngày bắt đầu ca dạng YYYY-MM-DD. Ca đêm bắt đầu 22:00 của work_date và '
+    'checkout lúc 06:00 ngày hôm sau.';
 
 COMMENT ON COLUMN cham_cong.check_in_at IS
     'Giờ vào ca DỰ KIẾN theo lịch (planned). Dùng để tính "đi muộn" khi so '
@@ -244,9 +247,10 @@ COMMENT ON COLUMN cham_cong.clock_in_at IS
     'hoặc đang nghỉ phép / vắng. Sau khi có giá trị, mới tính được di_tre_phut.';
 
 COMMENT ON COLUMN cham_cong.tong_gio_lam IS
-    'Tổng giờ làm thực tế = (clock_out - clock_in) - break_hours + overtime_hours. '
-    'NULL khi chưa check-out. Khi tạo bang_luong, hệ thống lấy SUM(tong_gio_lam) '
-    'của các cham_cong có work_date thuộc tháng đó.';
+    'Tổng giờ làm thực tế = (clock_out - clock_in) - break_hours; phần OT đã '
+    'nằm trong tổng này và được lưu riêng ở overtime_hours. NULL khi chưa '
+    'check-out. Khi tạo bang_luong, hệ thống lấy SUM(tong_gio_lam) của các ca '
+    'đã checkout có work_date thuộc tháng đó.';
 
 COMMENT ON COLUMN cham_cong.da_thanh_toan IS
     'Cờ đánh dấu lương cho ca này đã được duyệt chi. Khi bang_luong chuyển sang '
