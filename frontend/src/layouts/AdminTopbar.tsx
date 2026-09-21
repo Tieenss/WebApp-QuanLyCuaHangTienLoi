@@ -168,6 +168,7 @@ export const AdminTopbar: FC = () => {
           value={activeBranchId ?? ALL_BRANCHES}
           options={branchOptions}
           onChange={handleBranchChange}
+          disabled
           prefix={<ShopOutlined className="branch-select-icon" />}
           // Cửa hàng nhiều nên cần tìm kiếm trong danh sách.
           showSearch

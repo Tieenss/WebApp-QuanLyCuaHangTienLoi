@@ -311,16 +311,15 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       dataIndex: 'unitCost',
       align: 'right',
       width: 150,
-      render: (value: number, row) => (
+      render: (value: number) => (
         <InputNumber<number>
           className="purchase-line-input"
           min={1}
           step={1_000}
           value={value}
-          disabled={row.productId === ''}
+          disabled
           formatter={(input) => `${input ?? 0}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
           parser={(input) => Number((input ?? '0').replace(/\./g, ''))}
-          onChange={(unitCost) => updateRow(row.key, { unitCost: unitCost ?? 0 })}
         />
       ),
     },
