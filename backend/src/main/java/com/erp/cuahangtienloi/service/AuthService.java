@@ -77,6 +77,7 @@ public class AuthService {
         
         if (nhanVien != null) {
             dto.setEmail(nhanVien.getEmail());
+            dto.setSoDienThoai(nhanVien.getSoDienThoai());
             dto.setHoTen(nhanVien.getHoTen());
             dto.setVaiTro(nhanVien.getVaiTro());
             dto.setIdChiNhanh(nhanVien.getIdChiNhanh());

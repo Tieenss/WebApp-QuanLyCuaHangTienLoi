@@ -9,6 +9,7 @@ public class TaiKhoanDTO {
     private UUID id;
     private String tenDangNhap;
     private String email;
+    private String soDienThoai;
     private String hoTen;
     private String vaiTro;
     private UUID idNhanVien;

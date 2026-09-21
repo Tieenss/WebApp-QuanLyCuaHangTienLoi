@@ -33,7 +33,6 @@ import {
   changePassword,
   clearAuthError,
   logout,
-  updateProfile,
 } from '@/store/slices/authSlice';
 import {
   USER_ROLE_DESCRIPTION,
@@ -93,11 +92,6 @@ export const AccountPage: FC = () => {
   }, [dispatch]);
 
   if (user === null) return null;
-
-  const handleProfileSubmit = (values: ProfileFormValues): void => {
-    dispatch(updateProfile(values));
-    message.success('Đã cập nhật hồ sơ cá nhân.');
-  };
 
   const handlePasswordSubmit = async (
       values: ChangePasswordFormValues
@@ -218,7 +212,6 @@ export const AccountPage: FC = () => {
                         email: user.email,
                         phone: user.phone,
                       }}
-                      onFinish={handleProfileSubmit}
                     >
                       <Row gutter={16}>
                         <Col xs={24} md={12}>
@@ -233,6 +226,7 @@ export const AccountPage: FC = () => {
                             <Input
                               prefix={<UserOutlined className="account-input-icon" />}
                               placeholder="Nguyễn Văn A"
+                              disabled
                             />
                           </Form.Item>
                         </Col>
@@ -257,6 +251,7 @@ export const AccountPage: FC = () => {
                             <Input
                               prefix={<PhoneOutlined className="account-input-icon" />}
                               placeholder="0900 000 000"
+                              disabled
                             />
                           </Form.Item>
                         </Col>
@@ -273,6 +268,7 @@ export const AccountPage: FC = () => {
                             <Input
                               prefix={<MailOutlined className="account-input-icon" />}
                               placeholder="ten@circlek.vn"
+                              disabled
                             />
                           </Form.Item>
                         </Col>
