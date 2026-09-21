@@ -9,4 +9,6 @@ import java.util.UUID;
 @Repository
 public interface ChiNhanhRepository extends JpaRepository<ChiNhanh, UUID> {
     Optional<ChiNhanh> findByMaChiNhanh(String maChiNhanh);
+
+    Optional<ChiNhanh> findFirstByLoai(String loai);
 }

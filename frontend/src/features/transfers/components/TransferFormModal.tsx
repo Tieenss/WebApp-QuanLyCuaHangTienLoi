@@ -27,6 +27,7 @@ import { DISTRIBUTION_CENTER_ID } from '@/config/businessRules';
 import { chiNhanhApi, type ChiNhanhDTO } from '@/api/chiNhanh';
 import { API_BASE_URL } from '@/config/api';
 import { apiFetch } from '@/api/http';
+import { tonKhoApi, type TonKhoDTO } from '@/api/tonKho';
 import { chiTietPhieuXuatApi, phieuXuatKhoApi } from '@/api/phieuXuatKho';
 import { DOCUMENT_STATUS, STOCK_LEVEL, USER_ROLE, type DocumentStatus, type StockLevel } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
@@ -101,6 +102,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   // Load cửa hàng (CUA_HANG_BAN_LE) từ API riêng
   const [cuaHangOptions, setCuaHangOptions] = useState<ChiNhanhDTO[]>([]);
   const [khoTongList, setKhoTongList] = useState<ChiNhanhDTO[]>([]);
+  const [transferStock, setTransferStock] = useState<TonKhoDTO[]>([]);
   useEffect(() => {
     chiNhanhApi.getCuaHang()
       .then((data) => setCuaHangOptions(data))
@@ -110,6 +112,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       .catch(() => setKhoTongList([]));
     // Cũng load tồn kho để filter sản phẩm
     dispatch(fetchStock());
+    tonKhoApi.getAvailableForTransfer()
+      .then((data) => setTransferStock(data))
+      .catch(() => setTransferStock([]));
   }, [dispatch]);
 
   // Auto-select kho tổng đầu tiên khi load xong
@@ -161,11 +166,16 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   /** Chỉ hàng có tồn > 0 ở kho xuất đã chọn mới xuất được. */
   const availableProducts = useMemo(
     () =>
-      sellableProducts.filter(
-        (product) => stockOf(balances, fromBranchId, product.id) > 0,
+      sellableProducts.filter((product) =>
+        transferStock.some((stock) =>
+          stock.idSanPham === product.id && (stock.soLuongTon ?? 0) > 0,
+        ),
       ),
-    [balances, fromBranchId],
+    [sellableProducts, transferStock],
   );
+
+  const transferStockOf = (productId: string): number =>
+    transferStock.find((stock) => stock.idSanPham === productId)?.soLuongTon ?? 0;
 
   // Debug
 
@@ -348,8 +358,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
             item.branchId === fromBranchId &&
             item.productId === row.productId,
         );
-        if (balance === undefined) return <Text type="secondary">0</Text>;
-
+        if (balance === undefined) {
+          return <Text className="numeric-cell">{transferStockOf(row.productId)}</Text>;
+        }
         const level = resolveStockLevel(
           balance.quantity,
           balance.minStock,

@@ -77,6 +77,24 @@ public class TonKhoController {
         return ResponseEntity.ok(list);
     }
 
+    /**
+     * Danh sách mặt hàng Kho Tổng còn tồn để lập yêu cầu điều chuyển.
+     * Quản lý chi nhánh được đọc dữ liệu tối thiểu này nhưng không được đọc
+     * toàn bộ tồn kho Kho Tổng qua endpoint thông thường.
+     */
+    @GetMapping("/available-for-transfer")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    public ResponseEntity<List<TonKhoDTO>> getAvailableForTransfer() {
+        UUID khoTongId = chiNhanhRepository.findFirstByLoai("KHO_TONG")
+                .map(cn -> cn.getId())
+                .orElseThrow(() -> new IllegalStateException("Chưa cấu hình Kho Tổng"));
+        List<TonKhoDTO> list = tonKhoRepository.findByIdChiNhanh(khoTongId).stream()
+                .filter(tk -> tk.getSoLuongTon() != null && tk.getSoLuongTon() > 0)
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
+    }
+
     @GetMapping("/detail/{idSanPham}/{idChiNhanh}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> getDetail(@PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh,

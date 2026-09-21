@@ -26,5 +26,13 @@ export const tonKhoApi = {
     if (!response.ok) throw new Error('Failed to fetch');
     return response.json();
   },
+
+  getAvailableForTransfer: async (): Promise<TonKhoDTO[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/ton-kho/available-for-transfer`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch transfer stock');
+    return response.json();
+  },
 };
 
