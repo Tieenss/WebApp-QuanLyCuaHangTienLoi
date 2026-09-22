@@ -74,6 +74,7 @@ export const InventoryPage: FC = () => {
   /** Dữ liệu kho hiện hành. */
   const allBalances = useAppSelector((state) => state.stock.balances);
   const allLedger = useAppSelector((state) => state.stock.ledger);
+  const stockLoading = useAppSelector((state) => state.stock.loading);
   const allProducts = useAppSelector((state) => state.product.products);
   const allBranches = useAppSelector((state) => state.branch.branches);
   const allCategories = useAppSelector((state) => state.category.categories);
@@ -656,6 +657,7 @@ export const InventoryPage: FC = () => {
                     dataSource={balances}
                     rowKey="id"
                     size="middle"
+                    loading={stockLoading}
                     scroll={{ x: 1800 }}
                     pagination={{
                       pageSize: 15,

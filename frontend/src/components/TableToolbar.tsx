@@ -61,6 +61,8 @@ export const TableToolbar: FC<TableToolbarProps> = ({
       <Col xs={12} md={6} lg={filter.span ?? 4} key={filter.key}>
         <Select
           allowClear
+          showSearch
+          optionFilterProp="label"
           className="toolbar-filter"
           placeholder={filter.placeholder}
           value={filter.value}
