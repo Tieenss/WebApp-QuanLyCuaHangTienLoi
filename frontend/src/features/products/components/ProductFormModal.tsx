@@ -177,7 +177,17 @@ export const ProductFormModal: FC = () => {
               label="Danh mục"
               rules={[{ required: true, message: 'Chọn danh mục.' }]}
             >
-              <Select placeholder="Chọn danh mục" options={categoryOptions} />
+              <Select
+                  showSearch
+                  optionFilterProp="label"
+                  filterOption={(input, option) =>
+                      String(option?.label ?? '')
+                          .toLowerCase()
+                          .includes(input.toLowerCase())
+                  }
+                  placeholder="Chọn danh mục"
+                  options={categoryOptions}
+              />
             </Form.Item>
           </Col>
         </Row>

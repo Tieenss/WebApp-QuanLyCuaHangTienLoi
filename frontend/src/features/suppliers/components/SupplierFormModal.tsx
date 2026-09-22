@@ -188,14 +188,16 @@ export const SupplierFormModal: FC = () => {
               rules={[{ required: true, message: 'Chọn ít nhất một nhóm hàng.' }]}
             >
               <Select
-                mode="multiple"
-                placeholder="Chọn nhóm hàng"
-                options={allCategories
-                    .filter(c => c.status === 'Active')
-                    .map((c) => ({
-                      value: c.id,
-                      label: `${c.icon ?? ''} ${c.name}`.trim(),
-                    }))}
+                  mode="multiple"
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Chọn nhóm hàng"
+                  options={allCategories
+                      .filter((c) => c.status === 'Active')
+                      .map((c) => ({
+                        value: c.id,
+                        label: `${c.icon ?? ''} ${c.name}`.trim(),
+                      }))}
               />
             </Form.Item>
           </Col>
