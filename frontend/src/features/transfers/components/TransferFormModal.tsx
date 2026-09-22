@@ -177,6 +177,16 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   const transferStockOf = (productId: string): number =>
     transferStock.find((stock) => stock.idSanPham === productId)?.soLuongTon ?? 0;
 
+  const distributionCenterStockOf = (productId: string): number => {
+    const balance = balances.find(
+        (item) =>
+            item.branchId === DISTRIBUTION_CENTER_ID &&
+            item.productId === productId,
+    );
+
+    return balance?.quantity ?? transferStockOf(productId);
+  };
+
   // Debug
 
   const usedProductIds = useMemo(
@@ -208,9 +218,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
     () =>
       validRows.filter(
         (row) =>
-          row.quantity > stockOf(balances, DISTRIBUTION_CENTER_ID, row.productId),
+            row.quantity > distributionCenterStockOf(row.productId)
       ),
-    [validRows, balances],
+      [validRows, balances, transferStock]
   );
 
   const updateRow = (key: string, patch: Partial<DraftRow>): void => {
@@ -388,7 +398,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         ),
     },
     {
-      title: 'Số lượng xuất',
+      title: isRequest ? 'Số lượng yêu cầu' : 'Số lượng xuất',
       dataIndex: 'quantity',
       align: 'right',
       width: 130,
@@ -396,7 +406,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         const available =
           row.productId === ''
             ? 0
-            : stockOf(balances, DISTRIBUTION_CENTER_ID, row.productId);
+              : distributionCenterStockOf(row.productId);
         return (
           <InputNumber<number>
             className="transfer-line-input"
