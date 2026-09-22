@@ -14,7 +14,7 @@ export interface NhanVienDTO {
   caMacDinh?: string;
   luongTheoGio?: number;
   luongCung?: number;
-  idChiNhanh?: string;
+  idChiNhanh?: string | null;
   trangThai?: string;
   soTaiKhoan?: string;
   tenNganHang?: string;

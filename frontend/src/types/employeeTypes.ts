@@ -56,7 +56,7 @@ export interface Employee {
   phone: string;
   role: UserRole;
   position: string;
-  branchId: ID;
+  branchId: ID | null;
   branchName: string;
   employmentType: EmploymentType;
   /** Ca làm việc mặc định được phân công. */
