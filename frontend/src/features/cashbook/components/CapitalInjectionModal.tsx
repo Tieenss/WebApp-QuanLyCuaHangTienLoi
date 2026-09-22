@@ -152,6 +152,7 @@ export const CapitalInjectionModal: FC<CapitalInjectionModalProps> = ({
             allowClear={false}
             // Không cho ghi nhận vốn ở tương lai.
             maxDate={dayjs(today())}
+            disabled
           />
         </Form.Item>
 

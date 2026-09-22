@@ -19,6 +19,12 @@ export const RECORD_STATUS = {
 
 export type RecordStatus = (typeof RECORD_STATUS)[keyof typeof RECORD_STATUS];
 
+/** Chuẩn hoá trạng thái API (`ACTIVE`, `LOCKED`...) về trạng thái dùng ở UI. */
+export const normalizeRecordStatus = (status: unknown): RecordStatus =>
+  typeof status === 'string' && status.trim().toUpperCase() === 'ACTIVE'
+    ? RECORD_STATUS.Active
+    : RECORD_STATUS.Inactive;
+
 /** Trạng thái phiếu (nhập/xuất/kiểm kê/thu chi) theo luồng duyệt. */
 export const DOCUMENT_STATUS = {
   Draft: 'DRAFT',

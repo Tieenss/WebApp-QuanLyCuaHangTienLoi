@@ -26,7 +26,7 @@ import {
   type CashBookSummary,
 } from '@/types';
 import { dayjs, formatDate, lastNDays } from '@/utils/dateUtils';
-import { formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { CapitalInjectionModal } from './components/CapitalInjectionModal';
 import { ManualEntryModal } from './components/ManualEntryModal';
@@ -47,6 +47,7 @@ const { RangePicker } = DatePicker;
 export const CashbookPage: FC = () => {
   const dispatch = useAppDispatch();
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
+  const isBranchScoped = user?.role === USER_ROLE.StoreManager;
   const allEntries = useAppSelector((state) => state.cashbook.entries);
 
   // Nạp sổ quỹ từ backend khi vào trang.
@@ -64,6 +65,10 @@ export const CashbookPage: FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [branchFilter, setBranchFilter] = useState<string | null>(activeBranchId);
   const [range, setRange] = useState(() => lastNDays(30));
+
+  useEffect(() => {
+    if (isBranchScoped && user?.branchId) setBranchFilter(user.branchId);
+  }, [isBranchScoped, user?.branchId]);
 
   const filtered = useMemo(
     () =>
@@ -88,7 +93,7 @@ export const CashbookPage: FC = () => {
         return (
           matchSearch && matchDirection && matchCategory && matchBranch && matchRange
         );
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.entryDate)),
     [allEntries, search, directionFilter, categoryFilter, branchFilter, range],
   );
 
@@ -101,10 +106,11 @@ export const CashbookPage: FC = () => {
       .reduce((sum, e) => sum + e.amount, 0);
     const lastEntry = entries[0];
     return {
-      openingBalance: 50_000_000,
+      openingBalance:
+        entries.find((entry) => entry.code === 'OPENING')?.runningBalance ?? 0,
       totalReceipt,
       totalPayment,
-      closingBalance: lastEntry?.runningBalance ?? 50_000_000,
+      closingBalance: lastEntry?.runningBalance ?? 0,
       cashOnHand: entries
         .filter((e) => e.paymentMethod === PAYMENT_METHOD.Cash)
         .reduce((sum, e) => sum + (e.direction === CASH_FLOW_DIRECTION.Receipt ? e.amount : -e.amount), 0),
@@ -178,7 +184,7 @@ export const CashbookPage: FC = () => {
       })),
       span: 5,
     },
-    {
+    ...(!isBranchScoped ? [{
       key: 'branch',
       placeholder: 'Chi nhánh',
       value: branchFilter,
@@ -188,7 +194,7 @@ export const CashbookPage: FC = () => {
         label: branch.name,
       })),
       span: 5,
-    },
+    } as ToolbarFilter] : []),
   ];
 
   const columns: ColumnsType<CashEntry> = [
@@ -204,6 +210,7 @@ export const CashbookPage: FC = () => {
       dataIndex: 'entryDate',
       width: 105,
       sorter: (a, b) => a.entryDate.localeCompare(b.entryDate),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
@@ -375,7 +382,7 @@ export const CashbookPage: FC = () => {
       <Card styles={{ body: { padding: '18px 18px 8px' } }}>
         <TableToolbar
           searchValue={search}
-          searchPlaceholder="Tìm theo mã phiếu, nội dung, đối tượng..."
+          searchPlaceholder="Tìm theo mã phiếu, mã tham chiếu, nội dung, đối tượng..."
           onSearchChange={setSearch}
           filters={filters}
           onExport={handleExport}

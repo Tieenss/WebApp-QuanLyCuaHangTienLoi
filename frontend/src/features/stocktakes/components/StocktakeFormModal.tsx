@@ -30,8 +30,12 @@ interface StocktakeFormValues {
   note: string;
 }
 
-interface DraftRow extends StocktakeLine {
+interface DraftRow extends Omit<StocktakeLine, 'countedQuantity' | 'varianceQuantity' | 'varianceValue'> {
   key: string;
+  /** null là giá trị người dùng vừa nhập không hợp lệ hoặc chưa nhập. */
+  countedQuantity: number | null;
+  varianceQuantity: number | null;
+  varianceValue: number | null;
 }
 
 interface StocktakeFormModalProps {
@@ -72,6 +76,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
   const balances = useAppSelector((state) => state.stock.balances);
   const branches = useAppSelector((state) => state.branch.branches);
   const products = useAppSelector((state) => state.product.products);
+  const user = useAppSelector((state) => state.auth.user);
 
   const sellableProducts = products.filter((p) => p.status === 'Active');
   const branchById = (id: string) => branches.find((b) => b.id === id);
@@ -86,6 +91,14 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
 
   const [branchId, setBranchId] = useState<string | null>(null);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
+  const isBranchScoped = user?.role !== 'ADMIN';
+
+  useEffect(() => {
+    if (!open || !isBranchScoped) return;
+    const ownBranchId = user?.branchId ?? null;
+    setBranchId(ownBranchId);
+    form.setFieldValue('branchId', ownBranchId);
+  }, [open, isBranchScoped, user?.branchId, form]);
 
   const handleAfterClose = (): void => {
     form.resetFields();
@@ -94,11 +107,10 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
   };
 
   const availableProducts = useMemo(
-    () =>
-      sellableProducts.filter(
-        (product) => branchId && stockOf(balances, branchId, product.id) > 0,
-      ),
-    [sellableProducts, balances, branchId],
+    // Kiểm kê phải cho phép đếm cả SKU sổ sách đang bằng 0: thực tế vẫn có
+    // thể còn hàng và cần ghi nhận chênh lệch dương.
+    () => (branchId ? sellableProducts : []),
+    [sellableProducts, branchId],
   );
 
   const usedProductIds = useMemo(
@@ -132,16 +144,19 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
     );
   };
 
-  const handleCountedChange = (key: string, countedQty: number): void => {
+  const handleCountedChange = (key: string, countedQty: number | null): void => {
     setRows((prev) =>
       prev.map((row) =>
         row.key === key
           ? {
               ...row,
               countedQuantity: countedQty,
-              varianceQuantity: countedQty - row.systemQuantity,
+              varianceQuantity:
+                countedQty === null ? null : countedQty - row.systemQuantity,
               varianceValue:
-                (countedQty - row.systemQuantity) * row.unitCost,
+                countedQty === null
+                  ? null
+                  : (countedQty - row.systemQuantity) * row.unitCost,
             }
           : row,
       ),
@@ -198,11 +213,13 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
       dataIndex: 'countedQuantity',
       align: 'center',
       width: 120,
-      render: (val: number, record: DraftRow) => (
+      render: (val: number | null, record: DraftRow) => (
         <InputNumber
           min={0}
+          precision={0}
           value={val}
-          onChange={(v) => handleCountedChange(record.key, v ?? 0)}
+          status={val === null ? 'error' : undefined}
+          onChange={(v) => handleCountedChange(record.key, v)}
           style={{ width: '100%' }}
         />
       ),
@@ -212,12 +229,12 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
       dataIndex: 'varianceQuantity',
       align: 'center',
       width: 80,
-      render: (val: number) => (
+      render: (val: number | null) => (
         <Text
           strong
-          className={`numeric-cell ${val < 0 ? 'qty-loss' : val > 0 ? 'qty-gain' : ''}`}
+          className={`numeric-cell ${val !== null && val < 0 ? 'qty-loss' : val !== null && val > 0 ? 'qty-gain' : ''}`}
         >
-          {val > 0 ? `+${val}` : val}
+          {val === null ? '—' : val > 0 ? `+${val}` : val}
         </Text>
       ),
     },
@@ -226,7 +243,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
       dataIndex: 'reason',
       width: 200,
       render: (val: string, record: DraftRow) =>
-        record.varianceQuantity !== 0 ? (
+        record.varianceQuantity !== null && record.varianceQuantity !== 0 ? (
           <Select
             placeholder="Chọn nguyên nhân"
             value={val || undefined}
@@ -259,8 +276,21 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
       const validRows = rows.filter((row) => row.productId !== '');
       if (validRows.length === 0) return;
 
+      const invalidCount = validRows.find(
+        (row) =>
+          row.countedQuantity === null ||
+          !Number.isInteger(row.countedQuantity) ||
+          row.countedQuantity < 0,
+      );
+      if (invalidCount) {
+        message.error(
+          `Số đếm thực tế của sản phẩm "${invalidCount.productName || invalidCount.sku}" phải là số nguyên lớn hơn hoặc bằng 0.`,
+        );
+        return;
+      }
+
       const missingReason = validRows.find(
-        (row) => row.varianceQuantity !== 0 && !row.reason,
+        (row) => row.varianceQuantity !== null && row.varianceQuantity !== 0 && !row.reason,
       );
       if (missingReason) {
         message.error(
@@ -269,7 +299,12 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
         return;
       }
 
-      const varianceLines = validRows.filter((row) => row.varianceQuantity !== 0);
+      const completeRows = validRows as Array<DraftRow & {
+        countedQuantity: number;
+        varianceQuantity: number;
+        varianceValue: number;
+      }>;
+      const varianceLines = completeRows.filter((row) => row.varianceQuantity !== 0);
       const branch = branchById(values.branchId);
 
       try {
@@ -278,15 +313,10 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
           idChiNhanh: values.branchId,
           ngayKiemKe: values.countDate.format('YYYY-MM-DD'),
           ghiChu: values.note,
-          lines: validRows.map((row) => ({
-            idPhieuKiemKe: '00000000-0000-0000-0000-000000000000',
+          lines: completeRows.map((row) => ({
             idSanPham: row.productId,
-            tonHeThong: row.systemQuantity,
             tonThucTe: row.countedQuantity,
-            soLuongLech: row.varianceQuantity,
             lyDoLech: row.reason,
-            donGiaVon: row.unitCost,
-            giaTriLech: row.varianceValue,
           })),
         });
 
@@ -296,15 +326,16 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
           branchId: values.branchId,
           branchName: branch?.name ?? '',
           countDate: values.countDate.format('YYYY-MM-DD'),
-          status: DOCUMENT_STATUS.Pending,
-          lines: validRows.map((row) => ({
+          createdById: user?.idNhanVien ?? undefined,
+          status: DOCUMENT_STATUS.Draft,
+          lines: completeRows.map((row) => ({
             ...row,
             id: `stl-new-${row.key}`,
           })),
           totalItemsCounted: validRows.length,
           totalVarianceItems: varianceLines.length,
           totalVarianceValue: varianceLines.reduce((sum, row) => sum + row.varianceValue, 0),
-          countedBy: branch?.managerName ?? 'Thủ kho',
+          countedBy: user?.fullName ?? 'Thủ kho',
           approvedBy: null,
           note: values.note,
         };
@@ -314,7 +345,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
         onClose();
       } catch (e: any) {
         console.error('[StocktakeForm] create error:', e);
-        alert('Lỗi tạo phiếu kiểm kê: ' + (e.message || e));
+        message.error('Lỗi tạo phiếu kiểm kê: ' + (e.message || e));
       }
     }).catch((err) => {
       console.error('[StocktakeForm] validate error:', err);
@@ -349,7 +380,10 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
               style={{ width: 280 }}
               value={branchId}
               onChange={(val) => setBranchId(val)}
-              options={branches.map((s) => ({ value: s.id, label: s.name }))}
+              disabled={isBranchScoped}
+              options={(isBranchScoped
+                ? branches.filter((s) => s.id === user?.branchId)
+                : branches).map((s) => ({ value: s.id, label: s.name }))}
             />
           </Form.Item>
           <Form.Item
@@ -358,7 +392,7 @@ export const StocktakeFormModal: FC<StocktakeFormModalProps> = ({
             initialValue={dayjs(today())}
             rules={[{ required: true, message: 'Vui lòng chọn ngày' }]}
           >
-            <DatePicker format="DD/MM/YYYY" style={{ width: 160 }} />
+            <DatePicker format="DD/MM/YYYY" style={{ width: 160 }} disabled />
           </Form.Item>
         </Space>
 

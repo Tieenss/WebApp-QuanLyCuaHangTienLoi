@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FC, type ReactElement } from 'react';
 import { API_BASE_URL } from '@/config/api';
+import { apiFetch } from '@/api/http';
 import { chiTietPhieuXuatApi, type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
 import { nhanVienApi} from '@/api/nhanVien';
 import { App as AntdApp, Button, Card, Descriptions, Popconfirm, Space, Table, Tag, Typography } from 'antd';
@@ -25,7 +26,7 @@ import {
   // type TransferLine,
 } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { ShipModal } from './components/ShipModal';
 import { TransferFormModal } from './components/TransferFormModal';
@@ -49,6 +50,7 @@ export const TransfersPage: FC = () => {
   const [statusFilter, setStatusFilter] = useState<DocumentStatus | null>(null);
 
   const isStoreManager = user?.role === USER_ROLE.StoreManager;
+  const isWarehouseKeeper = user?.role === USER_ROLE.WarehouseKeeper;
   const isApprover = user?.role === USER_ROLE.Admin || user?.role === USER_ROLE.WarehouseKeeper;
   // const branchScope = isStoreManager ? user?.branchId ?? null : null;
 
@@ -57,14 +59,19 @@ export const TransfersPage: FC = () => {
   }, [dispatch]);
 
   const enrichedTransfers = useMemo(
-    () =>
-      transfers.map((t) => ({
-        ...t,
-        fromBranchName: t.fromBranchName || branches.find((b) => b.id === t.fromBranchId)?.name || '',
-        toBranchName: t.toBranchName || branches.find((b) => b.id === t.toBranchId)?.name || '',
-        createdByName: t.createdById ? usersCache[t.createdById] : '',
-      })),
-    [transfers, branches, usersCache],
+      () =>
+          transfers.map((t) => ({
+            ...t,
+            fromBranchName:
+                t.fromBranchName ||
+                branches.find((b) => b.id === t.fromBranchId)?.name ||
+                '',
+            toBranchName:
+                t.toBranchName ||
+                branches.find((b) => b.id === t.toBranchId)?.name ||
+                '',
+          })),
+      [transfers, branches],
   );
 
   useEffect(() => {
@@ -84,14 +91,13 @@ export const TransfersPage: FC = () => {
   }, [transfers.length]);
 
   const scoped = useMemo(() => {
-    const allowed = user?.allowedBranchIds ?? [];
     const list = enrichedTransfers.filter((t) => {
       if (isStoreManager && t.toBranchId !== user?.branchId) return false;
-      if (allowed.length > 0 && !allowed.includes(t.toBranchId)) return false;
+      if (isWarehouseKeeper && t.fromBranchId !== user?.branchId) return false;
       return true;
     });
     return list;
-  }, [enrichedTransfers, isStoreManager, user]);
+  }, [enrichedTransfers, isStoreManager, isWarehouseKeeper, user?.branchId]);
 
   const filtered = useMemo(
     () =>
@@ -104,7 +110,7 @@ export const TransfersPage: FC = () => {
         const matchTo = toFilter === null || transfer.toBranchId === toFilter;
         const matchStatus = statusFilter === null || transfer.status === statusFilter;
         return matchSearch && matchTo && matchStatus;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.requestDate)),
     [scoped, search, toFilter, statusFilter],
   );
 
@@ -159,13 +165,13 @@ export const TransfersPage: FC = () => {
 
   const handleReject = (transfer: StockTransfer): void => {
     if (user === null) return;
-    fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${transfer.id}/reject`, {
+    apiFetch(`${API_BASE_URL}/api/phieu-xuat-kho/${transfer.id}/reject`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
+        ...{},
       },
-      body: JSON.stringify({ idNguoiDuyet: user.idNhanVien, lyDo: `Từ chối bởi ${user.fullName}` }),
+      body: JSON.stringify({ lyDo: `Từ chối bởi ${user.fullName}` }),
     })
       .then((r) => {
         if (!r.ok) throw new Error('Lỗi từ chối');
@@ -180,9 +186,7 @@ export const TransfersPage: FC = () => {
   const handleReceive = async (transfer: StockTransfer): Promise<void> => {
     if (user === null) return;
     try {
-      await phieuXuatKhoApi.receive(transfer.id, {
-        idNguoiThucHien: user.idNhanVien ?? '',
-      });
+      await phieuXuatKhoApi.receive(transfer.id, {});
       message.success(
         `Đã nhận hàng phiếu ${transfer.code}. Tồn kho chi nhánh đã tăng theo số thực nhận.`,
       );
@@ -260,15 +264,18 @@ export const TransfersPage: FC = () => {
       dataIndex: 'requestDate',
       width: 125,
       sorter: (a, b) => a.requestDate.localeCompare(b.requestDate),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
       title: 'Người yêu cầu',
+      dataIndex: 'requestedBy',
       width: 160,
-      render: (_, row) => {
-        const ten = (row as any).createdByName || usersCache[(row as any).createdById] || '—';
-        return <Text className="inv-text-12-5">{ten}</Text>;
-      },
+      render: (value: string) => (
+          <Text className="inv-text-12-5">
+            {value || '—'}
+          </Text>
+      ),
     },
     {
       title: 'Trạng thái',
@@ -397,7 +404,7 @@ export const TransfersPage: FC = () => {
           accessor: (row) => (row.lines || []).reduce((sum, line) => sum + line.shippedQuantity, 0),
         },
         { header: 'Giá trị hàng', accessor: (row) => row.totalValue },
-        { header: 'Người yêu cầu', accessor: (row) => row.requestedBy },
+        { header: 'Người yêu cầu', accessor: (row) => row.requestedBy || row.createdByName || '', },
         { header: 'Người xuất kho', accessor: (row) => row.approvedBy ?? '' },
         { header: 'Trạng thái', accessor: (row) => row.status },
       ],
@@ -439,7 +446,7 @@ export const TransfersPage: FC = () => {
       <Card styles={{ body: { padding: '18px 18px 8px' } }}>
         <TableToolbar
           searchValue={search}
-          searchPlaceholder="Tìm theo mã phiếu, cửa hàng nhận..."
+          searchPlaceholder="Tìm theo mã phiếu, cửa hàng nhận, người yêu cầu..."
           onSearchChange={setSearch}
           filters={filters}
           onExport={handleExport}
@@ -467,7 +474,7 @@ export const TransfersPage: FC = () => {
       <TransferFormModal
         open={isFormOpen}
         onClose={() => setFormOpen(false)}
-        initialStatus={isStoreManager ? DOCUMENT_STATUS.Pending : DOCUMENT_STATUS.Completed}
+        initialStatus={user?.role === USER_ROLE.Admin ? DOCUMENT_STATUS.Completed : DOCUMENT_STATUS.Pending}
       />
       <ShipModal
         open={shipTarget !== null}

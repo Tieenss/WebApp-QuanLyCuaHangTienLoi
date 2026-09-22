@@ -1,4 +1,4 @@
-import { useMemo, type FC } from 'react';
+import { useEffect, useMemo, type FC } from 'react';
 import { Breadcrumb, Layout, Menu, Space, Tag, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import { HomeOutlined } from '@ant-design/icons';
@@ -9,6 +9,8 @@ import {
   MODULE_BY_PATH,
   MODULE_GROUP_LABEL,
   MODULE_GROUP_ORDER,
+  canAccessPath,
+  getFirstAccessibleModulePath,
   getModulesForRole,
   type ModuleDefinition,
 } from '@/config/modules';
@@ -42,6 +44,14 @@ export const AdminLayout: FC = () => {
 
   /** Module mà vai trò hiện tại được phép thấy. */
   const visibleModules = useMemo(() => getModulesForRole(role), [role]);
+
+  // Role switch có thể làm thay đổi quyền trong khi layout vẫn đang mounted.
+  // Đưa người dùng về module đầu tiên trước khi ProtectedRoute rơi vào 403.
+  useEffect(() => {
+    if (!canAccessPath(role, location.pathname)) {
+      navigate(getFirstAccessibleModulePath(role), { replace: true });
+    }
+  }, [role, location.pathname, navigate]);
 
   /** Menu sidebar, nhóm theo `MODULE_GROUP_ORDER`. */
   const menuItems = useMemo<MenuProps['items']>(() => {

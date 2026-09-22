@@ -40,7 +40,7 @@ import {
   type ShiftCode,
 } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { EmployeeFormModal } from './components/EmployeeFormModal';
 import './EmployeesPage.css';
@@ -96,7 +96,7 @@ export const EmployeesPage: FC = () => {
         const matchShift = shiftFilter === null || employee.defaultShift === shiftFilter;
         const matchType = typeFilter === null || employee.employmentType === typeFilter;
         return matchSearch && matchBranch && matchShift && matchType;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.joinedAt)),
     [scoped, search, branchFilter, shiftFilter, typeFilter],
   );
 
@@ -303,6 +303,7 @@ export const EmployeesPage: FC = () => {
       dataIndex: 'joinedAt',
       width: 110,
       sorter: (a, b) => a.joinedAt.localeCompare(b.joinedAt),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
@@ -388,7 +389,7 @@ export const EmployeesPage: FC = () => {
       <Card styles={{ body: { padding: '18px 18px 8px' } }}>
         <TableToolbar
           searchValue={search}
-          searchPlaceholder="Tìm theo tên, mã NV, email, số điện thoại..."
+          searchPlaceholder="Tìm theo tên, mã NV, email, SĐT, chức vụ..."
           onSearchChange={setSearch}
           filters={filters}
           onExport={handleExport}

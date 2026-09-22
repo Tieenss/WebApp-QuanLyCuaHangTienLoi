@@ -1,9 +1,13 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietKiemKe;
-import com.erp.cuahangtienloi.repository.ChiTietKiemKeRepository;
+import com.erp.cuahangtienloi.repository.*;
+import com.erp.cuahangtienloi.service.BranchAccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,23 +20,32 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/chi-tiet-kiem-ke")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY', 'KE_TOAN')")
 public class ChiTietKiemKeController {
 
     private final ChiTietKiemKeRepository chiTietKiemKeRepository;
+    private final PhieuKiemKeRepository phieuKiemKeRepository;
+    private final SanPhamRepository sanPhamRepository;
+    private final BranchAccessService branchAccessService;
 
     @GetMapping("/by-phieu/{idPhieuKiemKe}")
-    public ResponseEntity<List<ChiTietKiemKe>> getByPhieuKiemKe(@PathVariable UUID idPhieuKiemKe) {
+    public ResponseEntity<List<ChiTietKiemKe>> getByPhieuKiemKe(@PathVariable UUID idPhieuKiemKe, HttpServletRequest request) {
+        requireReadableHeader(idPhieuKiemKe, request);
         return ResponseEntity.ok(chiTietKiemKeRepository.findByIdPhieuKiemKe(idPhieuKiemKe));
     }
 
     @GetMapping("/by-san-pham/{idSanPham}")
-    public ResponseEntity<List<ChiTietKiemKe>> getBySanPham(@PathVariable UUID idSanPham) {
-        return ResponseEntity.ok(chiTietKiemKeRepository.findByIdSanPham(idSanPham));
+    public ResponseEntity<List<ChiTietKiemKe>> getBySanPham(@PathVariable UUID idSanPham, HttpServletRequest request) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(request);
+        return ResponseEntity.ok(chiTietKiemKeRepository.findByIdSanPham(idSanPham).stream()
+                .filter(ct -> canReadHeader(actor, ct.getIdPhieuKiemKe())).toList());
     }
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody ChiTietKiemKe request) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    public ResponseEntity<?> create(@RequestBody ChiTietKiemKe request, HttpServletRequest httpRequest) {
+        validate(request, httpRequest);
         ChiTietKiemKe ct = new ChiTietKiemKe();
         ct.setId(UUID.randomUUID());
         ct.setIdPhieuKiemKe(request.getIdPhieuKiemKe());
@@ -50,13 +63,15 @@ public class ChiTietKiemKeController {
     }
 
     @PostMapping("/batch")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     @Transactional
-    public ResponseEntity<?> createBatch(@RequestBody List<ChiTietKiemKe> requests) {
+    public ResponseEntity<?> createBatch(@RequestBody List<ChiTietKiemKe> requests, HttpServletRequest httpRequest) {
         if (requests == null || requests.isEmpty()) {
-            return ResponseEntity.badRequest().body(new SuccessResponse("Danh sách chi tiết rỗng"));
+            return ResponseEntity.badRequest().body(ApiResponse.err("Danh sách chi tiết rỗng"));
         }
         List<ChiTietKiemKe> saved = new ArrayList<>();
         for (ChiTietKiemKe request : requests) {
+            validate(request, httpRequest);
             ChiTietKiemKe ct = new ChiTietKiemKe();
             ct.setId(UUID.randomUUID());
             ct.setIdPhieuKiemKe(request.getIdPhieuKiemKe());
@@ -74,21 +89,64 @@ public class ChiTietKiemKeController {
         return ResponseEntity.ok(saved);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable UUID id) {
-        if (chiTietKiemKeRepository.existsById(id)) {
-            chiTietKiemKeRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa chi tiết thành công"));
+    private void validate(ChiTietKiemKe request, HttpServletRequest httpRequest) {
+        if (request.getIdPhieuKiemKe() == null || !phieuKiemKeRepository.existsById(request.getIdPhieuKiemKe())) {
+            throw new IllegalArgumentException("Phiếu kiểm kê không tồn tại");
         }
-        return ResponseEntity.notFound().build();
+        if (request.getIdSanPham() == null || !sanPhamRepository.existsById(request.getIdSanPham())) {
+            throw new IllegalArgumentException("Sản phẩm không tồn tại");
+        }
+        requireReadableHeader(request.getIdPhieuKiemKe(), httpRequest);
+        requireEditableHeader(request.getIdPhieuKiemKe());
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getTonHeThong(), "Tồn hệ thống");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getTonThucTe(), "Tồn thực tế");
+        com.erp.cuahangtienloi.validation.InputValidator.nonNegative(request.getDonGiaVon(), "Đơn giá vốn");
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    public ResponseEntity<?> delete(@PathVariable UUID id, HttpServletRequest request) {
+        return chiTietKiemKeRepository.findById(id).map(ct -> {
+            requireReadableHeader(ct.getIdPhieuKiemKe(), request);
+            requireEditableHeader(ct.getIdPhieuKiemKe());
+            chiTietKiemKeRepository.delete(ct);
+            return ResponseEntity.ok(ApiResponse.ok("Xóa chi tiết thành công"));
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/by-phieu/{idPhieuKiemKe}")
-    public ResponseEntity<?> deleteByPhieuKiemKe(@PathVariable UUID idPhieuKiemKe) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    public ResponseEntity<?> deleteByPhieuKiemKe(@PathVariable UUID idPhieuKiemKe, HttpServletRequest request) {
+        requireReadableHeader(idPhieuKiemKe, request);
+        requireEditableHeader(idPhieuKiemKe);
         List<ChiTietKiemKe> list = chiTietKiemKeRepository.findByIdPhieuKiemKe(idPhieuKiemKe);
         chiTietKiemKeRepository.deleteAll(list);
-        return ResponseEntity.ok(new SuccessResponse("Xóa tất cả chi tiết kiểm kê"));
+        return ResponseEntity.ok( ApiResponse.ok("Xóa tất cả chi tiết kiểm kê"));
     }
 
-    record SuccessResponse(String message) {}
+    private boolean canReadHeader(com.erp.cuahangtienloi.entity.NhanVien actor, UUID idPhieuKiemKe) {
+        return phieuKiemKeRepository.findById(idPhieuKiemKe)
+                .map(header -> branchAccessService.canReadBranch(actor, header.getIdChiNhanh()))
+                .orElse(false);
+    }
+
+    private void requireReadableHeader(UUID idPhieuKiemKe, HttpServletRequest request) {
+        var actor = branchAccessService.requireAuthenticatedEmployee(request);
+        if (!canReadHeader(actor, idPhieuKiemKe)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Không được xem hoặc sửa chi tiết kiểm kê của chi nhánh khác");
+        }
+    }
+
+    private void requireEditableHeader(UUID idPhieuKiemKe) {
+        phieuKiemKeRepository.findById(idPhieuKiemKe).ifPresent(header -> {
+            if (!"DANG_KIEM_KE".equals(header.getTrangThai())) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT,
+                        "Phiếu kiểm kê không còn ở trạng thái đang kiểm kê nên không thể sửa chi tiết");
+            }
+        });
+    }
+
+//    record SuccessResponse(String message) {}
 }

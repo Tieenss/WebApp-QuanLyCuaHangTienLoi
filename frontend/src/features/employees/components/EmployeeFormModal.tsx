@@ -28,6 +28,12 @@ import {
   BRANCH_KIND,
   type EmployeeFormValues,
 } from '@/types';
+import {
+  applyFormErrors,
+  COMMON_PATTERNS,
+  getErrorMessage,
+  isFormValidationError,
+} from '@/utils/apiError';
 import './EmployeeFormModal.css';
 
 const ROLE_OPTIONS = Object.values(USER_ROLE).map((role) => ({
@@ -49,9 +55,11 @@ export const EmployeeFormModal: FC = () => {
   // Lọc chi nhánh theo vai trò: THU_KHO chỉ được chọn Kho tổng
   const filterBranchesByRole = (role: string) => {
     if (role === 'THU_KHO') {
-      return branches.filter((b) => b.kind === BRANCH_KIND.DistributionCenter);
+      return branches.filter((b) => b.status === RECORD_STATUS.Active
+        && b.kind === BRANCH_KIND.DistributionCenter);
     }
-    return branches.filter((b) => b.kind === BRANCH_KIND.Store);
+    return branches.filter((b) => b.status === RECORD_STATUS.Active
+      && b.kind === BRANCH_KIND.Store);
   };
 
   useEffect(() => {
@@ -82,7 +90,7 @@ export const EmployeeFormModal: FC = () => {
       const values = await form.validateFields();
       // Nếu vai trò là ADMIN/KE_TOAN → KHÔNG gửi branchId (DB constraint)
       if (values.role === 'ADMIN' || values.role === 'KE_TOAN') {
-        values.branchId = '';
+        values.branchId = null;
       }
       if (isEditing && selectedEmployee) {
         await dispatch(updateEmployeeThunk({ id: selectedEmployee.id, values })).unwrap();
@@ -94,8 +102,16 @@ export const EmployeeFormModal: FC = () => {
       // Reload danh sách để cập nhật branchName từ Redux
       dispatch(fetchEmployees());
       dispatch(setEmployeeModalOpen(false));
-    } catch (error: any) {
-      message.error(error?.message || 'Có lỗi xảy ra');
+    } catch (error: unknown) {
+      if (isFormValidationError(error)) return;
+      const errorMessage = getErrorMessage(error, 'Không thể lưu thông tin nhân viên');
+      const handled = applyFormErrors(form, errorMessage, {
+        email: ['email', 'hòm thư'],
+        phone: ['số điện thoại', 'sđt', 'phone'],
+        code: ['mã nhân viên'],
+        branchId: ['chi nhánh'],
+      });
+      if (!handled) message.error(errorMessage);
     }
   };
 
@@ -120,7 +136,10 @@ export const EmployeeFormModal: FC = () => {
             <Form.Item
               name="fullName"
               label="Họ và tên"
-              rules={[{ required: true, message: 'Vui lòng nhập họ và tên.' }]}
+              rules={[
+                { required: true, whitespace: true, message: 'Vui lòng nhập họ và tên.' },
+                { max: 255, message: 'Họ và tên tối đa 255 ký tự.' },
+              ]}
             >
               <Input placeholder="Họ và tên nhân viên" />
             </Form.Item>
@@ -154,7 +173,10 @@ export const EmployeeFormModal: FC = () => {
               label="Vai trò hệ thống"
               rules={[{ required: true, message: 'Chọn vai trò.' }]}
             >
-              <Select options={ROLE_OPTIONS} />
+              <Select
+                options={ROLE_OPTIONS}
+                onChange={() => form.setFieldValue('branchId', null)}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -283,7 +305,10 @@ export const EmployeeFormModal: FC = () => {
               label="Email"
               rules={[
                 { required: true, message: 'Vui lòng nhập email.' },
-                { type: 'email', message: 'Email không đúng định dạng.' },
+                {
+                  pattern: COMMON_PATTERNS.EMAIL,
+                  message: 'Email không đúng định dạng (VD: example@domain.com).',
+                },
               ]}
             >
               <Input placeholder="nv@example.com" />
@@ -293,7 +318,13 @@ export const EmployeeFormModal: FC = () => {
             <Form.Item
               name="phone"
               label="Số điện thoại"
-              rules={[{ required: true, message: 'Vui lòng nhập số điện thoại.' }]}
+              rules={[
+                { required: true, message: 'Vui lòng nhập số điện thoại.' },
+                {
+                  pattern: COMMON_PATTERNS.PHONE,
+                  message: 'Số điện thoại không hợp lệ (bắt đầu bằng 0, gồm 10 hoặc 11 chữ số).',
+                },
+              ]}
             >
               <Input placeholder="09xx xxx xxx" />
             </Form.Item>

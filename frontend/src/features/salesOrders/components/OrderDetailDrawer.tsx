@@ -18,7 +18,7 @@ import {
   PrinterOutlined,
   SaveOutlined,
 } from '@ant-design/icons';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   setSelectedOrder,
   updateOrderNote,
@@ -64,6 +64,7 @@ export const OrderDetailDrawer: FC<OrderDetailDrawerProps> = ({
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
   const open = order !== null;
+  const branches = useAppSelector((state) => state.branch.branches);
 
   const [noteEditing, setNoteEditing] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
@@ -87,7 +88,14 @@ export const OrderDetailDrawer: FC<OrderDetailDrawerProps> = ({
   const handlePrint = (): void => {
     if (order === null) return;
     try {
-      printHtml(buildReceiptHtml(order, '', '', ''), `Hoá đơn ${order.code}`);
+      const branch = branches.find((item) => item.id === order.branchId);
+      const address = branch
+        ? [branch.addressLine, branch.district, branch.province].filter(Boolean).join(', ')
+        : '';
+      printHtml(
+        buildReceiptHtml(order, branch?.name ?? order.branchName, address, branch?.phone ?? ''),
+        `Hoá đơn ${order.code}`,
+      );
     } catch {
       message.error(
         'Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép popup cho trang này rồi thử lại.',

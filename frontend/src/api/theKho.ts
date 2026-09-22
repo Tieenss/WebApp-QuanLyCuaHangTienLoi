@@ -1,7 +1,8 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 
 export interface TheKhoDTO {
-  id?: string;
+  id: string;
   idSanPham: string;
   tenSanPham?: string;
   maVach?: string;
@@ -16,11 +17,18 @@ export interface TheKhoDTO {
   donGia?: number;
   thanhTien?: number;
   ghiChu?: string;
+  ngayPhatSinh: string;
+  loaiGiaoDich?: string;
+  maChungTu?: string;
+  nguoiThucHien?: string;
+  hanSuDung?: string;
+  tonTruoc?: number;
+  tonSau?: number;
+  soLuong: number;
 }
 
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 export const theKhoApi = {
@@ -49,7 +57,7 @@ export const theKhoApi = {
   },
 
   getByProductAndBranch: async (idSanPham: string, idChiNhanh: string): Promise<TheKhoDTO[]> => {
-    const response = await fetch(`${API_BASE_URL}/api/the-kho/by-product/${idSanPham}/by-branch/${idChiNhanh}`, {
+    const response = await fetch(`${API_BASE_URL}/api/the-kho/by-product/${idSanPham}/branch/${idChiNhanh}`, {
       headers: getHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch thẻ kho');

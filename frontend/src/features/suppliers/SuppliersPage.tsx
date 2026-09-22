@@ -33,7 +33,7 @@ import {
 } from '@/store/slices/supplierSlice';
 import type { Supplier } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { SupplierFormModal } from './components/SupplierFormModal';
 import './SuppliersPage.css';
@@ -77,7 +77,7 @@ export const SuppliersPage: FC = () => {
           categoryFilter === null || supplier.categories.includes(categoryFilter);
         const matchStatus = statusFilter === null || supplier.status === statusFilter;
         return matchSearch && matchCategory && matchStatus;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.createdAt)),
     [suppliers, searchQuery, categoryFilter, statusFilter],
   );
 
@@ -273,6 +273,8 @@ export const SuppliersPage: FC = () => {
       title: 'Hợp tác từ',
       dataIndex: 'createdAt',
       width: 110,
+      sorter: (a, b) => a.createdAt.localeCompare(b.createdAt),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
@@ -356,7 +358,7 @@ export const SuppliersPage: FC = () => {
       <Card styles={{ body: { padding: '18px 18px 8px' } }}>
         <TableToolbar
           searchValue={searchQuery}
-          searchPlaceholder="Tìm theo tên, mã NCC, mã số thuế..."
+          searchPlaceholder="Tìm theo tên, mã NCC, mã số thuế, email, SĐT..."
           onSearchChange={(value) => dispatch(setSearchQuery(value))}
           filters={filters}
           onExport={handleExport}

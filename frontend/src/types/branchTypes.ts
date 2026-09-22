@@ -46,6 +46,7 @@ export interface Branch {
   phone: string;
   /** Giờ mở cửa, "24/7" với cửa hàng hoạt động liên tục. */
   openingHours: string;
+  /** Tên suy ra từ Nhân viên có id trùng managerId; không lưu trong chi_nhanh. */
   managerName: string;
   managerId?: ID;
   employeeCount: number;
@@ -60,5 +61,5 @@ export interface Branch {
 /** Giá trị form thêm/sửa chi nhánh (bỏ các field hệ thống tự sinh). */
 export type BranchFormValues = Omit<
   Branch,
-  'id' | 'employeeCount' | 'monthlyRevenue'
+  'id' | 'managerName' | 'managerId' | 'employeeCount' | 'monthlyRevenue'
 >;

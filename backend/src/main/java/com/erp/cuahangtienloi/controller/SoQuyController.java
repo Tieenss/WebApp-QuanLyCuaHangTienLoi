@@ -1,46 +1,61 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.SoQuyDTO;
 import com.erp.cuahangtienloi.entity.SoQuy;
 import com.erp.cuahangtienloi.repository.*;
+import com.erp.cuahangtienloi.service.BranchAccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.erp.cuahangtienloi.validation.InputValidator.*;
+
 @RestController
 @RequestMapping("/api/so-quy")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class SoQuyController {
 
     private final SoQuyRepository soQuyRepository;
     private final ChiNhanhRepository chiNhanhRepository;
     private final NhanVienRepository nhanVienRepository;
+    private final BranchAccessService branchAccessService;
 
     @GetMapping
-    public ResponseEntity<List<SoQuyDTO>> getAll() {
-        List<SoQuyDTO> list = soQuyRepository.findAll().stream()
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
+    public ResponseEntity<List<SoQuyDTO>> getAll(HttpServletRequest request) {
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getById(@PathVariable UUID id) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
+    public ResponseEntity<?> getById(@PathVariable UUID id, HttpServletRequest request) {
         return soQuyRepository.findById(id)
+                .filter(sq -> canReadEntry(branchAccessService.requireAuthenticatedEmployee(request), sq))
                 .map(sq -> ResponseEntity.ok(toDTO(sq)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
-    public ResponseEntity<List<SoQuyDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
+    public ResponseEntity<List<SoQuyDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh,
+                                                         HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<SoQuyDTO> list = soQuyRepository.findByIdChiNhanh(idChiNhanh).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -48,32 +63,53 @@ public class SoQuyController {
     }
 
     @GetMapping("/by-direction/{direction}")
-    public ResponseEntity<List<SoQuyDTO>> getByDirection(@PathVariable String direction) {
-        List<SoQuyDTO> list = soQuyRepository.findByDirection(direction).stream()
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
+    public ResponseEntity<List<SoQuyDTO>> getByDirection(@PathVariable String direction,
+                                                          HttpServletRequest request) {
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
+                .filter(sq -> direction.equals(sq.getDirection()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/by-hang-muc/{hangMuc}")
-    public ResponseEntity<List<SoQuyDTO>> getByHangMuc(@PathVariable String hangMuc) {
-        List<SoQuyDTO> list = soQuyRepository.findByHangMuc(hangMuc).stream()
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
+    public ResponseEntity<List<SoQuyDTO>> getByHangMuc(@PathVariable String hangMuc,
+                                                        HttpServletRequest request) {
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
+                .filter(sq -> hangMuc.equals(sq.getHangMuc()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/by-date-range")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getByDateRange(
-            @RequestParam LocalDate from, @RequestParam LocalDate to) {
-        List<SoQuyDTO> list = soQuyRepository.findByEntryDateBetween(from, to).stream()
+            @RequestParam LocalDate from, @RequestParam LocalDate to, HttpServletRequest request) {
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
+                .filter(sq -> !sq.getEntryDate().isBefore(from) && !sq.getEntryDate().isAfter(to))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody SoQuy request) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
+    @Transactional
+    public ResponseEntity<?> create(@RequestBody SoQuy request, HttpServletRequest httpRequest) {
+        if (request.getIdChiNhanh() != null && !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chi nhánh không tồn tại"));
+        }
+        if (request.getDirection() == null || !CASH_DIRECTIONS.contains(request.getDirection())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Loại thu/chi không hợp lệ"));
+        }
+        requireText(request.getHangMuc(), "Hạng mục", 1, 50);
+        if (request.getHinhThucTt() != null && !PAYMENT_METHODS.contains(request.getHinhThucTt())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Hình thức thanh toán không hợp lệ"));
+        }
+        positive(request.getSoTien(), "Số tiền");
         SoQuy sq = new SoQuy();
         sq.setId(UUID.randomUUID());
         sq.setMaChungTu(request.getMaChungTu());
@@ -82,11 +118,21 @@ public class SoQuyController {
         // id_nguoi_tao NOT NULL theo DB — nếu frontend không gửi (session cũ
         // chưa có idNhanVien) thì fallback nhân viên đầu tiên.
         UUID idNguoiTao = request.getIdNguoiTao();
+
         if (idNguoiTao == null || !nhanVienRepository.existsById(idNguoiTao)) {
-            idNguoiTao = nhanVienRepository.findAll().stream()
-                    .findFirst()
-                    .map(nv -> nv.getId())
-                    .orElse(null);
+            Object attr = httpRequest.getAttribute("authenticatedIdNhanVien");
+
+            if (attr instanceof String s) {
+                try {
+                    UUID id = UUID.fromString(s);
+
+                    if (nhanVienRepository.existsById(id)) {
+                        idNguoiTao = id;
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // UUID không hợp lệ
+                }
+            }
         }
         sq.setIdNguoiTao(idNguoiTao);
         sq.setDirection(request.getDirection());
@@ -101,14 +147,47 @@ public class SoQuyController {
         sq.setNgayTao(LocalDateTime.now());
         sq.setNgayCapNhat(LocalDateTime.now());
 
+        SoQuy latest = soQuyRepository.findByIdChiNhanh(sq.getIdChiNhanh()).stream()
+                .sorted(
+                        Comparator.comparing(SoQuy::getEntryDate)
+                                .reversed()
+                                .thenComparing(
+                                        SoQuy::getNgayTao,
+                                        Comparator.reverseOrder()
+                                )
+                )
+                .findFirst()
+                .orElse(null);
+
+        BigDecimal prevBalance =
+                latest != null
+                        ? latest.getRunningBalance()
+                        : BigDecimal.ZERO;
+
+        if ("RECEIPT".equals(sq.getDirection())) {
+            sq.setRunningBalance(prevBalance.add(sq.getSoTien()));
+        } else {
+            sq.setRunningBalance(prevBalance.subtract(sq.getSoTien()));
+        }
+
         soQuyRepository.save(sq);
         return ResponseEntity.ok(toDTO(sq));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
+    @Transactional
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody SoQuy request) {
         return soQuyRepository.findById(id)
                 .map(sq -> {
+                    if (request.getSoTien() != null) positive(request.getSoTien(), "Số tiền");
+                    if (request.getDirection() != null && !CASH_DIRECTIONS.contains(request.getDirection())) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Loại thu/chi không hợp lệ"));
+                    }
+                    if (request.getHangMuc() != null) requireText(request.getHangMuc(), "Hạng mục", 1, 50);
+                    if (request.getHinhThucTt() != null && !PAYMENT_METHODS.contains(request.getHinhThucTt())) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Hình thức thanh toán không hợp lệ"));
+                    }
                     if (request.getDirection() != null) sq.setDirection(request.getDirection());
                     if (request.getHangMuc() != null) sq.setHangMuc(request.getHangMuc());
                     if (request.getHinhThucTt() != null) sq.setHinhThucTt(request.getHinhThucTt());
@@ -116,7 +195,7 @@ public class SoQuyController {
                     if (request.getSoTien() != null) sq.setSoTien(request.getSoTien());
                     if (request.getDoiTuong() != null) sq.setDoiTuong(request.getDoiTuong());
                     if (request.getDienGiai() != null) sq.setDienGiai(request.getDienGiai());
-                    if (request.getRunningBalance() != null) sq.setRunningBalance(request.getRunningBalance());
+                    // runningBalance là giá trị dẫn xuất, không nhận từ client.
                     if (request.getTrangThai() != null) sq.setTrangThai(request.getTrangThai());
                     sq.setNgayCapNhat(LocalDateTime.now());
                     soQuyRepository.save(sq);
@@ -126,10 +205,11 @@ public class SoQuyController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (soQuyRepository.existsById(id)) {
             soQuyRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa sổ quỹ thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa sổ quỹ thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -163,5 +243,18 @@ public class SoQuyController {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+    private List<SoQuy> findEntriesVisibleTo(HttpServletRequest request) {
+        var employee = branchAccessService.requireAuthenticatedEmployee(request);
+        return branchAccessService.isSystemWide(employee)
+                ? soQuyRepository.findAll()
+                : soQuyRepository.findByIdChiNhanh(branchAccessService.requiredOwnBranch(employee));
+    }
+
+    private boolean canReadEntry(com.erp.cuahangtienloi.entity.NhanVien employee, SoQuy entry) {
+        return branchAccessService.isSystemWide(employee)
+                || (entry.getIdChiNhanh() != null
+                && entry.getIdChiNhanh().equals(branchAccessService.requiredOwnBranch(employee)));
+    }
+
+//    record SuccessResponse(String message) {}
 }

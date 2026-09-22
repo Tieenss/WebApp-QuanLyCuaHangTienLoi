@@ -1,4 +1,4 @@
-import { createAction, createSlice } from '@reduxjs/toolkit';
+import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
   ORDER_STATUS,
@@ -10,6 +10,7 @@ import {
   type Product,
   type SalesOrder,
 } from '@/types';
+import { tonKhoApi } from '@/api/tonKho';
 
 /**
  * Module 2 – State quầy bán hàng POS.
@@ -45,6 +46,15 @@ export interface CompletedSale {
  * cashbook đều import từ pos, còn pos không import ngược lại.
  */
 export const saleCompleted = createAction<CompletedSale>('pos/saleCompleted');
+
+/** Tồn khả dụng của chi nhánh POS; backend kiểm tra branchId theo JWT. */
+export const fetchPosAvailability = createAsyncThunk(
+  'pos/fetchAvailability',
+  async (branchId: string) => ({
+    branchId,
+    items: await tonKhoApi.getByBranch(branchId),
+  }),
+);
 
 /**
  * Dựng `SalesOrder` từ giỏ hàng hiện tại.
@@ -137,6 +147,8 @@ export interface PosState {
   lastCompletedSale: CompletedSale | null;
   /** Số hoá đơn đã lập trong phiên làm việc hiện tại, dùng sinh mã. */
   sessionOrderCount: number;
+  /** productId -> số lượng có thể bán ở chi nhánh POS. */
+  availabilityByProductId: Record<string, number>;
 }
 
 const initialState: PosState = {
@@ -150,6 +162,7 @@ const initialState: PosState = {
   searchKeyword: '',
   lastCompletedSale: null,
   sessionOrderCount: 0,
+  availabilityByProductId: {},
 };
 
 /**
@@ -202,6 +215,7 @@ export const posSlice = createSlice({
       const next = action.payload;
       if (!next || state.branchId === next) return;
       state.branchId = next;
+      state.availabilityByProductId = {};
       state.lines = [];
       state.orderDiscount = 0;
       state.tenderedAmount = 0;
@@ -211,6 +225,7 @@ export const posSlice = createSlice({
     setPosBranch: (state, action: PayloadAction<string>) => {
       if (state.branchId === action.payload) return;
       state.branchId = action.payload;
+      state.availabilityByProductId = {};
       state.lines = [];
       state.orderDiscount = 0;
       state.tenderedAmount = 0;
@@ -219,7 +234,7 @@ export const posSlice = createSlice({
     /**
      * Thêm sản phẩm vào giỏ. Nếu đã có thì tăng số lượng.
      *
-     * `availableStock` do component truyền vào (đọc từ `state.stock.balances`)
+     * `availableStock` do component truyền vào (đọc từ tồn khả dụng của POS)
      * vì reducer không đọc được slice khác. Số lượng bị chặn theo tồn kho khả
      * dụng tại chi nhánh — quy tắc BR-01 "không bán vượt tồn".
      */
@@ -341,14 +356,28 @@ export const posSlice = createSlice({
      * reducer, vì `stockSlice` và `cashbookSlice` cũng cần chính đối tượng đó —
      * nếu dựng bên trong thì hai slice kia không có cách nào đọc được.
      */
-    builder.addCase(saleCompleted, (state, action) => {
-      state.lastCompletedSale = action.payload;
-      state.sessionOrderCount += 1;
-      state.lines = [];
-      state.orderDiscount = 0;
-      state.tenderedAmount = 0;
-      state.memberPhone = '';
-    });
+    builder
+      .addCase(fetchPosAvailability.fulfilled, (state, action) => {
+        // Nếu người dùng đã đổi quầy khi request cũ đang chạy, không để kết
+        // quả cũ ghi đè tồn kho của quầy mới.
+        if (state.branchId !== action.payload.branchId) return;
+        const availability = Object.fromEntries(
+          action.payload.items.map((item) => [item.idSanPham, Math.max(0, item.soLuongTon ?? 0)]),
+        );
+        state.availabilityByProductId = availability;
+      })
+      .addCase(fetchPosAvailability.rejected, (state, action) => {
+        if (state.branchId !== action.meta.arg) return;
+        state.availabilityByProductId = {};
+      })
+      .addCase(saleCompleted, (state, action) => {
+        state.lastCompletedSale = action.payload;
+        state.sessionOrderCount += 1;
+        state.lines = [];
+        state.orderDiscount = 0;
+        state.tenderedAmount = 0;
+        state.memberPhone = '';
+      });
   },
 });
 

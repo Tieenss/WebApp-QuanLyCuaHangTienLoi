@@ -26,6 +26,7 @@ import {
   LEDGER_TYPE_LABEL,
   STOCK_LEVEL,
   STOCK_LEVEL_LABEL,
+  USER_ROLE,
   type LedgerType,
   type StockBalance,
   type StockLedgerEntry,
@@ -38,7 +39,7 @@ import {
   totalStockValue,
 } from '@/store/slices/stockSlice';
 import { daysUntil, formatDate, formatDateTime } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import type { CSSProperties } from 'react';
 import { LedgerDrawer } from './components/LedgerDrawer';
@@ -73,9 +74,13 @@ export const InventoryPage: FC = () => {
   /** Dữ liệu kho hiện hành. */
   const allBalances = useAppSelector((state) => state.stock.balances);
   const allLedger = useAppSelector((state) => state.stock.ledger);
+  const stockLoading = useAppSelector((state) => state.stock.loading);
   const allProducts = useAppSelector((state) => state.product.products);
   const allBranches = useAppSelector((state) => state.branch.branches);
   const allCategories = useAppSelector((state) => state.category.categories);
+  const user = useAppSelector((state) => state.auth.user);
+  const isBranchScoped = user?.role === USER_ROLE.StoreManager
+    || user?.role === USER_ROLE.WarehouseKeeper;
 
   const productById = (id: string) => allProducts.find((p) => p.id === id);
   const branchById = (id: string) => allBranches.find((b) => b.id === id);
@@ -85,6 +90,13 @@ export const InventoryPage: FC = () => {
       dispatch(fetchStock());
     }
   }, [dispatch, allBalances.length]);
+
+  // Khóa bộ lọc theo chi nhánh thực tế; backend vẫn là lớp bảo vệ chính.
+  useEffect(() => {
+    if (isBranchScoped && user?.branchId) {
+      dispatch(setBranchFilter(user.branchId));
+    }
+  }, [dispatch, isBranchScoped, user?.branchId]);
 
   // Enrich tồn kho: thêm tên sản phẩm, tên chi nhánh, mã SKU
   const enrichedBalances = useMemo(
@@ -123,7 +135,7 @@ export const InventoryPage: FC = () => {
   /** Tồn kho sau khi áp toàn bộ bộ lọc. */
   const balances = useMemo(
     () =>
-      enrichedBalances.filter((balance) => {
+    enrichedBalances.filter((balance) => {
         const matchSearch = matchKeyword(searchKeyword, [
           balance.productName,
           balance.sku,
@@ -147,7 +159,23 @@ export const InventoryPage: FC = () => {
           !onlyNearExpiry || (remainingDays !== null && remainingDays <= NEAR_EXPIRY_DAYS);
 
         return matchSearch && matchBranch && matchCategory && matchLevel && matchExpiry;
-      }),
+    }).sort((a, b) => {
+      const levelRank: Record<StockLevel, number> = {
+        [STOCK_LEVEL.OutOfStock]: 0,
+        [STOCK_LEVEL.Critical]: 1,
+        [STOCK_LEVEL.Low]: 2,
+        [STOCK_LEVEL.Healthy]: 3,
+        [STOCK_LEVEL.Overstock]: 4,
+      };
+      const rankDiff =
+        levelRank[resolveStockLevel(a.quantity, a.minStock, a.maxStock)] -
+        levelRank[resolveStockLevel(b.quantity, b.minStock, b.maxStock)];
+      if (rankDiff !== 0) return rankDiff;
+
+      const ratioA = a.minStock > 0 ? a.quantity / a.minStock : a.quantity;
+      const ratioB = b.minStock > 0 ? b.quantity / b.minStock : b.quantity;
+      return ratioA - ratioB || a.productName.localeCompare(b.productName);
+    }),
     [
       enrichedBalances,
       searchKeyword,
@@ -162,7 +190,7 @@ export const InventoryPage: FC = () => {
   /** Thẻ kho sau khi áp bộ lọc. */
   const ledgerEntries = useMemo(
     () =>
-      enrichedLedger.filter((entry) => {
+    enrichedLedger.filter((entry) => {
         const matchSearch = matchKeyword(searchKeyword, [
           entry.productName,
           entry.sku,
@@ -177,7 +205,7 @@ export const InventoryPage: FC = () => {
           categoryFilter === null || product?.categoryId === categoryFilter;
 
         return matchSearch && matchBranch && matchType && matchCategory;
-      }),
+    }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.occurredAt)),
     [enrichedLedger, searchKeyword, branchFilter, ledgerTypeFilter, categoryFilter, allProducts],
   );
 
@@ -235,14 +263,14 @@ export const InventoryPage: FC = () => {
 
   /** Bộ lọc dùng chung, thêm bộ lọc riêng theo tab đang mở. */
   const filters: ToolbarFilter[] = [
-    {
+    ...(!isBranchScoped ? [{
       key: 'branch',
       placeholder: 'Kho / Chi nhánh',
       value: branchFilter,
-      onChange: (value) => dispatch(setBranchFilter(value)),
+      onChange: (value: string | null) => dispatch(setBranchFilter(value)),
       options: branchOptions,
       span: 6,
-    },
+    } as ToolbarFilter] : []),
     {
       key: 'category',
       placeholder: 'Danh mục',
@@ -607,7 +635,7 @@ export const InventoryPage: FC = () => {
                 <>
                   <TableToolbar
                     searchValue={searchKeyword}
-                    searchPlaceholder="Tìm theo tên sản phẩm, SKU..."
+                    searchPlaceholder="Tìm theo tên sản phẩm, SKU, danh mục..."
                     onSearchChange={(value) => dispatch(setInventorySearch(value))}
                     filters={filters}
                     onExport={handleExportBalances}
@@ -629,6 +657,7 @@ export const InventoryPage: FC = () => {
                     dataSource={balances}
                     rowKey="id"
                     size="middle"
+                    loading={stockLoading}
                     scroll={{ x: 1800 }}
                     pagination={{
                       pageSize: 15,
@@ -646,7 +675,7 @@ export const InventoryPage: FC = () => {
                 <>
                   <TableToolbar
                     searchValue={searchKeyword}
-                    searchPlaceholder="Tìm theo sản phẩm, SKU, mã chứng từ..."
+                    searchPlaceholder="Tìm theo sản phẩm, SKU, mã chứng từ, người thực hiện..."
                     onSearchChange={(value) => dispatch(setInventorySearch(value))}
                     filters={filters}
                     onExport={handleExportLedger}

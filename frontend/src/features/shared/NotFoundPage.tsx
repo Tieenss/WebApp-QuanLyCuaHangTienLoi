@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Button, Card, Result } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '@/store/hooks';
-import { getLandingPath } from '@/config/modules';
+import { getFirstAccessibleModulePath } from '@/config/modules';
 import { USER_ROLE } from '@/types';
 
 /** Trang 404 cho các URL không khớp module nào. */
@@ -17,7 +17,7 @@ export const NotFoundPage: FC = () => {
         title="Không tìm thấy trang"
         subTitle="Đường dẫn bạn truy cập không tồn tại hoặc đã được thay đổi."
         extra={
-          <Button type="primary" onClick={() => navigate(getLandingPath(role))}>
+          <Button type="primary" onClick={() => navigate(getFirstAccessibleModulePath(role))}>
             Về trang chính
           </Button>
         }

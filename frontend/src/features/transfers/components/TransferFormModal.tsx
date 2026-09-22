@@ -22,10 +22,12 @@ import {
   buildTransfer,
   fetchTransfers,
   type TransferDraftLine,
-  DISTRIBUTION_CENTER_ID,
 } from '@/store/slices/transferSlice';
+import { DISTRIBUTION_CENTER_ID } from '@/config/businessRules';
 import { chiNhanhApi, type ChiNhanhDTO } from '@/api/chiNhanh';
 import { API_BASE_URL } from '@/config/api';
+import { apiFetch } from '@/api/http';
+import { tonKhoApi, type TonKhoDTO } from '@/api/tonKho';
 import { chiTietPhieuXuatApi, phieuXuatKhoApi } from '@/api/phieuXuatKho';
 import { DOCUMENT_STATUS, STOCK_LEVEL, USER_ROLE, type DocumentStatus, type StockLevel } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
@@ -52,9 +54,9 @@ interface TransferFormModalProps {
   /**
    * Trạng thái phiếu khi tạo:
    * - `PENDING`: yêu cầu chờ Thủ kho duyệt (StoreManager dùng).
-   * - `COMPLETED`: Thủ kho/Admin trực tiếp xuất, tồn kho chuyển ngay.
+ * - `COMPLETED`: chỉ Admin được xuất và nhận ngay.
    *
-   * Mặc định `COMPLETED` để giữ hành vi cũ khi gọi không truyền prop.
+ * Mặc định `PENDING` để không tự nhận hàng bằng quyền Thủ kho.
    */
   initialStatus?: DocumentStatus;
 }
@@ -78,7 +80,7 @@ const emptyRow = (): DraftRow => ({
 export const TransferFormModal: FC<TransferFormModalProps> = ({
   open,
   onClose,
-  initialStatus = DOCUMENT_STATUS.Completed,
+  initialStatus = DOCUMENT_STATUS.Pending,
 }) => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
@@ -90,7 +92,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   const products = useAppSelector((state) => state.product.products);
   const transferCount = useAppSelector((state) => state.transfer.transfers.length);
 
-  const activeStores = branches.filter((b) => b.status === 'Active');
+  // const activeStores = branches.filter((b) => b.status === 'Active');
   const sellableProducts = products.filter((p) => p.status === 'Active');
   const branchNameById = (id: string) => branches.find((b) => b.id === id)?.name ?? '';
   const productById = (id: string) => products.find((p) => p.id === id);
@@ -100,6 +102,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   // Load cửa hàng (CUA_HANG_BAN_LE) từ API riêng
   const [cuaHangOptions, setCuaHangOptions] = useState<ChiNhanhDTO[]>([]);
   const [khoTongList, setKhoTongList] = useState<ChiNhanhDTO[]>([]);
+  const [transferStock, setTransferStock] = useState<TonKhoDTO[]>([]);
   useEffect(() => {
     chiNhanhApi.getCuaHang()
       .then((data) => setCuaHangOptions(data))
@@ -109,6 +112,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       .catch(() => setKhoTongList([]));
     // Cũng load tồn kho để filter sản phẩm
     dispatch(fetchStock());
+    tonKhoApi.getAvailableForTransfer()
+      .then((data) => setTransferStock(data))
+      .catch(() => setTransferStock([]));
   }, [dispatch]);
 
   // Auto-select kho tổng đầu tiên khi load xong
@@ -141,8 +147,13 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
 
   const [toBranchId, setToBranchId] = useState<string | null>(defaultToBranchId);
   const [fromBranchId, setFromBranchId] = useState<string>(DISTRIBUTION_CENTER_ID);
-  console.log('[TransferForm] DEBUG fromBranchId:', fromBranchId);
   const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
+
+  useEffect(() => {
+    if (open && user?.role === USER_ROLE.WarehouseKeeper && user.branchId) {
+      setFromBranchId(user.branchId);
+    }
+  }, [open, user?.role, user?.branchId]);
 
   /** Dọn form sau khi modal đóng hẳn (dùng sự kiện, không dùng effect). */
   const handleAfterClose = (): void => {
@@ -155,14 +166,28 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   /** Chỉ hàng có tồn > 0 ở kho xuất đã chọn mới xuất được. */
   const availableProducts = useMemo(
     () =>
-      sellableProducts.filter(
-        (product) => stockOf(balances, fromBranchId, product.id) > 0,
+      sellableProducts.filter((product) =>
+        transferStock.some((stock) =>
+          stock.idSanPham === product.id && (stock.soLuongTon ?? 0) > 0,
+        ),
       ),
-    [balances, fromBranchId],
+    [sellableProducts, transferStock],
   );
 
+  const transferStockOf = (productId: string): number =>
+    transferStock.find((stock) => stock.idSanPham === productId)?.soLuongTon ?? 0;
+
+  const distributionCenterStockOf = (productId: string): number => {
+    const balance = balances.find(
+        (item) =>
+            item.branchId === DISTRIBUTION_CENTER_ID &&
+            item.productId === productId,
+    );
+
+    return balance?.quantity ?? transferStockOf(productId);
+  };
+
   // Debug
-  console.log('[TransferForm] balances:', balances.length, 'fromBranchId:', fromBranchId, 'availableProducts:', availableProducts.length);
 
   const usedProductIds = useMemo(
     () => new Set(rows.map((row) => row.productId).filter((id) => id !== '')),
@@ -193,9 +218,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
     () =>
       validRows.filter(
         (row) =>
-          row.quantity > stockOf(balances, DISTRIBUTION_CENTER_ID, row.productId),
+            row.quantity > distributionCenterStockOf(row.productId)
       ),
-    [validRows, balances],
+      [validRows, balances, transferStock]
   );
 
   const updateRow = (key: string, patch: Partial<DraftRow>): void => {
@@ -238,17 +263,16 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       // 1) Tạo header PENDING + dòng chi tiết xuống DB. Việc trừ/cộng tồn do
       //    backend làm qua /ship và /receive (fun the_kho + ton_kho).
       try {
-        const response = await fetch(`${API_BASE_URL}/api/phieu-xuat-kho`, {
+        const response = await apiFetch(`${API_BASE_URL}/api/phieu-xuat-kho`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(localStorage.getItem('auth_token') ? { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } : {}),
+            ...{},
           },
           body: JSON.stringify({
             maPhieu: '', // trigger DB tự sinh PX-YYYYMMDD-NNN
             idChiNhanhXuat: fromBranchId,
             idChiNhanhNhan: values.toBranchId,
-            idNguoiTao: user?.idNhanVien ?? null,
             ngayYeuCau: values.requestDate.format('YYYY-MM-DD'),
             trangThai: 'PENDING', // luôn tạo PENDING — bước tiếp theo qua API ship/receive
             ghiChu: values.note?.trim() ?? '',
@@ -277,12 +301,10 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         // 2) Thủ kho/Admin lập phiếu trực tiếp: tự chạy luôn bước xuất + nhận
         //    để DB trừ tồn kho xuất, cộng tồn kho nhận, đủ 2 dòng thẻ kho.
         if (initialStatus === DOCUMENT_STATUS.Completed) {
-          const idNhanVien = user?.idNhanVien ?? '';
           await phieuXuatKhoApi.ship(created.id, {
-            idNguoiThucHien: idNhanVien,
             lines: validRows.map((row) => ({ idSanPham: row.productId, soLuong: row.quantity })),
           });
-          await phieuXuatKhoApi.receive(created.id, { idNguoiThucHien: idNhanVien });
+          await phieuXuatKhoApi.receive(created.id, {});
         }
       } catch (e: any) {
         message.error(e?.message || 'Có lỗi khi lưu phiếu xuất');
@@ -343,11 +365,12 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
 
         const balance = balances.find(
           (item) =>
-            item.branchId === DISTRIBUTION_CENTER_ID &&
+            item.branchId === fromBranchId &&
             item.productId === row.productId,
         );
-        if (balance === undefined) return <Text type="secondary">0</Text>;
-
+        if (balance === undefined) {
+          return <Text className="numeric-cell">{transferStockOf(row.productId)}</Text>;
+        }
         const level = resolveStockLevel(
           balance.quantity,
           balance.minStock,
@@ -375,7 +398,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         ),
     },
     {
-      title: 'Số lượng xuất',
+      title: isRequest ? 'Số lượng yêu cầu' : 'Số lượng xuất',
       dataIndex: 'quantity',
       align: 'right',
       width: 130,
@@ -383,14 +406,14 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         const available =
           row.productId === ''
             ? 0
-            : stockOf(balances, DISTRIBUTION_CENTER_ID, row.productId);
+              : distributionCenterStockOf(row.productId);
         return (
           <InputNumber<number>
             className="transfer-line-input"
             min={0}
             // BR-01: chặn xuất vượt tồn ngay tại ô nhập.
             max={available}
-            step={6}
+            step={1}
             value={value}
             disabled={row.productId === ''}
             status={value > available ? 'error' : undefined}
@@ -494,7 +517,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
               onChange={setToBranchId}
               options={availableBranches.map((branch) => ({
                 value: branch.id,
-                label: `${(branch as any).maChiNhanh || branch.code} — ${(branch as any).tenChiNhanh || branch.name}`,
+                label: `${(branch as any).maChiNhanh } — ${(branch as any).tenChiNhanh }`,
               }))}
             />
           </Form.Item>
@@ -508,6 +531,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
               format="DD/MM/YYYY"
               allowClear={false}
               maxDate={dayjs(today())}
+              disabled
             />
           </Form.Item>
         </Space>

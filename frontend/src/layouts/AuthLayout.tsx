@@ -3,7 +3,7 @@ import { Typography } from 'antd';
 import { CheckCircleOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { APP_VERSION } from '@/config/brand';
-import { getLandingPath } from '@/config/modules';
+import { canAccessPath, getFirstAccessibleModulePath } from '@/config/modules';
 import { useAppSelector } from '@/store/hooks';
 import logo from '@/assets/logo.png';
 import './AuthLayout.css';
@@ -40,7 +40,10 @@ export const AuthLayout: FC = () => {
     // `from` do ProtectedRoute gắn vào khi chặn một URL cần quyền: đăng nhập
     // xong thì trả người dùng về đúng chỗ họ định tới.
     const state = location.state as { from?: string } | null;
-    return <Navigate to={state?.from ?? getLandingPath(user.role)} replace />;
+    const destination = state?.from && canAccessPath(user.role, state.from)
+      ? state.from
+      : getFirstAccessibleModulePath(user.role);
+    return <Navigate to={destination} replace />;
   }
 
   return (

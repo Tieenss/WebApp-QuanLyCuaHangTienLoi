@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 
 export interface TonKhoDTO {
   idSanPham: string;
@@ -12,26 +13,9 @@ export interface TonKhoDTO {
   lanBienDongCuoi?: string;
 }
 
-export interface TheKhoDTO {
-  id: string;
-  ngayPhatSinh: string;
-  idSanPham: string;
-  idChiNhanh: string;
-  loaiGiaoDich: string;
-  soLuong: number;
-  donGia?: number;
-  thanhTien?: number;
-  tonTruoc?: number;
-  tonSau?: number;
-  maChungTu?: string;
-  nguoiThucHien?: string;
-  hanSuDung?: string;
-  ghiChu?: string;
-}
 
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 export const tonKhoApi = {
@@ -42,14 +26,25 @@ export const tonKhoApi = {
     if (!response.ok) throw new Error('Failed to fetch');
     return response.json();
   },
-};
 
-export const theKhoApi = {
-  getAll: async (): Promise<TheKhoDTO[]> => {
-    const response = await fetch(`${API_BASE_URL}/api/the-kho`, {
+  /**
+   * Tồn kho một chi nhánh. Backend kiểm tra chi nhánh trong JWT, vì vậy UI
+   * không thể dùng path này để đọc kho của chi nhánh khác.
+   */
+  getByBranch: async (branchId: string): Promise<TonKhoDTO[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/ton-kho/by-branch/${branchId}`, {
       headers: getHeaders(),
     });
-    if (!response.ok) throw new Error('Failed to fetch');
+    if (!response.ok) throw new Error(`Không tải được tồn kho chi nhánh (HTTP ${response.status})`);
+    return response.json();
+  },
+
+  getAvailableForTransfer: async (): Promise<TonKhoDTO[]> => {
+    const response = await fetch(`${API_BASE_URL}/api/ton-kho/available-for-transfer`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch transfer stock');
     return response.json();
   },
 };
+

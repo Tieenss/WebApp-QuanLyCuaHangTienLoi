@@ -7,6 +7,7 @@ import {
   type TransferLine,
 } from '@/types';
 import { phieuXuatKhoApi, type PhieuXuatKhoDTO } from '@/api/phieuXuatKho';
+import { DISTRIBUTION_CENTER_ID } from '@/config/businessRules';
 
 /**
  * Module 9 — Xuất kho nội bộ (dữ liệu ghi được).
@@ -66,7 +67,7 @@ const mapDtoToTransfer = (dto: PhieuXuatKhoDTO): StockTransfer => ({
   toBranchId: dto.idChiNhanhNhan || '',
   toBranchName: '',
   createdById: dto.idNguoiTao || '',
-  createdByName: '',
+  createdByName: dto.tenNguoiTao || '',
   requestDate: dto.ngayYeuCau || '',
   shippedDate: dto.ngayXuatThucTe || null,
   receivedDate: dto.ngayNhanThucTe || null,
@@ -74,8 +75,8 @@ const mapDtoToTransfer = (dto: PhieuXuatKhoDTO): StockTransfer => ({
   note: dto.ghiChu || '',
   lines: [],
   totalValue: 0,
-  requestedBy: '',
-  approvedBy: dto.idNguoiDuyet || null,
+  requestedBy: dto.tenNguoiTao || '',
+  approvedBy: dto.tenNguoiDuyet || null,
 });
 
 export const fetchTransfers = createAsyncThunk('transfer/fetchAll', async () => {
@@ -83,7 +84,6 @@ export const fetchTransfers = createAsyncThunk('transfer/fetchAll', async () => 
   return data.map(mapDtoToTransfer);
 });
 
-export const DISTRIBUTION_CENTER_ID = 'a1b2c3d4-0001-0000-0000-000000000001'; // Kho Tổng Circle K Miền Nam
 export const DISTRIBUTION_CENTER_NAME = 'Kho Tổng';
 
 /**

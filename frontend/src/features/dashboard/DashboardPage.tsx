@@ -38,6 +38,7 @@ import {
 } from './components/DashboardCharts';
 import './DashboardPage.css';
 import { API_BASE_URL } from '@/config/api';
+import { apiFetch } from '@/api/http';
 
 const { Text } = Typography;
 
@@ -153,9 +154,8 @@ export const DashboardPage: FC = () => {
         await Promise.all(
           sorted.map(async (hd) => {
             try {
-              const res = await fetch(
+              const res = await apiFetch(
                 `${API_BASE_URL}/api/chi-tiet-hoa-don/by-hoa-don/${hd.id}`,
-                { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } },
               );
               if (res.ok) lineMap[hd.id] = await res.json();
             } catch {
@@ -249,6 +249,14 @@ export const DashboardPage: FC = () => {
     const revenue = periodInvoices.reduce((s, hd) => s + hd.grandTotal, 0);
     const previousRevenue = previousPeriodInvoices.reduce((s, hd) => s + hd.grandTotal, 0);
     const cogs = [...productStats.values()].reduce((s, v) => s + v.cogs, 0);
+    const previousCogs = previousPeriodInvoices.reduce(
+      (sum, hd) =>
+        sum + (invoiceLines[hd.id] ?? []).reduce(
+          (lineSum, line) => lineSum + line.soLuong * (costByProduct.get(line.idSanPham) ?? 0),
+          0,
+        ),
+      0,
+    );
     const itemsSold = [...productStats.values()].reduce((s, v) => s + v.qty, 0);
     const stockValue = balances.reduce(
       (sum, b) => sum + Number(b.stockValue ?? 0),
@@ -268,12 +276,12 @@ export const DashboardPage: FC = () => {
           ? 0
           : Math.round(previousRevenue / previousPeriodInvoices.length),
       grossProfit: revenue - cogs,
-      previousGrossProfit: 0,
+      previousGrossProfit: previousRevenue - previousCogs,
       itemsSold,
       stockValue,
       lowStockCount,
     };
-  }, [periodInvoices, previousPeriodInvoices, productStats, balances]);
+  }, [periodInvoices, previousPeriodInvoices, productStats, invoiceLines, costByProduct, balances]);
 
   /** Biến động doanh thu theo ngày trong kỳ. */
   const trendData = useMemo<RevenueTrendData[]>(() => {

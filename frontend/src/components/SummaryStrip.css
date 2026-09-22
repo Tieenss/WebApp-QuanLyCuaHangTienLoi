@@ -1,19 +1,37 @@
 .summary-strip {
   display: grid;
-  /* Mặc định 4 cột khi không truyền `columns` prop; nếu có prop, inline
-     style sẽ override lưới theo số cột do component truyền vào. */
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
+.summary-strip--auto { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.summary-strip--columns-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+.summary-strip--columns-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.summary-strip--columns-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.summary-strip--columns-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.summary-strip--columns-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.summary-strip--columns-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
 @media (max-width: 992px) {
-  .summary-strip {
+  .summary-strip,
+  .summary-strip--columns-1,
+  .summary-strip--columns-2,
+  .summary-strip--columns-3,
+  .summary-strip--columns-4,
+  .summary-strip--columns-5,
+  .summary-strip--columns-6 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 576px) {
-  .summary-strip {
+  .summary-strip,
+  .summary-strip--columns-1,
+  .summary-strip--columns-2,
+  .summary-strip--columns-3,
+  .summary-strip--columns-4,
+  .summary-strip--columns-5,
+  .summary-strip--columns-6 {
     grid-template-columns: 1fr;
   }
 }

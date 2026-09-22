@@ -124,3 +124,21 @@ export const matchKeyword = (
     normalizeSearch(field).includes(normalized),
   );
 };
+
+/** So sánh ngày giảm dần, đưa ngày rỗng xuống cuối danh sách. */
+export const compareDateDesc = (
+  a?: string | null,
+  b?: string | null,
+): number => {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return b.localeCompare(a);
+};
+
+/** Sort ngày giảm dần và dùng id làm tie-breaker ổn định. */
+export const compareDateDescWithId = <T extends { id: string }>(
+  a: T,
+  b: T,
+  getDate: (item: T) => string | null | undefined,
+): number => compareDateDesc(getDate(a), getDate(b)) || b.id.localeCompare(a.id);

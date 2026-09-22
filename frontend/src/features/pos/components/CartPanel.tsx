@@ -1,5 +1,7 @@
 import { useMemo, type FC } from 'react';
 import { API_BASE_URL } from '@/config/api';
+import { CATEGORY_ID } from '@/config/businessRules';
+import { apiFetch } from '@/api/http';
 import {
   App as AntdApp,
   Button,
@@ -35,16 +37,17 @@ import {
   setTenderedAmount,
   updateLineQuantity,
 } from '@/store/slices/posSlice';
-import { orderSaved } from '@/store/slices/salesOrderSlice';
 import {
   PAYMENT_IS_CASH,
   PAYMENT_METHOD,
   PAYMENT_METHOD_LABEL,
   SHIFT_CODE,
+  USER_ROLE,
   type PaymentMethod,
   type ShiftCode,
 } from '@/types';
-import { stockOf } from '@/store/slices/stockSlice';
+import { fetchPosAvailability } from '@/store/slices/posSlice';
+import { fetchCashbook } from '@/store/slices/cashbookSlice';
 import { nowIso } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 
@@ -84,7 +87,6 @@ export const CartPanel: FC = () => {
 
   const { user } = useAppSelector((state) => state.auth);
   const posState = useAppSelector((state) => state.pos);
-  const balances = useAppSelector((state) => state.stock.balances);
   const products = useAppSelector((state) => state.product.products);
   const employees = useAppSelector((state) => state.employee.employees);
   const {
@@ -94,6 +96,7 @@ export const CartPanel: FC = () => {
     paymentMethod,
     tenderedAmount,
     memberPhone,
+    availabilityByProductId,
   } = posState;
 
   const productById = (id: string) => products.find((p) => p.id === id);
@@ -113,12 +116,12 @@ export const CartPanel: FC = () => {
   /** Kiểm tra tồn kho tại thời điểm thanh toán (BR-01). */
   const hasOutOfStockLines = useMemo(() => {
     return lines.some((line) => {
-      const currentStock = stockOf(balances, branchId, line.productId);
-      if (currentStock > 0) return false;
+      const currentStock = availabilityByProductId[line.productId] ?? 0;
       const product = productById(line.productId);
-      return product?.categoryId !== 'cat-03';
+      if (product?.categoryId === CATEGORY_ID.MadeToOrder) return false;
+      return currentStock < line.quantity;
     });
-  }, [lines, balances, branchId]);
+  }, [lines, availabilityByProductId, products]);
 
   /**
    * Chốt hoá đơn — một dispatch duy nhất cho cả 4 bước của transaction:
@@ -135,20 +138,22 @@ export const CartPanel: FC = () => {
     }
     if (hasOutOfStockLines) {
       const outOfStockLine = lines.find((line) => {
-        const currentStock = stockOf(balances, branchId, line.productId);
-        if (currentStock > 0) return false;
+        const currentStock = availabilityByProductId[line.productId] ?? 0;
         const product = productById(line.productId);
-        return product?.categoryId !== 'cat-03';
+        if (product?.categoryId === CATEGORY_ID.MadeToOrder) return false;
+        return currentStock < line.quantity;
       });
       message.error(
-        `Sản phẩm "${outOfStockLine?.productName}" đã hết hàng, không thể thanh toán.`,
+        `Sản phẩm "${outOfStockLine?.productName}" không đủ tồn kho, không thể thanh toán.`,
       );
       return;
     }
 
     // Thu ngân đang đăng nhập; nếu là quản lý thì lấy người trực ca tại quầy.
     const fallbackCashier = cashiersOfBranch(branchId)[0];
-    const cashierId = user?.id ?? fallbackCashier?.id ?? 'unknown';
+    // `hoa_don.id_thu_ngan` là khóa tới nhan_vien.id, không phải tai_khoan.id.
+    // Dùng đúng ID này để Lịch sử hóa đơn của thu ngân lọc được đơn vừa bán.
+    const cashierId = user?.idNhanVien ?? fallbackCashier?.id ?? 'unknown';
     const cashierName = user?.fullName ?? fallbackCashier?.fullName ?? 'Thu ngân';
 
     // Giá vốn lấy tại thời điểm bán để báo cáo lợi nhuận không bị lệch về sau.
@@ -167,42 +172,31 @@ const sale = buildSalesOrder({
     });
     if (sale === null) return;
 
-    dispatch(saleCompleted(sale));
-
-    // Persist hoá đơn xuống DB trong 1 transaction (hoa_don + chi_tiet_hoa_don),
-    // rồi thay hoá đơn local bằng bản ghi thật (mã HD do backend sinh) để
-    // "Lịch sử hoá đơn" hiển thị đúng dữ liệu đã lưu.
+    // Không cập nhật Redux trước: checkout backend phải commit cả hóa đơn,
+    // tồn kho, thẻ kho và sổ quỹ trước khi UI thay đổi.
     void (async () => {
       try {
-        const created = await fetch(
-          `${API_BASE_URL}/api/hoa-don/with-lines`,
+        const created = await apiFetch(
+          `${API_BASE_URL}/api/hoa-don/checkout`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+              ...{},
             },
             body: JSON.stringify({
               idChiNhanh: sale.order.branchId,
-              idThuNgan: user?.idNhanVien ?? cashierId,
               caLamViec: sale.order.shiftCode,
-              ngayBan: sale.order.soldAt,
               hinhThucTt: sale.order.paymentMethod,
               sdtThanhVien: sale.order.memberPhone || undefined,
-              subTotal: sale.order.subTotal,
-              giamGia: sale.order.discountTotal,
-              vatTotal: sale.order.vatTotal,
-              grandTotal: sale.order.grandTotal,
+              // Giảm giá là dữ liệu nghiệp vụ nhập tay; giá, VAT, thành tiền
+              // và giá vốn đều do backend tính từ DB.
+              giamGia: posState.orderDiscount,
               tienKhachDua: sale.tendered,
-              tienThoi: sale.order.changeAmount,
               lines: sale.order.lines.map((line) => ({
                 idSanPham: line.productId,
                 soLuong: line.quantity,
-                donGia: line.unitPrice,
                 giamGiaDong: line.lineDiscount,
-                vatPhantram: line.vatPercent,
-                thanhTien: line.lineTotal,
-                donGiaVon: line.unitCost,
               })),
             }),
           },
@@ -210,23 +204,38 @@ const sale = buildSalesOrder({
         if (!created.ok) {
           const err = await created.json().catch(() => null);
           console.warn('Không lưu được hoá đơn xuống DB:', err);
+          message.error(err?.message ?? err?.error ?? 'Thanh toán thất bại. Giỏ hàng chưa thay đổi.');
           return;
         }
         const saved = await created.json();
-        dispatch(
-          orderSaved({
-            localId: sale.order.id,
-            order: {
-              ...sale.order,
-              id: saved.id,
-              code: saved.maHoaDon ?? sale.order.code,
-              branchName: saved.tenChiNhanh ?? '',
-              cashierName: saved.tenThuNgan ?? sale.order.cashierName,
-            },
-          }),
-        );
+        dispatch(saleCompleted({
+          ...sale,
+          order: {
+            ...sale.order,
+            id: saved.id,
+            code: saved.maHoaDon ?? sale.order.code,
+            branchId: saved.idChiNhanh ?? sale.order.branchId,
+            branchName: saved.tenChiNhanh ?? '',
+            cashierId: saved.idThuNgan ?? sale.order.cashierId,
+            cashierName: saved.tenThuNgan ?? sale.order.cashierName,
+            subTotal: Number(saved.subTotal ?? sale.order.subTotal),
+            discountTotal: Number(saved.giamGia ?? sale.order.discountTotal),
+            vatTotal: Number(saved.vatTotal ?? sale.order.vatTotal),
+            grandTotal: Number(saved.grandTotal ?? sale.order.grandTotal),
+            tenderedAmount: Number(saved.tienKhachDua ?? sale.tendered),
+            changeAmount: Number(saved.tienThoi ?? sale.order.changeAmount),
+          },
+          tendered: Number(saved.tienKhachDua ?? sale.tendered),
+        }));
+        // Thu ngân chỉ đọc tồn của quầy đang bán. Làm mới ngay sau checkout
+        // để lưới sản phẩm, giỏ hàng và lần bán kế tiếp cùng dùng số liệu mới.
+        dispatch(fetchPosAvailability(branchId));
+        // Sổ quỹ không thuộc phạm vi đọc của Thu ngân; backend đã tạo phiếu
+        // thu nguyên tử trong checkout. Quản lý vẫn làm mới dữ liệu quản trị.
+        if (user?.role !== USER_ROLE.Cashier) dispatch(fetchCashbook());
       } catch (e) {
         console.warn('Không lưu được hoá đơn xuống DB:', e);
+        message.error('Không thể kết nối máy chủ. Giỏ hàng chưa thay đổi.');
       }
     })();
   };
@@ -266,74 +275,81 @@ const sale = buildSalesOrder({
         />
       ) : (
         <div className="pos-cart-lines">
-          {lines.map((line) => (
-            <div className="pos-cart-line" key={line.productId}>
-              <div className="cart-line-info">
-                <Text strong className="cart-line-name">
-                  {line.productName}
-                </Text>
-                <Text type="secondary" className="cart-line-price">
-                  {formatVND(line.unitPrice)} / {line.unit}
-                  {line.lineDiscount > 0 && ` · giảm ${formatVND(line.lineDiscount)}`}
-                </Text>
+          {lines.map((line) => {
+            const cap = line.availableStock > 0 ? line.availableStock : undefined;
 
-                <Space size={4} className="cart-line-qty">
-                  <Button
-                    size="small"
-                    icon={<MinusOutlined />}
-                    onClick={() =>
-                      dispatch(
-                        updateLineQuantity({
-                          productId: line.productId,
-                          quantity: line.quantity - 1,
-                        }),
-                      )
-                    }
-                  />
-                  <InputNumber
-                    size="small"
-                    min={1}
-                    value={line.quantity}
-                    className="cart-line-qty-input"
-                    onChange={(value) =>
-                      dispatch(
-                        updateLineQuantity({
-                          productId: line.productId,
-                          quantity: value ?? 1,
-                        }),
-                      )
-                    }
-                  />
-                  <Button
-                    size="small"
-                    icon={<PlusOutlined />}
-                    onClick={() =>
-                      dispatch(
-                        updateLineQuantity({
-                          productId: line.productId,
-                          quantity: line.quantity + 1,
-                        }),
-                      )
-                    }
-                  />
-                </Space>
-              </div>
+            return (
+              <div className="pos-cart-line" key={line.productId}>
+                <div className="cart-line-info">
+                  <Text strong className="cart-line-name">
+                    {line.productName}
+                  </Text>
+                  <Text type="secondary" className="cart-line-price">
+                    {formatVND(line.unitPrice)} / {line.unit}
+                    {line.lineDiscount > 0 && ` · giảm ${formatVND(line.lineDiscount)}`}
+                  </Text>
 
-              <div className="cart-line-total">
-                <Text strong className="numeric-cell cart-line-amount">
-                  {formatVND(line.unitPrice * line.quantity - line.lineDiscount)}
-                </Text>
-                <br />
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  onClick={() => dispatch(removeFromCart(line.productId))}
-                />
+                  <Space size={4} className="cart-line-qty">
+                    <Button
+                      size="small"
+                      icon={<MinusOutlined />}
+                      disabled={line.quantity <= 1}
+                      onClick={() =>
+                        dispatch(
+                          updateLineQuantity({
+                            productId: line.productId,
+                            quantity: line.quantity - 1,
+                          }),
+                        )
+                      }
+                    />
+                    <InputNumber
+                      size="small"
+                      min={1}
+                      max={cap}
+                      value={line.quantity}
+                      className="cart-line-qty-input"
+                      onChange={(value) =>
+                        dispatch(
+                          updateLineQuantity({
+                            productId: line.productId,
+                            quantity: value ?? 1,
+                          }),
+                        )
+                      }
+                    />
+                    <Button
+                      size="small"
+                      icon={<PlusOutlined />}
+                      disabled={cap !== undefined && line.quantity >= cap}
+                      onClick={() =>
+                        dispatch(
+                          updateLineQuantity({
+                            productId: line.productId,
+                            quantity: line.quantity + 1,
+                          }),
+                        )
+                      }
+                    />
+                  </Space>
+                </div>
+
+                <div className="cart-line-total">
+                  <Text strong className="numeric-cell cart-line-amount">
+                    {formatVND(line.unitPrice * line.quantity - line.lineDiscount)}
+                  </Text>
+                  <br />
+                  <Button
+                    type="text"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    onClick={() => dispatch(removeFromCart(line.productId))}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

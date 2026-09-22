@@ -33,7 +33,6 @@ import {
   changePassword,
   clearAuthError,
   logout,
-  updateProfile,
 } from '@/store/slices/authSlice';
 import {
   USER_ROLE_DESCRIPTION,
@@ -41,6 +40,10 @@ import {
   type ChangePasswordFormValues,
   type ProfileFormValues,
 } from '@/types';
+import {
+  applyFormErrors,
+  getErrorMessage,
+} from '@/utils/apiError';
 import './AccountPage.css';
 
 const { Text, Paragraph } = Typography;
@@ -90,15 +93,23 @@ export const AccountPage: FC = () => {
 
   if (user === null) return null;
 
-  const handleProfileSubmit = (values: ProfileFormValues): void => {
-    dispatch(updateProfile(values));
-    message.success('Đã cập nhật hồ sơ cá nhân.');
-  };
+  const handlePasswordSubmit = async (
+      values: ChangePasswordFormValues
+  ) => {
+    try {
+      await dispatch(changePassword(values)).unwrap();
 
-  const handlePasswordSubmit = (values: ChangePasswordFormValues): void => {
-    dispatch(changePassword(values));
-    passwordForm.resetFields();
-    message.success('Đã đổi mật khẩu. Lần đăng nhập sau hãy dùng mật khẩu mới.');
+      passwordForm.resetFields();
+
+      message.success('Đổi mật khẩu thành công');
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, 'Đổi mật khẩu thất bại');
+      const handled = applyFormErrors(passwordForm, errorMessage, {
+        currentPassword: ['mật khẩu hiện tại không đúng', 'currentpassword'],
+        newPassword: ['mật khẩu mới', 'newpassword'],
+      });
+      if (!handled) message.error(errorMessage);
+    }
   };
 
   const handleLogout = (): void => {
@@ -201,7 +212,6 @@ export const AccountPage: FC = () => {
                         email: user.email,
                         phone: user.phone,
                       }}
-                      onFinish={handleProfileSubmit}
                     >
                       <Row gutter={16}>
                         <Col xs={24} md={12}>
@@ -216,6 +226,7 @@ export const AccountPage: FC = () => {
                             <Input
                               prefix={<UserOutlined className="account-input-icon" />}
                               placeholder="Nguyễn Văn A"
+                              disabled
                             />
                           </Form.Item>
                         </Col>
@@ -240,6 +251,7 @@ export const AccountPage: FC = () => {
                             <Input
                               prefix={<PhoneOutlined className="account-input-icon" />}
                               placeholder="0900 000 000"
+                              disabled
                             />
                           </Form.Item>
                         </Col>
@@ -256,23 +268,24 @@ export const AccountPage: FC = () => {
                             <Input
                               prefix={<MailOutlined className="account-input-icon" />}
                               placeholder="ten@circlek.vn"
+                              disabled
                             />
                           </Form.Item>
                         </Col>
                       </Row>
 
-                      <Space>
-                        <Button
-                          type="primary"
-                          htmlType="submit"
-                          icon={<SaveOutlined />}
-                        >
-                          Lưu thay đổi
-                        </Button>
-                        <Button onClick={() => profileForm.resetFields()}>
-                          Hoàn tác
-                        </Button>
-                      </Space>
+                      {/*<Space>*/}
+                      {/*  <Button*/}
+                      {/*    type="primary"*/}
+                      {/*    htmlType="submit"*/}
+                      {/*    icon={<SaveOutlined />}*/}
+                      {/*  >*/}
+                      {/*    Lưu thay đổi*/}
+                      {/*  </Button>*/}
+                      {/*  <Button onClick={() => profileForm.resetFields()}>*/}
+                      {/*    Hoàn tác*/}
+                      {/*  </Button>*/}
+                      {/*</Space>*/}
                     </Form>
                   ),
                 },
@@ -302,17 +315,17 @@ export const AccountPage: FC = () => {
                                   required: true,
                                   message: 'Vui lòng nhập mật khẩu hiện tại.',
                                 },
-                                {
-                                  // Xác thực ngay tại field để lỗi hiện đúng
-                                  // chỗ người dùng cần sửa.
-                                  validator: (_rule, value: string) =>
-                                    value === undefined ||
-                                    value === ''
-                                      ? Promise.resolve()
-                                      : Promise.reject(
-                                          new Error('Mật khẩu hiện tại không đúng.'),
-                                        ),
-                                },
+                                // {
+                                //   // Xác thực ngay tại field để lỗi hiện đúng
+                                //   // chỗ người dùng cần sửa.
+                                //   validator: (_rule, value: string) =>
+                                //     value === undefined ||
+                                //     value === ''
+                                //       ? Promise.resolve()
+                                //       : Promise.reject(
+                                //           new Error('Mật khẩu hiện tại không đúng.'),
+                                //         ),
+                                // },
                               ]}
                             >
                               <Input.Password
@@ -339,16 +352,18 @@ export const AccountPage: FC = () => {
                                   min: MIN_PASSWORD_LENGTH,
                                   message: `Mật khẩu tối thiểu ${MIN_PASSWORD_LENGTH} ký tự.`,
                                 },
-                                {
+                                ({ getFieldValue }) => ({
                                   validator: (_rule, value: string) =>
-                                    value === undefined || value !== ''
+                                    value === undefined
+                                    || value === ''
+                                    || value !== getFieldValue('currentPassword')
                                       ? Promise.resolve()
                                       : Promise.reject(
                                           new Error(
                                             'Mật khẩu mới phải khác mật khẩu hiện tại.',
                                           ),
                                         ),
-                                },
+                                }),
                               ]}
                             >
                               <Input.Password

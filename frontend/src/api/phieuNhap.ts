@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 
 export interface PhieuNhapDTO {
   id: string;
@@ -6,7 +7,7 @@ export interface PhieuNhapDTO {
   idChiNhanh?: string;
   idNcc?: string;
   idNguoiNhap?: string;
-  nguoiNhapTen?: string;
+  tenNguoiNhap?: string;
   ngayDatHang?: string;
   ngayDuKienGiao?: string;
   ngayNhanThucTe?: string;
@@ -23,8 +24,7 @@ export interface PhieuNhapDTO {
 }
 
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 /** Dòng hàng trong request /with-lines. */
@@ -41,7 +41,6 @@ export interface PurchaseLineDTO {
 export interface CreatePurchaseWithLinesDTO {
   idChiNhanh?: string | null;
   idNcc: string;
-  idNguoiNhap?: string | null;
   ngayDatHang?: string;
   ngayDuKienGiao?: string;
   ngayNhanThucTe?: string;

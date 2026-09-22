@@ -1,7 +1,7 @@
 import { useEffect, type FC } from 'react';
 import { Alert, Form, Input, InputNumber, Modal, Typography } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { adjustHours, closeHourAdjust } from '@/store/slices/payrollSlice';
+import { adjustPayrollHours, closeHourAdjust } from '@/store/slices/payrollSlice';
 import { formatVND } from '@/utils/formatters';
 import './HourAdjustModal.css';
 
@@ -27,6 +27,8 @@ export const HourAdjustModal: FC = () => {
   const row = useAppSelector((state) =>
     state.payroll.rows.find((item) => item.id === state.payroll.adjustingId),
   );
+  const saving = useAppSelector((state) => state.payroll.savingAdjustment);
+  const error = useAppSelector((state) => state.payroll.error);
 
   // Nạp lại giá trị mỗi lần mở để không dùng lại số của dòng trước.
   useEffect(() => {
@@ -43,13 +45,13 @@ export const HourAdjustModal: FC = () => {
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
-      dispatch(
-        adjustHours({
+      await dispatch(
+        adjustPayrollHours({
           id: row.id,
           hours: values.hours,
           reason: values.reason,
         }),
-      );
+      ).unwrap();
     } catch {
       // antd đã hiển thị lỗi tại từng field.
     }
@@ -63,6 +65,8 @@ export const HourAdjustModal: FC = () => {
       cancelText="Huỷ"
       onOk={handleSubmit}
       onCancel={() => dispatch(closeHourAdjust())}
+      confirmLoading={saving}
+      okButtonProps={{ disabled: saving }}
       destroyOnHidden
       width={520}
     >
@@ -78,6 +82,8 @@ export const HourAdjustModal: FC = () => {
         message={`Giờ hệ thống tổng hợp: ${row.totalHours.toFixed(1)} giờ`}
         description={`Thực nhận hiện tại ${formatVND(row.netPay)}. Sửa số giờ sẽ tính lại lương theo ca và thực nhận.`}
       />
+
+      {error !== null && <Alert type="error" showIcon className="hour-adjust-alert" message={error} />}
 
       <Form<HourAdjustFormValues> form={form} layout="vertical" requiredMark={false}>
         <Form.Item

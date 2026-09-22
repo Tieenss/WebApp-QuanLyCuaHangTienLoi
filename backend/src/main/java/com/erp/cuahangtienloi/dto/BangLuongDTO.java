@@ -10,6 +10,8 @@ public class BangLuongDTO {
     private UUID id;
     private UUID idNhanVien;
     private String tenNhanVien;
+    private String maNhanVien;
+    private String vaiTro;
     private UUID idChiNhanh;
     private String tenChiNhanh;
     private String loaiHopDong;

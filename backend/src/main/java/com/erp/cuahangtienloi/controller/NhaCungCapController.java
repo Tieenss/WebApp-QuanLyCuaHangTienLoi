@@ -1,13 +1,16 @@
 package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.NhaCungCapDTO;
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.NhaCungCap;
 import com.erp.cuahangtienloi.entity.NhaCungCapDanhMuc;
 import com.erp.cuahangtienloi.repository.DanhMucRepository;
 import com.erp.cuahangtienloi.repository.NhaCungCapDanhMucRepository;
 import com.erp.cuahangtienloi.repository.NhaCungCapRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/nha-cung-cap")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class NhaCungCapController {
 
     private final NhaCungCapRepository nhaCungCapRepository;
@@ -28,6 +31,7 @@ public class NhaCungCapController {
     private final DanhMucRepository danhMucRepository;
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<NhaCungCapDTO>> getAll() {
         List<NhaCungCapDTO> list = nhaCungCapRepository.findAll().stream()
                 .map(this::toDTO)
@@ -35,6 +39,7 @@ public class NhaCungCapController {
         return ResponseEntity.ok(list);
     }
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> getById(@PathVariable UUID id) {
         return nhaCungCapRepository.findById(id)
                 .map(ncc -> ResponseEntity.ok(toDTO(ncc)))
@@ -42,6 +47,7 @@ public class NhaCungCapController {
     }
 
     @GetMapping("/active")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<NhaCungCapDTO>> getActive() {
         List<NhaCungCapDTO> list = nhaCungCapRepository.findAll().stream()
                 .filter(ncc -> ncc.getDangHoatDong() != null && ncc.getDangHoatDong())
@@ -53,11 +59,20 @@ public class NhaCungCapController {
 
     @Transactional
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody NhaCungCapDTO request) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> create(@Valid @RequestBody NhaCungCapDTO request) {
+
+        if (request.getTenNcc() == null || request.getTenNcc().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Tên NCC không được để trống"));
+        }
 
         if (nhaCungCapRepository.existsByMaNcc(request.getMaNcc())) {
             return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("Mã NCC đã tồn tại"));
+                    .body( ApiResponse.err("Mã NCC đã tồn tại"));
+        }
+        if (request.getCategoryIds() != null
+                && request.getCategoryIds().stream().anyMatch(categoryId -> !danhMucRepository.existsById(categoryId))) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Danh mục của nhà cung cấp không tồn tại"));
         }
 
         NhaCungCap ncc = new NhaCungCap();
@@ -130,12 +145,27 @@ public class NhaCungCapController {
 
     @Transactional
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> update(
             @PathVariable UUID id,
-            @RequestBody NhaCungCapDTO request
+            @Valid @RequestBody NhaCungCapDTO request
     ) {
         return nhaCungCapRepository.findById(id)
                 .map(ncc -> {
+
+                    if (request.getTenNcc() != null && request.getTenNcc().isBlank()) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Tên NCC không được để trống"));
+                    }
+                    if (request.getMaNcc() != null) {
+                        NhaCungCap duplicate = nhaCungCapRepository.findByMaNcc(request.getMaNcc()).orElse(null);
+                        if (duplicate != null && !duplicate.getId().equals(id)) {
+                            return ResponseEntity.badRequest().body(ApiResponse.err("Mã NCC đã tồn tại"));
+                        }
+                    }
+                    if (request.getCategoryIds() != null
+                            && request.getCategoryIds().stream().anyMatch(categoryId -> !danhMucRepository.existsById(categoryId))) {
+                        return ResponseEntity.badRequest().body(ApiResponse.err("Danh mục của nhà cung cấp không tồn tại"));
+                    }
 
                     if (request.getMaNcc() != null) {
                         ncc.setMaNcc(request.getMaNcc());
@@ -219,10 +249,11 @@ public class NhaCungCapController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> delete(@PathVariable UUID id) {
         if (nhaCungCapRepository.existsById(id)) {
             nhaCungCapRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa NCC thành công"));
+            return ResponseEntity.ok( ApiResponse.ok("Xóa NCC thành công"));
         }
         return ResponseEntity.notFound().build();
     }
@@ -304,6 +335,6 @@ public class NhaCungCapController {
         return dto;
     }
 
-    record ErrorResponse(String message) {}
-    record SuccessResponse(String message) {}
+//    record ErrorResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

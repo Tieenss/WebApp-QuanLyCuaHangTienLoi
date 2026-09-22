@@ -4,20 +4,15 @@ import {
   CASH_CATEGORY,
   CASH_FLOW_DIRECTION,
   DOCUMENT_STATUS,
-  PAYMENT_IS_CASH,
   PAYMENT_METHOD,
   type CashEntry,
   type CashFlowDirection,
   type PayrollRow,
 } from '@/types';
 import { soQuyApi, type SoQuyDTO } from '@/api/soQuy';
-import { payrollPaid } from './payrollSlice';
-import { saleCompleted } from './posSlice';
 import { purchaseReceived } from './purchaseSlice';
 import { orderRefunded } from './salesOrderSlice';
-
-/** Số dư quỹ đầu kỳ toàn hệ thống. */
-export const OPENING_BALANCE = 50_000_000;
+import { compareDateDescWithId } from '@/utils/formatters';
 
 /**
  * Module 12 — Sổ quỹ (dữ liệu ghi được).
@@ -72,7 +67,7 @@ export const fetchCashbook = createAsyncThunk('cashbook/fetchAll', async () => {
   // Backend trả theo thứ tự DB; sắp giảm theo entry_date để mới nhất trước.
   return list
     .map(mapDtoToEntry)
-    .sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+    .sort((a, b) => compareDateDescWithId(a, b, (entry) => entry.entryDate));
 });
 
 /**
@@ -99,11 +94,13 @@ const nextCode = (
  */
 const reindex = (entries: CashEntry[]): CashEntry[] => {
   const ascending = [...entries].sort((a, b) =>
-    a.entryDate.localeCompare(b.entryDate),
+    compareDateDescWithId(b, a, (entry) => entry.entryDate),
   );
 
-  let balance = OPENING_BALANCE;
+  const openingEntry = ascending.find((entry) => entry.code === 'OPENING');
+  let balance = openingEntry?.runningBalance ?? 0;
   for (const entry of ascending) {
+    if (entry.code === 'OPENING') continue;
     balance +=
       entry.direction === CASH_FLOW_DIRECTION.Receipt ? entry.amount : -entry.amount;
     entry.runningBalance = balance;
@@ -224,8 +221,8 @@ export const cashbookSlice = createSlice({
     /**
      * Kế toán duyệt chi lương — một phiếu CHI cho mỗi nhân viên.
      *
-     * Giữ lại làm action độc lập cho trường hợp cần lập phiếu tay; luồng chính
-     * đi qua `payrollPaid` ở `extraReducers` bên dưới.
+     * Chỉ dùng cho trường hợp lập phiếu tay; luồng duyệt lương chính được ghi
+     * nguyên tử ở backend để tránh tạo trùng chứng từ trên trình duyệt.
      */
     addPayrollPayments: (
       state,
@@ -284,42 +281,6 @@ export const cashbookSlice = createSlice({
       .addCase(fetchCashbook.rejected, (state) => {
         state.loading = false;
       });
-
-    /**
-     * Bước 4 của transaction bán hàng: phiếu THU hạng mục BAN_HANG.
-     *
-     * Hình thức thanh toán của phiếu quỹ lấy đúng theo hoá đơn, để cột "Tiền
-     * mặt tại quầy" trên trang Sổ quỹ phản ánh đúng số tiền trong két.
-     */
-    builder.addCase(saleCompleted, (state, action) => {
-      const { order } = action.payload;
-
-      insertEntry(state, {
-        direction: CASH_FLOW_DIRECTION.Receipt,
-        category: CASH_CATEGORY.SalesRevenue,
-        branchId: order.branchId,
-        entryDate: order.soldAt.slice(0, 10),
-        amount: order.grandTotal,
-        paymentMethod: order.paymentMethod,
-        counterparty: PAYMENT_IS_CASH[order.paymentMethod]
-          ? 'Khách lẻ (tiền mặt)'
-          : 'Khách lẻ (không dùng tiền mặt)',
-        referenceCode: order.code,
-        description: `Doanh thu hoá đơn ${order.code} · ${order.lines.length} mặt hàng`,
-        createdBy: order.cashierName,
-      });
-    });
-
-    /**
-     * Kế toán duyệt chi lương → phiếu CHI hạng mục TRA_LUONG cho mỗi nhân viên.
-     * Cùng lúc `payrollSlice` chuyển bảng lương sang `DA_THANH_TOAN`.
-     */
-    builder.addCase(payrollPaid, (state, action) => {
-      const entryDate = action.payload.paidAt.slice(0, 10);
-      for (const row of action.payload.rows) {
-        insertPayrollEntry(state, row, entryDate, action.payload.approvedBy);
-      }
-    });
 
     /**
      * Bước 4 của transaction nhập kho: phiếu CHI hạng mục NHAP_HANG.

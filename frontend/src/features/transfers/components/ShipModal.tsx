@@ -117,7 +117,6 @@ export const ShipModal: FC<ShipModalProps> = ({ open, transfer, onClose }) => {
     setSubmitting(true);
     try {
       await phieuXuatKhoApi.ship(transfer.id, {
-        idNguoiThucHien: user.idNhanVien ?? '',
         lines: rows.map((row) => ({ idSanPham: row.productId, soLuong: row.shipQty })),
       });
       message.success(

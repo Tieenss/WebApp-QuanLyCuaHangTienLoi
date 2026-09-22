@@ -3,7 +3,6 @@ import type { AttendanceRecord, AttendanceStatus, ShiftCode } from '@/types';
 import { chamCongApi, type ChamCongDTO } from '@/api/chamCong';
 import { today } from '@/utils/dateUtils';
 import dayjs from 'dayjs';
-import { API_BASE_URL } from '@/config/api';
 
 export interface AttendanceState {
   records: AttendanceRecord[];
@@ -28,12 +27,12 @@ const initialState: AttendanceState = {
  * - `daThanhToan` → `isPaid`, `ghiChu` → `note`
  * - `diTrePhut` (chỉ có ở backend) chưa hiện trên type cũ — bỏ qua.
  */
-const mapDtoToRecord = (dto: ChamCongDTO, fallback: { employeeCode?: string; branchId?: string } = {}): AttendanceRecord => ({
+const mapDtoToRecord = (dto: ChamCongDTO): AttendanceRecord => ({
   id: dto.id,
   employeeId: dto.idNhanVien,
   employeeName: dto.tenNhanVien ?? '',
-  employeeCode: fallback.employeeCode ?? '',
-  branchId: fallback.branchId ?? '',
+  employeeCode: dto.maNhanVien ?? '',
+  branchId: dto.idChiNhanh ?? '',
   workDate: dto.workDate,
   shift: dto.caLamViec as ShiftCode,
   checkInAt: dto.checkInAt ?? null,
@@ -52,72 +51,33 @@ const mapDtoToRecord = (dto: ChamCongDTO, fallback: { employeeCode?: string; bra
 /**
  * Tải toàn bộ chấm công từ backend.
  */
-export const fetchAttendance = createAsyncThunk('attendance/fetchAll', async () => {
-  const list = await chamCongApi.getAll();
+export const fetchAttendance = createAsyncThunk(
+  'attendance/fetchAll',
+  async ({ from, to }: { from?: string; to?: string } = {}) => {
+  const list = await chamCongApi.getByDateRange(
+    from ?? dayjs().subtract(29, 'day').format('YYYY-MM-DD'),
+    to ?? dayjs().format('YYYY-MM-DD'),
+  );
   return list.map((d) => mapDtoToRecord(d));
-});
+},
+);
 
 /**
  * Sinh lịch ca cho nhân viên từ hôm nay đến N ngày tới (dựa trên ca mặc định).
- * Dùng POST /api/cham-cong (create) để tạo từng ca.
- * Sau khi xong sẽ reload lại danh sách để cập nhật UI.
+ * Dùng endpoint chuyên dụng để backend tự xác định ca mặc định và giới hạn
+ * người thường chỉ được sinh lịch của chính mình.
  */
 export const scheduleAttendance = createAsyncThunk(
   'attendance/schedule',
   async (
     { idNhanVien, days = 7 }: { idNhanVien: string; days?: number },
-    { rejectWithValue, dispatch },
+    { rejectWithValue },
   ) => {
     try {
-      const today = dayjs().format('YYYY-MM-DD');
-      const to = dayjs().add(days, 'day').format('YYYY-MM-DD');
+      const from = dayjs().format('YYYY-MM-DD');
+      const to = dayjs().add(Math.max(0, days - 1), 'day').format('YYYY-MM-DD');
+      const created = await chamCongApi.scheduleRange(idNhanVien, from, to);
 
-      // Lấy ca mặc định của nhân viên từ API
-      const nvList = await fetch(`${API_BASE_URL}/api/nhan-vien/${idNhanVien}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
-      }).then((r) => r.json());
-      const ca = nvList.caMacDinh || 'MORNING';
-
-      // Định nghĩa giờ cho từng ca
-      const SHIFT_HOURS: Record<string, [number, number]> = {
-        MORNING: [6, 14],
-        AFTERNOON: [14, 22],
-        NIGHT: [22, 30],
-      };
-      const [startH, endH] = SHIFT_HOURS[ca] || [6, 14];
-
-      const created: ChamCongDTO[] = [];
-      let cur = dayjs(today);
-      const end = dayjs(to);
-
-      while (cur.isBefore(end) || cur.isSame(end, 'day')) {
-        const dateStr = cur.format('YYYY-MM-DD');
-        const checkIn = cur.hour(startH % 24).minute(0).second(0);
-        const checkOut = endH >= 24
-          ? cur.add(1, 'day').hour(endH % 24).minute(0).second(0)
-          : cur.hour(endH).minute(0).second(0);
-
-        try {
-          const dto = await chamCongApi.create({
-            id: '',
-            idNhanVien,
-            workDate: dateStr,
-            caLamViec: ca,
-            checkInAt: checkIn.toISOString(),
-            checkOutAt: checkOut.toISOString(),
-            overtimeHours: 0,
-            breakHours: 0,
-            trangThai: 'PRESENT',
-            daThanhToan: false,
-          });
-          created.push(dto);
-        } catch {
-          // Bỏ qua nếu đã tồn tại (UNIQUE constraint)
-        }
-        cur = cur.add(1, 'day');
-      }
-
-      void dispatch(fetchAttendance());
       return created;
     } catch (e: any) {
       return rejectWithValue(e?.message || 'Lỗi sinh lịch ca');

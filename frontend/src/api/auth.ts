@@ -1,4 +1,5 @@
 import type { LoginFormValues, LoginResult } from '@/types/authTypes';
+import { normalizeRecordStatus } from '@/types/commonTypes';
 import { API_BASE_URL } from '@/config/api';
 
 export const authApi = {
@@ -30,7 +31,7 @@ export const authApi = {
         branchId: data.user.idChiNhanh,
         allowedBranchIds: [],
         avatarText: (data.user.hoTen || data.user.tenDangNhap)?.charAt(0) || 'U',
-        status: data.user.trangThai || 'ACTIVE',
+        status: normalizeRecordStatus(data.user.trangThai),
       },
       token: data.token,
       expiresAt: data.expiresAt,

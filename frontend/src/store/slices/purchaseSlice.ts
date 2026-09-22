@@ -1,7 +1,7 @@
 import { createAction, createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import {
-  DOCUMENT_STATUS,
+  DOCUMENT_STATUS, type DocumentStatus,
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '@/types';
@@ -21,7 +21,7 @@ import { phieuNhapApi, type PhieuNhapDTO } from '@/api/phieuNhap';
  *   4. Tạo phiếu chi sổ quỹ CHI / NHAP_HANG         → `cashbookSlice`
  *
  * Cùng mô hình "một action, nhiều slice lắng nghe" như `saleCompleted` và
- * `payrollPaid`: Redux Toolkit chạy hết reducer của một dispatch rồi mới thông
+ * Redux Toolkit chạy hết reducer của một dispatch rồi mới thông
  * báo cho UI, nên không có trạng thái trung gian nào lộ ra.
  */
 
@@ -47,17 +47,17 @@ const mapDtoToOrder = (dto: PhieuNhapDTO): PurchaseOrder => ({
   orderDate: dto.ngayDatHang || '',
   expectedDate: dto.ngayDuKienGiao || null,
   receivedDate: dto.ngayNhanThucTe || null,
-  status: (dto.trangThai as any) || 'PENDING',
+  status: (dto.trangThai as DocumentStatus) ?? DOCUMENT_STATUS.Pending,
   subTotal: dto.subTotal || 0,
   vatTotal: dto.vatTotal || 0,
   discount: dto.giamGia || 0,
   grandTotal: dto.grandTotal || 0,
   paidAmount: dto.daThanhToan || 0,
-  debtAmount: dto.congNo || 0,
+  // debtAmount: dto.congNo || 0,
   note: dto.ghiChu || '',
-  createdAt: dto.ngayTao || '',
-  createdBy: '',
-  idNguoiNhap: dto.idNguoiNhap || '',
+  // createdAt: dto.ngayTao || '',
+  createdBy: dto.tenNguoiNhap || '',
+  // idNguoiNhap: dto.idNguoiNhap || '',
   lines: [],
 });
 
@@ -74,6 +74,7 @@ export interface PurchaseDraftLine {
   productId: string;
   quantity: number;
   unitCost: number;
+  vatPercent: number;
 }
 
 /** Action dùng chung cho cả transaction nhập kho. */
@@ -116,7 +117,7 @@ export const buildPurchaseOrder = (input: {
       orderedQuantity: draft.quantity,
       receivedQuantity: draft.quantity,
       unitCost: draft.unitCost,
-      vatPercent: 0,
+      vatPercent: draft.vatPercent,
       lineTotal: draft.quantity * draft.unitCost,
       expiryDate: null,
     });
@@ -185,7 +186,12 @@ export const purchaseSlice = createSlice({
       });
     // Bước 1: lưu phiếu nhập, mới nhất lên đầu.
     builder.addCase(purchaseReceived, (state, action) => {
-      state.orders.unshift(action.payload.order);
+      const idx = state.orders.findIndex((o) => o.id === action.payload.order.id);
+      if (idx >= 0) {
+        state.orders[idx] = action.payload.order;   // cập nhật status → COMPLETED
+      } else {
+        state.orders.unshift(action.payload.order); // phiếu hoàn toàn mới (luồng cũ)
+      }
     });
   },
 });

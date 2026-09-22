@@ -8,16 +8,14 @@ import { saleCompleted } from './posSlice';
  *
  * Vòng đời một hoá đơn:
  *   1. Thu ngân chốt đơn tại POS → `posSlice` gọi `buildSalesOrder()`.
- *   2. `posSlice` dispatch `saleCompleted` (action dùng chung cho cả transaction
- *      bán hàng — xem giải thích ở `posSlice.ts`).
- *   3. Bốn slice cùng lắng nghe action đó và xử lý song song:
- *        - `posSlice`      → lưu `lastCompletedSale`, xoá giỏ
- *        - `stockSlice`    → trừ tồn + ghi thẻ kho `SALE_OUT`
- *        - `cashbookSlice` → tạo phiếu thu `BAN_HANG`
- *        - `salesOrderSlice` (slice này) → push hoá đơn vào lịch sử
+ *   2. POS gọi `/api/hoa-don/checkout`; backend commit nguyên tử hóa đơn,
+ *      chi tiết, thẻ kho, tồn kho và phiếu thu.
+ *   3. Chỉ khi API thành công, POS dispatch `saleCompleted` để:
+ *        - `posSlice`               → lưu `lastCompletedSale`, xoá giỏ
+ *        - `salesOrderSlice` này    → push hoá đơn vào lịch sử cục bộ
+ *      Tồn kho và sổ quỹ được tải lại từ backend, không tự biến động trong Redux.
  *
- *   Redux Toolkit chạy hết reducer của một dispatch rồi mới thông báo cho UI,
- *   nên người dùng không bao giờ thấy trạng thái trung gian.
+ *   Vì vậy thất bại ở backend không tạo “bán ảo” trên giao diện.
  *
  * Vì sao tách khỏi `posSlice`:
  *   `posSlice` chỉ giữ trạng thái runtime của quầy (giỏ hàng, thanh toán,

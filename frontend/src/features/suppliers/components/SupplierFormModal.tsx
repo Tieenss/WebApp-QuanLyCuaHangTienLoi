@@ -15,6 +15,7 @@ import {
   updateSupplierThunk,
 } from '@/store/slices/supplierSlice';
 import type { SupplierFormValues } from '@/types';
+import { COMMON_PATTERNS } from '@/utils/apiError';
 import './SupplierFormModal.css';
 import { fetchCategories } from '@/store/slices/categorySlice';
 
@@ -81,12 +82,13 @@ export const SupplierFormModal: FC = () => {
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
+      const payload = { ...values, phone: values.phone.replace(/\s+/g, '') };
 
       if (isEditing && selectedSupplier) {
-        await dispatch(updateSupplierThunk({ id: selectedSupplier.id, values })).unwrap();
+        await dispatch(updateSupplierThunk({ id: selectedSupplier.id, values: payload })).unwrap();
         message.success('Đã cập nhật thông tin nhà cung cấp.');
       } else {
-        await dispatch(createSupplier(values)).unwrap();
+        await dispatch(createSupplier(payload)).unwrap();
         message.success('Đã thêm nhà cung cấp mới.');
       }
 
@@ -144,9 +146,16 @@ export const SupplierFormModal: FC = () => {
             <Form.Item
               name="phone"
               label="Số điện thoại"
-              rules={[{ required: true, message: 'Vui lòng nhập số điện thoại.' }]}
+              normalize={(value: string | undefined) => value?.replace(/\s+/g, '')}
+              rules={[
+                { required: true, message: 'Vui lòng nhập số điện thoại.' },
+                {
+                  pattern: COMMON_PATTERNS.PHONE,
+                  message: 'Số điện thoại không hợp lệ (bắt đầu bằng 0, gồm 10 hoặc 11 chữ số).',
+                },
+              ]}
             >
-              <Input placeholder="028 3821 9999" />
+              <Input placeholder="09xx xxx xxx" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
@@ -179,14 +188,16 @@ export const SupplierFormModal: FC = () => {
               rules={[{ required: true, message: 'Chọn ít nhất một nhóm hàng.' }]}
             >
               <Select
-                mode="multiple"
-                placeholder="Chọn nhóm hàng"
-                options={allCategories
-                    .filter(c => c.status === 'Active')
-                    .map((c) => ({
-                      value: c.id,
-                      label: `${c.icon ?? ''} ${c.name}`.trim(),
-                    }))}
+                  mode="multiple"
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Chọn nhóm hàng"
+                  options={allCategories
+                      .filter((c) => c.status === 'Active')
+                      .map((c) => ({
+                        value: c.id,
+                        label: `${c.icon ?? ''} ${c.name}`.trim(),
+                      }))}
               />
             </Form.Item>
           </Col>

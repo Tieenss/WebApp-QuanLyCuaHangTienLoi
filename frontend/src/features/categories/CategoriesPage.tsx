@@ -25,7 +25,7 @@ import {
   USER_ROLE,
   type Category,
 } from '@/types';
-import { formatNumber, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { CategoryFormModal } from './components/CategoryFormModal';
 import './CategoriesPage.css';
@@ -84,7 +84,7 @@ export const CategoriesPage: FC = () => {
         const matchStatus =
           statusFilter === null || category.status === statusFilter;
         return matchSearch && matchStatus;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, () => undefined)),
     [categories, search, statusFilter],
   );
 

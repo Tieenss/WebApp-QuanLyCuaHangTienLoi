@@ -30,12 +30,12 @@ interface SummaryStripProps {
  * hiện tại — phù hợp cho tổng công nợ, tổng giá trị tồn, số phiếu chờ duyệt.
  */
 export const SummaryStrip: FC<SummaryStripProps> = ({ items, columns }) => {
-  const style =
-    columns !== undefined && columns > 0
-      ? ({ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } as const)
-      : undefined;
+  const columnClass =
+    columns !== undefined && columns >= 1 && columns <= 6
+      ? `summary-strip--columns-${columns}`
+      : 'summary-strip--auto';
   return (
-    <div className="summary-strip" style={style}>
+    <div className={`summary-strip ${columnClass}`}>
       {items.map((item) => (
         <Card key={item.key} styles={{ body: { padding: '16px 18px' } }}>
           <Statistic

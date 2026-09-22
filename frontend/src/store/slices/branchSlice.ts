@@ -28,17 +28,18 @@ const mapDtoToBranch = (dto: ChiNhanhDTO): Branch => ({
   district: dto.quanHuyen || '',
   province: dto.tinhThanh || '',
   region: (dto.vungMien || 'SOUTH') as Branch['region'],
-  kind: (dto.loaiChiNhanh === 'KHO_TONG' || dto.loai === 'KHO_TONG')
+  kind: dto.loai === 'KHO_TONG'
     ? ('DISTRIBUTION_CENTER' as const)
     : ('STORE' as const),
   phone: dto.soDienThoai || '',
   openingHours: dto.gioMoCua || '',
-  managerName: dto.tenQuanLy || '',
+  managerName: '',
+  managerId: dto.idQuanLy,
   employeeCount: 0,
   areaSqm: dto.dienTichM2 ? Number(dto.dienTichM2) : 0,
   monthlyRevenue: dto.doanhThuThang || 0,
   openedAt: dto.ngayKhaiTruong || today(),
-  status: (dto.dangHoatDong === false || dto.trangThai === 'INACTIVE') ? ('Inactive' as const) : ('Active' as const),
+  status: dto.dangHoatDong === false ? ('Inactive' as const) : ('Active' as const),
 });
 
 export const fetchBranches = createAsyncThunk('branch/fetchAll', async () => {
@@ -70,10 +71,8 @@ export const createBranch = createAsyncThunk(
       soDienThoai: values.phone,
       gioMoCua: values.openingHours,
       dienTichM2: values.areaSqm,
-      loaiChiNhanh: values.kind === 'DISTRIBUTION_CENTER' ? 'KHO_TONG' : 'CUA_HANG_BAN_LE',
+      loai: values.kind === 'DISTRIBUTION_CENTER' ? 'KHO_TONG' : 'CUA_HANG_BAN_LE',
       dangHoatDong: values.status === 'Active',
-      trangThai: values.status === 'Active' ? 'ACTIVE' : 'INACTIVE',
-      tenQuanLy: values.managerName,
     };
     const data = await chiNhanhApi.create(dto);
     return mapDtoToBranch(data);
@@ -92,11 +91,9 @@ export const updateBranchThunk = createAsyncThunk(
       vungMien: values.region,
       soDienThoai: values.phone,
       gioMoCua: values.openingHours,
-      tenQuanLy: values.managerName,
       dienTichM2: values.areaSqm,
-      loaiChiNhanh: values.kind === 'DISTRIBUTION_CENTER' ? 'KHO_TONG' : 'CUA_HANG_BAN_LE',
+      loai: values.kind === 'DISTRIBUTION_CENTER' ? 'KHO_TONG' : 'CUA_HANG_BAN_LE',
       dangHoatDong: values.status === 'Active',
-      trangThai: values.status === 'Active' ? 'ACTIVE' : 'INACTIVE',
     };
     const data = await chiNhanhApi.update(id, dto);
     return mapDtoToBranch(data);
@@ -106,8 +103,24 @@ export const updateBranchThunk = createAsyncThunk(
 export const deleteBranchThunk = createAsyncThunk(
   'branch/delete',
   async (id: string) => {
-    await chiNhanhApi.delete(id);
-    return id;
+    const data = await chiNhanhApi.delete(id);
+    return mapDtoToBranch(data);
+  },
+);
+
+export const assignBranchManager = createAsyncThunk(
+  'branch/assignManager',
+  async ({ branchId, employeeId }: { branchId: string; employeeId: string }) => {
+    const data = await chiNhanhApi.assignQuanLy(branchId, employeeId);
+    return mapDtoToBranch(data);
+  },
+);
+
+export const clearBranchManager = createAsyncThunk(
+  'branch/clearManager',
+  async (branchId: string) => {
+    const data = await chiNhanhApi.clearQuanLy(branchId);
+    return mapDtoToBranch(data);
   },
 );
 
@@ -146,8 +159,17 @@ export const branchSlice = createSlice({
         const index = state.branches.findIndex((b) => b.id === action.payload.id);
         if (index !== -1) state.branches[index] = action.payload;
       })
+      .addCase(assignBranchManager.fulfilled, (state, action) => {
+        const index = state.branches.findIndex((b) => b.id === action.payload.id);
+        if (index !== -1) state.branches[index] = action.payload;
+      })
+      .addCase(clearBranchManager.fulfilled, (state, action) => {
+        const index = state.branches.findIndex((b) => b.id === action.payload.id);
+        if (index !== -1) state.branches[index] = action.payload;
+      })
       .addCase(deleteBranchThunk.fulfilled, (state, action) => {
-        state.branches = state.branches.filter((b) => b.id !== action.payload);
+        const index = state.branches.findIndex((b) => b.id === action.payload.id);
+        if (index !== -1) state.branches[index] = action.payload;
       });
   },
 });

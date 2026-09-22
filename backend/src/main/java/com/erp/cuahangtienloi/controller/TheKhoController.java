@@ -1,10 +1,14 @@
 package com.erp.cuahangtienloi.controller;
 
+import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.TheKhoDTO;
 import com.erp.cuahangtienloi.entity.TheKho;
 import com.erp.cuahangtienloi.repository.*;
+import com.erp.cuahangtienloi.service.BranchAccessService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -14,34 +18,50 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.erp.cuahangtienloi.validation.InputValidator.*;
+
 @RestController
 @RequestMapping("/api/the-kho")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+//@CrossOrigin(origins = "*")
 public class TheKhoController {
 
     private final TheKhoRepository theKhoRepository;
     private final SanPhamRepository sanPhamRepository;
     private final ChiNhanhRepository chiNhanhRepository;
+    private final BranchAccessService branchAccessService;
 
     @GetMapping
-    public ResponseEntity<List<TheKhoDTO>> getAll() {
-        List<TheKhoDTO> list = theKhoRepository.findAll().stream()
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    public ResponseEntity<List<TheKhoDTO>> getAll(HttpServletRequest request) {
+        var employee = branchAccessService.requireAuthenticatedEmployee(request);
+        List<TheKho> source = branchAccessService.isSystemWide(employee)
+                ? theKhoRepository.findAll()
+                : theKhoRepository.findByIdChiNhanhOrderByNgayPhatSinhDesc(
+                        branchAccessService.requiredOwnBranch(employee));
+        List<TheKhoDTO> list = source.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getById(@PathVariable UUID id) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    public ResponseEntity<?> getById(@PathVariable UUID id, HttpServletRequest request) {
         return theKhoRepository.findById(id)
-                .map(tk -> ResponseEntity.ok(toDTO(tk)))
+                .map(tk -> {
+                    branchAccessService.requireReadableBranch(
+                            branchAccessService.requireAuthenticatedEmployee(request), tk.getIdChiNhanh());
+                    return ResponseEntity.ok(toDTO(tk));
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/by-product/{idSanPham}/branch/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TheKhoDTO>> getByProductAndBranch(
-            @PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh) {
+            @PathVariable UUID idSanPham, @PathVariable UUID idChiNhanh, HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<TheKhoDTO> list = theKhoRepository
                 .findByIdSanPhamAndIdChiNhanhOrderByNgayPhatSinhDesc(idSanPham, idChiNhanh).stream()
                 .map(this::toDTO)
@@ -50,17 +70,21 @@ public class TheKhoController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}")
-    public ResponseEntity<List<TheKhoDTO>> getByBranch(@PathVariable UUID idChiNhanh) {
-        List<TheKhoDTO> list = theKhoRepository.findAll().stream()
-                .filter(tk -> idChiNhanh.equals(tk.getIdChiNhanh()))
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
+    public ResponseEntity<List<TheKhoDTO>> getByBranch(@PathVariable UUID idChiNhanh,
+                                                        HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
+        List<TheKhoDTO> list = theKhoRepository.findByIdChiNhanhOrderByNgayPhatSinhDesc(idChiNhanh).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 
     @GetMapping("/by-type/{loaiGiaoDich}/branch/{idChiNhanh}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TheKhoDTO>> getByTypeAndBranch(
-            @PathVariable String loaiGiaoDich, @PathVariable UUID idChiNhanh) {
+            @PathVariable String loaiGiaoDich, @PathVariable UUID idChiNhanh, HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<TheKhoDTO> list = theKhoRepository
                 .findByLoaiGiaoDichAndIdChiNhanhOrderByNgayPhatSinhDesc(loaiGiaoDich, idChiNhanh).stream()
                 .map(this::toDTO)
@@ -69,10 +93,13 @@ public class TheKhoController {
     }
 
     @GetMapping("/by-branch/{idChiNhanh}/from/{from}/to/{to}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<List<TheKhoDTO>> getByBranchAndDateRange(
             @PathVariable UUID idChiNhanh,
             @PathVariable LocalDateTime from,
-            @PathVariable LocalDateTime to) {
+            @PathVariable LocalDateTime to,
+            HttpServletRequest request) {
+        branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<TheKhoDTO> list = theKhoRepository
                 .findByIdChiNhanhAndNgayPhatSinhBetweenOrderByNgayPhatSinhDesc(idChiNhanh, from, to).stream()
                 .map(this::toDTO)
@@ -81,35 +108,10 @@ public class TheKhoController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody TheKho request) {
-        TheKho tk = new TheKho();
-        tk.setId(UUID.randomUUID());
-        tk.setNgayPhatSinh(request.getNgayPhatSinh() != null ? request.getNgayPhatSinh() : LocalDateTime.now());
-        tk.setIdSanPham(request.getIdSanPham());
-        tk.setIdChiNhanh(request.getIdChiNhanh());
-        tk.setLoaiGiaoDich(request.getLoaiGiaoDich());
-        tk.setSoLuong(request.getSoLuong());
-        tk.setDonGia(request.getDonGia());
-        tk.setThanhTien(request.getThanhTien());
-        tk.setTonTruoc(request.getTonTruoc());
-        tk.setTonSau(request.getTonSau());
-        tk.setMaChungTu(request.getMaChungTu());
-        tk.setNguoiThucHien(request.getNguoiThucHien());
-        tk.setHanSuDung(request.getHanSuDung());
-        tk.setGhiChu(request.getGhiChu());
-        tk.setNgayTao(LocalDateTime.now());
-
-        theKhoRepository.save(tk);
-        return ResponseEntity.ok(toDTO(tk));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable UUID id) {
-        if (theKhoRepository.existsById(id)) {
-            theKhoRepository.deleteById(id);
-            return ResponseEntity.ok(new SuccessResponse("Xóa thẻ kho thành công"));
-        }
-        return ResponseEntity.notFound().build();
+        return ResponseEntity.badRequest().body(ApiResponse.err(
+                "Không được tạo trực tiếp thẻ kho. Hãy thực hiện qua giao dịch nhập kho, bán hàng hoặc kiểm kê."));
     }
 
     private TheKhoDTO toDTO(TheKho tk) {
@@ -144,5 +146,5 @@ public class TheKhoController {
         return dto;
     }
 
-    record SuccessResponse(String message) {}
+//    record SuccessResponse(String message) {}
 }

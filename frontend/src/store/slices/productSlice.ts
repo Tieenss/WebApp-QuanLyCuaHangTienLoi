@@ -30,7 +30,7 @@ const mapDtoToProduct = (dto: SanPhamDTO): Product => ({
   unit: (dto.donVi as Product['unit']) || 'PIECE',
   costPrice: dto.giaVon || 0,
   salePrice: dto.giaBan,
-  vatPercent: dto.vatPhantram || 8,
+  vatPercent: dto.vatPhantram ?? 8,
   supplierId: dto.idNhaCungCap || '',
   supplierName: '',
   minStock: dto.tonToiThieu || 0,

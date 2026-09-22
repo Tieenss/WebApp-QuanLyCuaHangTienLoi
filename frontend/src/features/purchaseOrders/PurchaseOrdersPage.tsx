@@ -35,7 +35,7 @@ import {
   type PurchaseOrderLine,
 } from '@/types';
 import { formatDate, today } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { PurchaseFormModal } from './components/PurchaseFormModal';
 import './PurchaseOrdersPage.css';
@@ -59,6 +59,7 @@ export const PurchaseOrdersPage: FC = () => {
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
   const products = useAppSelector((state) => state.product.products);
   const branches = useAppSelector((state) => state.branch.branches);
+  const [paying, setPaying] = useState<string | null>(null); // orderId đang thanh toán
 
   // Enrich orders: thêm tên NCC + tên kho
   const enrichedOrders = useMemo(
@@ -72,7 +73,6 @@ export const PurchaseOrdersPage: FC = () => {
   );
 
   // Debug tạm thời
-  // console.log('[PurchaseOrders] orders:', orders.length, 'enriched:', enrichedOrders.length, 'branches:', branches.length, 'suppliers:', suppliers.length);
 
   // Cache chi tiết phiếu nhập theo orderId
   const [detailsCache, setDetailsCache] = useState<Record<string, ChiTietPhieuNhapDTO[]>>({});
@@ -108,9 +108,11 @@ export const PurchaseOrdersPage: FC = () => {
     dispatch(fetchPurchaseOrders());
   }, [dispatch]);
 
-  /** Admin và Thủ kho được lập phiếu nhập (ma trận phân quyền). */
-  const canCreate =
-    user?.role === USER_ROLE.Admin || user?.role === USER_ROLE.WarehouseKeeper;
+  /** Thủ kho chỉ lập phiếu NCC tại Kho Tổng được gán cho chính mình. */
+  const assignedBranch = branches.find((branch) => branch.id === user?.branchId);
+  const canCreate = user?.role === USER_ROLE.Admin
+    || (user?.role === USER_ROLE.WarehouseKeeper
+      && assignedBranch?.kind === 'DISTRIBUTION_CENTER');
   const [isFormOpen, setFormOpen] = useState(false);
 
   /** Chỉ Kế toán (và Admin) được bấm "Thanh toán" trả NCC. */
@@ -130,6 +132,7 @@ export const PurchaseOrdersPage: FC = () => {
    */
   const handlePay = async (order: PurchaseOrder): Promise<void> => {
     if (user === null) return;
+    setPaying(order.id);
     try {
       const updated = await phieuNhapApi.pay(order.id);
       const details = detailsCache[order.id] ?? [];
@@ -166,6 +169,8 @@ export const PurchaseOrdersPage: FC = () => {
       dispatch(fetchStock());
     } catch (e) {
       message.error((e as Error).message || 'Lỗi thanh toán phiếu nhập');
+    } finally {
+      setPaying(null);
     }
   };
 
@@ -185,7 +190,7 @@ export const PurchaseOrdersPage: FC = () => {
         const matchSupplier =
           supplierFilter === null || order.supplierId === supplierFilter;
         return matchSearch && matchStatus && matchSupplier;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.orderDate)),
     [enrichedOrders, search, statusFilter, supplierFilter],
   );
 
@@ -312,6 +317,7 @@ export const PurchaseOrdersPage: FC = () => {
       dataIndex: 'orderDate',
       width: 125,
       sorter: (a, b) => a.orderDate.localeCompare(b.orderDate),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
@@ -346,12 +352,12 @@ export const PurchaseOrdersPage: FC = () => {
     },
     {
       title: 'Người nhập',
-      dataIndex: 'idNguoiNhap',
-      width: 200,
-      render: () => (
-        <Text className="po-text-12-5">
-          {user?.fullName || '—'}
-        </Text>
+      dataIndex: 'createdBy',
+      width: 160,
+      render: (value: string) => (
+          <Text className="inv-text-12-5">
+            {value || '—'}
+          </Text>
       ),
     },
     {
@@ -385,7 +391,12 @@ export const PurchaseOrdersPage: FC = () => {
                   cancelText="Đóng"
                   onConfirm={() => void handlePay(row)}
                 >
-                  <Button type="primary" size="small">
+                  <Button
+                      type="primary"
+                      size="small"
+                      loading={paying === row.id}
+                      disabled={paying !== null}
+                  >
                     Thanh toán
                   </Button>
                 </Popconfirm>
@@ -577,7 +588,7 @@ export const PurchaseOrdersPage: FC = () => {
       <Card styles={{ body: { padding: '18px 18px 8px' } }}>
         <TableToolbar
           searchValue={search}
-          searchPlaceholder="Tìm theo mã phiếu, nhà cung cấp..."
+          searchPlaceholder="Tìm theo mã phiếu, nhà cung cấp, người tạo..."
           onSearchChange={setSearch}
           filters={filters}
           onExport={handleExport}

@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 
 export interface PhieuKiemKeDTO {
   id?: string;
@@ -12,11 +13,14 @@ export interface PhieuKiemKeDTO {
   ghiChu?: string;
   ngayTao?: string;
   ngayCapNhat?: string;
+  tenNguoiTao?: string;
+  tenNguoiDuyet?: string;
 }
 
 export interface ChiTietKiemKeDTO {
   id?: string;
-  idPhieuKiemKe: string;
+  /** Backend assigns this when creating lines under /with-lines. */
+  idPhieuKiemKe?: string;
   idSanPham: string;
   tonHeThong: number;
   tonThucTe: number;
@@ -26,9 +30,15 @@ export interface ChiTietKiemKeDTO {
   giaTriLech: number;
 }
 
+/** Dữ liệu người dùng nhập khi lập phiếu; các giá trị chênh lệch do backend tự tính. */
+export interface CreateStocktakeLineRequest {
+  idSanPham: string;
+  tonThucTe: number;
+  lyDoLech?: string;
+}
+
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 export const phieuKiemKeApi = {
@@ -66,7 +76,7 @@ export const phieuKiemKeApi = {
     idChiNhanh: string;
     ngayKiemKe: string;
     ghiChu?: string;
-    lines: ChiTietKiemKeDTO[];
+    lines: CreateStocktakeLineRequest[];
   }): Promise<PhieuKiemKeDTO> => {
     const response = await fetch(`${API_BASE_URL}/api/phieu-kiem-ke/with-lines`, {
       method: 'POST',
@@ -79,7 +89,7 @@ export const phieuKiemKeApi = {
     }
     return response.json();
   },
-  /** Cập nhật phiếu (duyệt / cân bằng / huỷ) — persist xuống backend. */
+  /** Chỉ cập nhật metadata phiếu; không được dùng để đổi trạng thái kho. */
   update: async (id: string, data: Partial<PhieuKiemKeDTO>): Promise<PhieuKiemKeDTO> => {
     const response = await fetch(`${API_BASE_URL}/api/phieu-kiem-ke/${id}`, {
       method: 'PUT',
@@ -89,6 +99,40 @@ export const phieuKiemKeApi = {
     if (!response.ok) {
       const err = await response.json();
       throw new Error(err.message || 'Failed to update');
+    }
+    return response.json();
+  },
+  /** Cân bằng tồn kho, ghi thẻ kho ADJUSTMENT và đổi trạng thái trong một transaction. */
+  submit: async (id: string): Promise<PhieuKiemKeDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-kiem-ke/${id}/submit`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => null);
+      throw new Error(err?.message || 'Không thể gửi duyệt phiếu kiểm kê');
+    }
+    return response.json();
+  },
+  balance: async (id: string): Promise<PhieuKiemKeDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-kiem-ke/${id}/balance`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => null);
+      throw new Error(err?.message || 'Không thể cân bằng phiếu kiểm kê');
+    }
+    return response.json();
+  },
+  cancel: async (id: string): Promise<PhieuKiemKeDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-kiem-ke/${id}/cancel`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => null);
+      throw new Error(err?.message || 'Không thể hủy phiếu kiểm kê');
     }
     return response.json();
   },

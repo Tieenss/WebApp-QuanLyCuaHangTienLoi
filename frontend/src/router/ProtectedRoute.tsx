@@ -2,7 +2,7 @@ import type { FC, ReactElement } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Result, Button } from 'antd';
 import { useAppSelector } from '@/store/hooks';
-import { canAccessPath, getLandingPath } from '@/config/modules';
+import { canAccessPath, getFirstAccessibleModulePath } from '@/config/modules';
 
 interface ProtectedRouteProps {
   children: ReactElement;
@@ -29,7 +29,7 @@ export const ProtectedRoute: FC<ProtectedRouteProps> = ({ children }) => {
         title="Không có quyền truy cập"
         subTitle={`Vai trò của bạn không được phép mở chức năng này. Vui lòng liên hệ Admin chuỗi nếu cần cấp thêm quyền.`}
         extra={
-          <Button type="primary" href={getLandingPath(user.role)}>
+          <Button type="primary" href={getFirstAccessibleModulePath(user.role)}>
             Về trang chính
           </Button>
         }

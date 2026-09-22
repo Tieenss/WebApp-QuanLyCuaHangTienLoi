@@ -12,4 +12,5 @@ public interface NhanVienRepository extends JpaRepository<NhanVien, UUID> {
     Optional<NhanVien> findByMaNhanVien(String maNhanVien);
     boolean existsByEmail(String email);
     boolean existsByMaNhanVien(String maNhanVien);
+    boolean existsByIdChiNhanh(UUID idChiNhanh);
 }

@@ -1,41 +1,6 @@
-import type { LoginFormValues, LoginResult } from '@/types/authTypes';
 import { API_BASE_URL } from '@/config/api';
-
-export const authApi = {
-  login: async (values: LoginFormValues): Promise<LoginResult> => {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: values.username,
-        password: values.password,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Đăng nhập thất bại');
-    }
-
-    const data = await response.json();
-    return {
-      user: {
-        id: data.user.id,
-        employeeCode: data.user.tenDangNhap || data.user.tenDangNhap,
-        fullName: data.user.hoTen || data.user.tenDangNhap,
-        email: data.user.email || '',
-        phone: data.user.soDienThoai || '',
-        role: data.user.vaiTro || 'THU_NGAN',
-        branchId: data.user.idChiNhanh,
-        allowedBranchIds: [],
-        avatarText: (data.user.hoTen || data.user.tenDangNhap)?.charAt(0) || 'U',
-        status: data.user.trangThai || 'ACTIVE',
-      },
-      token: data.token,
-      expiresAt: data.expiresAt,
-    };
-  },
-};
+import { parseApiError } from '@/utils/apiError';
+import { getAuthHeaders } from './http';
 
 export interface TaiKhoanDTO {
   id: string;
@@ -46,14 +11,15 @@ export interface TaiKhoanDTO {
   idNhanVien?: string;
   idChiNhanh?: string;
   trangThai: string;
+  ngayTao?: string;
 }
 
 export interface CreateTaiKhoanRequest {
   tenDangNhap: string;
   matKhau: string;
   idNhanVien?: string;
-  vaiTro?: string;
-  idChiNhanh?: string;
+  // vaiTro?: string;
+  // idChiNhanh?: string;
 }
 
 export interface UpdateTaiKhoanRequest {
@@ -64,65 +30,78 @@ export interface UpdateTaiKhoanRequest {
 
 export const taiKhoanApi = {
   getAll: async (): Promise<TaiKhoanDTO[]> => {
-    const token = localStorage.getItem('auth_token');
     const response = await fetch(`${API_BASE_URL}/api/tai-khoan`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch');
     return response.json();
   },
 
   getById: async (id: string): Promise<TaiKhoanDTO> => {
-    const token = localStorage.getItem('auth_token');
     const response = await fetch(`${API_BASE_URL}/api/tai-khoan/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch');
     return response.json();
   },
 
   create: async (data: CreateTaiKhoanRequest): Promise<void> => {
-    const token = localStorage.getItem('auth_token');
     const response = await fetch(`${API_BASE_URL}/api/tai-khoan`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...getAuthHeaders(),
       },
       body: JSON.stringify(data),
     });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create');
-    }
+    if (!response.ok) throw await parseApiError(response, 'Không thể tạo tài khoản');
   },
 
   update: async (id: string, data: UpdateTaiKhoanRequest): Promise<void> => {
-    const token = localStorage.getItem('auth_token');
     const response = await fetch(`${API_BASE_URL}/api/tai-khoan/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...getAuthHeaders(),
       },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error('Failed to update');
+    if (!response.ok) throw await parseApiError(response, 'Không thể cập nhật tài khoản');
   },
 
   delete: async (id: string): Promise<void> => {
-    const token = localStorage.getItem('auth_token');
     const response = await fetch(`${API_BASE_URL}/api/tai-khoan/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAuthHeaders(),
     });
-    if (!response.ok) throw new Error('Failed to delete');
+    if (!response.ok) throw await parseApiError(response, 'Không thể xóa tài khoản');
+  },
+
+  changePassword: async (
+      id: string,
+      data: {
+        currentPassword: string;
+        newPassword: string;
+      }
+  ): Promise<void> => {
+    const response = await fetch(
+        `${API_BASE_URL}/api/tai-khoan/${id}/change-password`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify(data),
+        }
+    );
+
+    if (!response.ok) throw await parseApiError(response, 'Đổi mật khẩu thất bại');
   },
 
   getNhanVienChuaCoTaiKhoan: async (): Promise<any[]> => {
-    const token = localStorage.getItem('auth_token');
     const response = await fetch(`${API_BASE_URL}/api/tai-khoan/nhan-vien`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch');
     return response.json();

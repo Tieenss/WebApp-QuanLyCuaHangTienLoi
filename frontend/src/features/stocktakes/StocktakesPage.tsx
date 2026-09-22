@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FC, type ReactElement } from 'react';
-import { Button, Card, Descriptions, Modal, Space, Statistic, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Descriptions, Modal, Space, Statistic, Table, Tag, Typography, message } from 'antd';
 const { Paragraph } = Typography;
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined } from '@ant-design/icons';
@@ -11,15 +11,17 @@ import { BRAND } from '@/config/brand';
 import { phieuKiemKeApi, chiTietKiemKeApi } from '@/api/phieuKiemKe';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { fetchProducts } from '@/store/slices/productSlice';
+import { fetchStock } from '@/store/slices/stockSlice';
 import {
   DOCUMENT_STATUS,
   DOCUMENT_STATUS_LABEL,
+  USER_ROLE,
   type DocumentStatus,
   type Stocktake,
   type StocktakeLine,
 } from '@/types';
 import { formatDate } from '@/utils/dateUtils';
-import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
+import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { StocktakeFormModal } from './components/StocktakeFormModal';
 import './StocktakesPage.css';
@@ -35,6 +37,7 @@ const { Text } = Typography;
 export const StocktakesPage: FC = () => {
   const branches = useAppSelector((state) => state.branch.branches);
   const products = useAppSelector((state) => state.product.products);
+  const user = useAppSelector((state) => state.auth.user);
   const productById = (id: string) => products.find((p) => p.id === id);
   const dispatch = useAppDispatch();
   const [search, setSearch] = useState('');
@@ -45,15 +48,27 @@ export const StocktakesPage: FC = () => {
   const [stocktakes, setStocktakes] = useState<Stocktake[]>([]);
   const [loading, setLoading] = useState(false);
   const [details, setDetails] = useState<Record<string, StocktakeLine[]>>({});
+  const [detailErrors, setDetailErrors] = useState<Record<string, string>>({});
+  const [balancing, setBalancing] = useState(false);
+  const isBranchScoped = user?.role !== USER_ROLE.Admin && user?.role !== USER_ROLE.Accountant;
+  const canCreate = user?.role === USER_ROLE.Admin
+    || user?.role === USER_ROLE.WarehouseKeeper
+    || user?.role === USER_ROLE.StoreManager;
+
+  useEffect(() => {
+    if (isBranchScoped && user?.branchId) {
+      setBranchFilter(user.branchId);
+    }
+  }, [isBranchScoped, user?.branchId]);
 
   /** Map trạng thái DB sang enum frontend. */
   const mapTrangThai = (db: string | undefined): DocumentStatus => {
     switch (db) {
-      case 'DA_DUYET': return DOCUMENT_STATUS.Approved;
+      case 'CHO_DUYET': return DOCUMENT_STATUS.Pending;
       case 'DA_CAN_BANG': return DOCUMENT_STATUS.Balanced;
       case 'CANCELLED': return DOCUMENT_STATUS.Cancelled;
       case 'DANG_KIEM_KE':
-      default: return DOCUMENT_STATUS.Pending;
+      default: return DOCUMENT_STATUS.Draft;
     }
   };
 
@@ -68,19 +83,19 @@ export const StocktakesPage: FC = () => {
         branchId: d.idChiNhanh || '',
         branchName: branches.find((b) => b.id === d.idChiNhanh)?.name || '',
         countDate: d.ngayKiemKe || '',
+        createdById: d.idNguoiTao,
         status: mapTrangThai(d.trangThai),
         lines: [],
         totalItemsCounted: 0,
         totalVarianceItems: 0,
         totalVarianceValue: 0,
-        countedBy: '',
-        approvedBy: d.idNguoiDuyet || null,
+        countedBy: d.tenNguoiTao || '',
+        approvedBy: d.tenNguoiDuyet || null,
         note: d.ghiChu || '',
       }));
-      setStocktakes(mapped);
-
       // Load chi tiết cho tất cả phiếu (1 lần, tránh lazy-load khi expand)
       const allDetails: Record<string, StocktakeLine[]> = {};
+      const allDetailErrors: Record<string, string> = {};
       await Promise.all(
         mapped.map(async (st) => {
           try {
@@ -101,12 +116,14 @@ export const StocktakesPage: FC = () => {
                 reason: d.lyDoLech ?? '',
               };
             });
-          } catch {
+          } catch (error) {
             allDetails[st.id] = [];
+            allDetailErrors[st.id] = (error as Error).message || 'Không thể tải chi tiết phiếu.';
           }
         }),
       );
       setDetails(allDetails);
+      setDetailErrors(allDetailErrors);
 
       // Tính các thống kê trên bảng chính từ details đã load.
       setStocktakes(
@@ -165,7 +182,7 @@ export const StocktakesPage: FC = () => {
           branchFilter === null || stocktake.branchId === branchFilter;
         const matchStatus = statusFilter === null || stocktake.status === statusFilter;
         return matchSearch && matchBranch && matchStatus;
-      }),
+      }).sort((a, b) => compareDateDescWithId(a, b, (row) => row.countDate)),
     [stocktakes, search, branchFilter, statusFilter],
   );
 
@@ -213,7 +230,7 @@ export const StocktakesPage: FC = () => {
       },
       {
         key: 'pending',
-        title: 'Chờ duyệt cân bằng',
+        title: 'Phiếu chưa cân bằng',
         value: formatNumber(pending.length),
         suffix: 'phiếu',
       },
@@ -221,7 +238,7 @@ export const StocktakesPage: FC = () => {
   }, [stocktakes, details]);
 
   const filters: ToolbarFilter[] = [
-    {
+    ...(isBranchScoped ? [] : [{
       key: 'branch',
       placeholder: 'Chi nhánh',
       value: branchFilter,
@@ -231,13 +248,18 @@ export const StocktakesPage: FC = () => {
         label: branch.name,
       })),
       span: 6,
-    },
+    }]),
     {
       key: 'status',
       placeholder: 'Trạng thái',
       value: statusFilter,
       onChange: setStatusFilter,
-      options: Object.values(DOCUMENT_STATUS).map((status) => ({
+      options: [
+        DOCUMENT_STATUS.Draft,
+        DOCUMENT_STATUS.Pending,
+        DOCUMENT_STATUS.Balanced,
+        DOCUMENT_STATUS.Cancelled,
+      ].map((status) => ({
         value: status,
         label: DOCUMENT_STATUS_LABEL[status],
       })),
@@ -267,6 +289,7 @@ export const StocktakesPage: FC = () => {
       dataIndex: 'countDate',
       width: 125,
       sorter: (a, b) => a.countDate.localeCompare(b.countDate),
+      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
     },
     {
@@ -341,28 +364,28 @@ export const StocktakesPage: FC = () => {
       title: 'Thao tác',
       key: 'actions',
       align: 'center',
-      width: 160,
+      width: 220,
       fixed: 'right',
       render: (_: unknown, stocktake: Stocktake) =>
-        canApprove(stocktake) ? (
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => handleApprove(stocktake)}
-          >
-            Duyệt
-          </Button>
-        ) : canBalance(stocktake) ? (
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => handleBalance(stocktake)}
-          >
-            Cân bằng kho
-          </Button>
-        ) : (
-          <Text type="secondary">—</Text>
-        ),
+        (canSubmit(stocktake) || canBalance(stocktake) || canCancel(stocktake)) ? (
+          <Space size={4}>
+            {canSubmit(stocktake) && (
+              <Button type="primary" size="small" onClick={() => void submitStocktake(stocktake)}>
+                Gửi duyệt
+              </Button>
+            )}
+            {canBalance(stocktake) && (
+              <Button type="primary" size="small" onClick={() => handleBalance(stocktake)}>
+                Cân bằng kho
+              </Button>
+            )}
+            {canCancel(stocktake) && (
+              <Button danger size="small" onClick={() => cancelStocktake(stocktake)}>
+                Hủy
+              </Button>
+            )}
+          </Space>
+        ) : <Text type="secondary">—</Text>,
     },
   ];
 
@@ -431,6 +454,7 @@ export const StocktakesPage: FC = () => {
     ];
 
     const currentLines = details[stocktake.id] ?? [];
+    const detailError = detailErrors[stocktake.id];
 
     const totalItems = currentLines.length;
     const varianceItems = currentLines.filter((l) => l.varianceQuantity !== 0).length;
@@ -445,6 +469,14 @@ export const StocktakesPage: FC = () => {
 
     return (
       <Space direction="vertical" size={14} className="stk-detail-full">
+        {detailError && (
+          <Alert
+            type="error"
+            showIcon
+            message="Không thể tải chi tiết phiếu kiểm kê"
+            description="Dữ liệu dòng kiểm kê chưa sẵn sàng. Hãy tải lại trang trước khi thực hiện các thao tác tiếp theo."
+          />
+        )}
         <Space size={32} wrap>
           <Statistic
             title="Số dòng đã đếm"
@@ -509,27 +541,27 @@ export const StocktakesPage: FC = () => {
     );
   };
 
-  const canBalance = (stocktake: Stocktake): boolean => {
-    return stocktake.status === DOCUMENT_STATUS.Approved;
-  };
+  const canSubmit = (stocktake: Stocktake): boolean =>
+    stocktake.status === DOCUMENT_STATUS.Draft
+    && (user?.role === USER_ROLE.Admin || stocktake.createdById === user?.idNhanVien);
 
-  const canApprove = (stocktake: Stocktake): boolean => {
-    return stocktake.status === DOCUMENT_STATUS.Pending;
-  };
+  const canBalance = (stocktake: Stocktake): boolean =>
+    stocktake.status === DOCUMENT_STATUS.Pending
+    && detailErrors[stocktake.id] === undefined
+    && (user?.role === USER_ROLE.Admin
+      || (user?.role === USER_ROLE.Accountant && stocktake.createdById !== user?.idNhanVien));
 
-  const handleApprove = async (stocktake: Stocktake): Promise<void> => {
+  const canCancel = (stocktake: Stocktake): boolean =>
+    (stocktake.status === DOCUMENT_STATUS.Draft || stocktake.status === DOCUMENT_STATUS.Pending)
+    && (user?.role === USER_ROLE.Admin || stocktake.createdById === user?.idNhanVien);
+
+  const submitStocktake = async (stocktake: Stocktake): Promise<void> => {
     try {
-      await phieuKiemKeApi.update(stocktake.id, { trangThai: 'DA_DUYET' });
-      setStocktakes((prev) =>
-        prev.map((s) =>
-          s.id === stocktake.id
-            ? { ...s, status: DOCUMENT_STATUS.Approved, approvedBy: 'Quản lý cửa hàng' }
-            : s,
-        ),
-      );
-      message.success(`Đã duyệt phiếu ${stocktake.code}`);
+      await phieuKiemKeApi.submit(stocktake.id);
+      await loadStocktakes();
+      message.success(`Đã gửi duyệt phiếu ${stocktake.code}`);
     } catch (e: any) {
-      message.error('Lỗi duyệt phiếu: ' + (e?.message || e));
+      message.error('Lỗi gửi duyệt: ' + (e?.message || e));
     }
   };
 
@@ -537,25 +569,39 @@ export const StocktakesPage: FC = () => {
     setBalanceModal(stocktake);
   };
 
+  const cancelStocktake = (stocktake: Stocktake): void => {
+    Modal.confirm({
+      title: 'Hủy phiếu kiểm kê?',
+      content: `Phiếu ${stocktake.code} sẽ không thể tiếp tục gửi duyệt hoặc cân bằng.`,
+      okText: 'Xác nhận hủy',
+      cancelText: 'Đóng',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await phieuKiemKeApi.cancel(stocktake.id);
+          await loadStocktakes();
+          message.success(`Đã hủy phiếu ${stocktake.code}`);
+        } catch (e: any) {
+          message.error('Lỗi hủy phiếu: ' + (e?.message || e));
+          throw e;
+        }
+      },
+    });
+  };
+
   const confirmBalance = async (): Promise<void> => {
     if (!balanceModal) return;
+    setBalancing(true);
     try {
-      const today = new Date().toISOString().slice(0, 10);
-      await phieuKiemKeApi.update(balanceModal.id, {
-        trangThai: 'DA_CAN_BANG',
-        ngayCanBang: today,
-      });
-      setStocktakes((prev) =>
-        prev.map((s) =>
-          s.id === balanceModal.id
-            ? { ...s, status: DOCUMENT_STATUS.Balanced }
-            : s,
-        ),
-      );
+      await phieuKiemKeApi.balance(balanceModal.id);
+      await loadStocktakes();
+      dispatch(fetchStock());
       message.success(`Đã cân bằng kho cho phiếu ${balanceModal.code}`);
       setBalanceModal(null);
     } catch (e: any) {
       message.error('Lỗi cân bằng: ' + (e?.message || e));
+    } finally {
+      setBalancing(false);
     }
   };
 
@@ -576,13 +622,15 @@ export const StocktakesPage: FC = () => {
         description="Đối chiếu tồn thực tế với sổ sách, xác định nguyên nhân lệch và cân bằng lại số liệu kho."
         extra={
           <Space>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setCreateModal(true)}
-            >
-              Tạo phiếu kiểm kê
-            </Button>
+            {canCreate && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setCreateModal(true)}
+              >
+                Tạo phiếu kiểm kê
+              </Button>
+            )}
             <Tag color="red" className="tag-no-margin">
               {filtered.length} / {stocktakes.length} phiếu
             </Tag>
@@ -626,7 +674,9 @@ export const StocktakesPage: FC = () => {
         title="Xác nhận cân bằng kho"
         open={!!balanceModal}
         onOk={confirmBalance}
-        onCancel={() => setBalanceModal(null)}
+        onCancel={() => !balancing && setBalanceModal(null)}
+        confirmLoading={balancing}
+        maskClosable={!balancing}
         okText="Xác nhận cân bằng"
         cancelText="Huỷ"
       >

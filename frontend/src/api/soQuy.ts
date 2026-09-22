@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 
 /**
  * DTO khớp với backend `SoQuyDTO` (controller trả entity + resolve tên).
@@ -56,8 +57,7 @@ const normalize = (raw: any): SoQuyDTO => {
 };
 
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 export const soQuyApi = {

@@ -4,8 +4,6 @@ import {
   addCapitalInjection,
   addManualEntry,
 } from './slices/cashbookSlice';
-import { saleCompleted } from './slices/posSlice';
-import { payrollPaid } from './slices/payrollSlice';
 import { purchaseReceived } from './slices/purchaseSlice';
 import { orderRefunded } from './slices/salesOrderSlice';
 import { soQuyApi, type SoQuyDTO } from '@/api/soQuy';
@@ -69,45 +67,6 @@ cashbookPersistence.startListening({
       dienGiai: action.payload.description,
       maChungTuLienQuan: action.payload.referenceCode ?? undefined,
     });
-  },
-});
-
-cashbookPersistence.startListening({
-  type: saleCompleted.type,
-  effect: async (action: any, api) => {
-    const state = api.getState() as RootState;
-    const { order } = action.payload;
-    void postEntry({
-      ...buildBase(state),
-      direction: 'RECEIPT',
-      hangMuc: 'BAN_HANG',
-      soTien: order.grandTotal,
-      entryDate: order.soldAt.slice(0, 10),
-      hinhThucTt: order.paymentMethod,
-      doiTuong: 'Khách lẻ',
-      dienGiai: `Doanh thu hoá đơn ${order.code}`,
-      maChungTuLienQuan: order.code,
-    });
-  },
-});
-
-cashbookPersistence.startListening({
-  type: payrollPaid.type,
-  effect: async (action: any, api) => {
-    const state = api.getState() as RootState;
-    for (const row of action.payload.rows) {
-      void postEntry({
-        ...buildBase(state),
-        direction: 'PAYMENT',
-        hangMuc: 'TRA_LUONG',
-        soTien: row.netPay,
-        entryDate: action.payload.paidAt.slice(0, 10),
-        hinhThucTt: 'BANK_TRANSFER',
-        doiTuong: `${row.employeeName} (${row.employeeCode})`,
-        dienGiai: `Chi lương kỳ ${row.period} cho ${row.employeeName}`,
-        maChungTuLienQuan: `BL-${row.period.replace('-', '')}-${row.employeeCode}`,
-      });
-    }
   },
 });
 

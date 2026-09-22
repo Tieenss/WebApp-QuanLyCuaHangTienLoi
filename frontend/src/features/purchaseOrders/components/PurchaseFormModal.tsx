@@ -23,15 +23,13 @@ import { phieuNhapApi } from '@/api/phieuNhap';
 import { fetchBranches  } from '@/store/slices/branchSlice';
 import { fetchProducts } from '@/store/slices/productSlice';
 import { fetchSuppliers } from '@/store/slices/supplierSlice';
-import { PRODUCT_UNIT_LABEL } from '@/types';
+import { PRODUCT_UNIT_LABEL, USER_ROLE } from '@/types';
 import { BRANCH_KIND } from '@/types/branchTypes';
+import { DISTRIBUTION_CENTER_ID } from '@/config/businessRules';
 import { dayjs, today } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
 import type { Dayjs } from 'dayjs';
 import './PurchaseFormModal.css';
-
-// const DISTRIBUTION_CENTER_ID = 'br-dc-001';
-const DISTRIBUTION_CENTER_ID = 'a1b2c3d4-0001-0000-0000-000000000001';
 
 const { Text, Paragraph } = Typography;
 
@@ -56,6 +54,7 @@ const emptyRow = (): DraftRow => ({
   productId: '',
   quantity: 0,
   unitCost: 0,
+  vatPercent: 8,
 });
 
 /**
@@ -123,11 +122,22 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       () => branches.filter((b) => b.kind === BRANCH_KIND.DistributionCenter),
       [branches],
   );
+  const isWarehouseKeeper = user?.role === USER_ROLE.WarehouseKeeper;
+  const ownDistributionCenter = useMemo(
+    () => khoTongBranches.find((branch) => branch.id === user?.branchId) ?? null,
+    [khoTongBranches, user?.branchId],
+  );
+  const selectableDistributionCenters = isWarehouseKeeper
+    ? (ownDistributionCenter ? [ownDistributionCenter] : [])
+    : khoTongBranches;
   useEffect(() => {
-    if (open && branchId === null && khoTongBranches.length > 0) {
+    if (!open) return;
+    if (isWarehouseKeeper) {
+      setBranchId(ownDistributionCenter?.id ?? null);
+    } else if (branchId === null && khoTongBranches.length > 0) {
       setBranchId(khoTongBranches[0].id);
     }
-  }, [open, branchId, khoTongBranches]);
+  }, [open, branchId, khoTongBranches, isWarehouseKeeper, ownDistributionCenter?.id]);
 
   /** Sản phẩm NCC đang chọn cung ứng: được gán trực tiếp. */
   const supplierProducts = useMemo(() => {
@@ -158,9 +168,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       0,
     );
     const vatTotal = validRows.reduce((sum, row) => {
-      const product = sellableProducts.find((item) => item.id === row.productId);
-      const vatPercent = product?.vatPercent ?? 0;
-      return sum + (row.quantity * row.unitCost * vatPercent) / 100;
+      return sum + (row.quantity * row.unitCost * row.vatPercent) / 100;
     }, 0);
 
     return {
@@ -186,8 +194,22 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
     try {
       const values = await form.validateFields();
 
+      if (branchId === null) {
+        message.error('Chưa xác định được Kho Tổng nhận hàng.');
+        return;
+      }
+      if (isWarehouseKeeper && branchId !== ownDistributionCenter?.id) {
+        message.error('Thủ kho chỉ được lập phiếu nhập cho Kho Tổng được phân công.');
+        return;
+      }
+
       if (validRows.length === 0) {
         message.error('Phiếu nhập phải có ít nhất một dòng hàng hợp lệ.');
+        return;
+      }
+
+      if (validRows.some((row) => row.unitCost <= 0)) {
+        message.error('Đơn giá nhập phải lớn hơn 0.');
         return;
       }
 
@@ -197,18 +219,16 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       const createdOrder = await phieuNhapApi.createWithLines({
         idChiNhanh: branchId,
         idNcc: values.supplierId,
-        idNguoiNhap: user?.idNhanVien ?? null,
         ngayDatHang: values.orderDate.format('YYYY-MM-DD'),
         trangThai: 'PENDING_PAYMENT',
         ghiChu: values.note?.trim() ?? '',
         lines: validRows.map((row) => {
-          const product = sellableProducts.find((item) => item.id === row.productId);
           return {
             idSanPham: row.productId,
             soLuong: row.quantity,
             soLuongNhan: row.quantity,
             donGiaNhap: row.unitCost,
-            vatPhantram: product?.vatPercent ?? 8,
+            vatPhantram: row.vatPercent,
           };
         }),
       });
@@ -244,6 +264,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
             updateRow(row.key, {
               productId,
               unitCost: product?.costPrice ?? 0,
+              vatPercent: product?.vatPercent ?? 8,
             });
           }}
           options={supplierProducts.map((product) => ({
@@ -278,7 +299,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         <InputNumber<number>
           className="purchase-line-input"
           min={0}
-          step={12}
+          step={1}
           value={value}
           disabled={row.productId === ''}
           onChange={(quantity) => updateRow(row.key, { quantity: quantity ?? 0 })}
@@ -290,16 +311,15 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       dataIndex: 'unitCost',
       align: 'right',
       width: 150,
-      render: (value: number, row) => (
+      render: (value: number) => (
         <InputNumber<number>
           className="purchase-line-input"
-          min={0}
+          min={1}
           step={1_000}
           value={value}
-          disabled={row.productId === ''}
+          disabled
           formatter={(input) => `${input ?? 0}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
           parser={(input) => Number((input ?? '0').replace(/\./g, ''))}
-          onChange={(unitCost) => updateRow(row.key, { unitCost: unitCost ?? 0 })}
         />
       ),
     },
@@ -361,6 +381,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       afterClose={handleAfterClose}
       destroyOnHidden
       width={1000}
+      okButtonProps={{ disabled: branchId === null }}
     >
       <Alert
         type="info"
@@ -403,11 +424,12 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
                 placeholder="Chọn Kho Tổng"
                 value={branchId}
                 onChange={setBranchId}
+                disabled={isWarehouseKeeper}
                 loading={branchLoading}
                 showSearch
                 optionFilterProp="label"
                 notFoundContent="Không có Kho Tổng nào"
-                options={khoTongBranches.map((b) => ({
+                options={selectableDistributionCenters.map((b) => ({
                   value: b.id,
                   label: `${b.code} - ${b.name}`,
                 }))}
@@ -424,6 +446,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
               allowClear={false}
               // Không ghi nhận hàng nhập ở tương lai.
               maxDate={dayjs(today())}
+              disabled
             />
           </Form.Item>
         </Space>

@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '@/config/api';
+import { getAuthHeaders } from './http';
 
 export interface PhieuXuatKhoDTO {
   id: string;
@@ -15,6 +16,9 @@ export interface PhieuXuatKhoDTO {
   ghiChu?: string;
   ngayTao?: string;
   ngayCapNhat?: string;
+  tenNguoiTao?: string;
+  tenNguoiDuyet?: string;
+  tenNguoiNhan?: string;
 }
 
 export interface ChiTietPhieuXuatDTO {
@@ -31,8 +35,7 @@ export interface ChiTietPhieuXuatDTO {
 }
 
 const getHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return getAuthHeaders();
 };
 
 export const phieuXuatKhoApi = {
@@ -65,7 +68,7 @@ export const phieuXuatKhoApi = {
   /** Thủ kho xác nhận xuất: PENDING → SHIPPED, trừ tồn kho xuất + thẻ kho. */
   ship: async (
     id: string,
-    body: { idNguoiThucHien: string; lines: { idSanPham: string; soLuong: number }[] },
+    body: { lines: { idSanPham: string; soLuong: number }[] },
   ): Promise<PhieuXuatKhoDTO> => {
     const response = await fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${id}/ship`, {
       method: 'PUT',
@@ -81,7 +84,7 @@ export const phieuXuatKhoApi = {
   /** Chi nhánh xác nhận đã nhận: SHIPPED → COMPLETED, cộng tồn chi nhánh. */
   receive: async (
     id: string,
-    body: { idNguoiThucHien: string; lines?: { idSanPham: string; soLuong: number }[] },
+    body: { lines?: { idSanPham: string; soLuong: number }[] },
   ): Promise<PhieuXuatKhoDTO> => {
     const response = await fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${id}/receive`, {
       method: 'PUT',
