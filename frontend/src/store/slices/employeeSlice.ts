@@ -37,6 +37,8 @@ const mapDtoToEmployee = (dto: NhanVienDTO): Employee => ({
   avatarText: dto.hoTen?.charAt(0) || 'U',
   joinedAt: dto.ngayVaoLam || today(),
   status: dto.trangThai === 'INACTIVE' ? ('Inactive' as const) : ('Active' as const),
+  createdAt: dto.ngayTao,
+  updatedAt: dto.ngayCapNhat || dto.ngayTao || undefined,
 });
 
 export const fetchEmployees = createAsyncThunk('employee/fetchAll', async () => {

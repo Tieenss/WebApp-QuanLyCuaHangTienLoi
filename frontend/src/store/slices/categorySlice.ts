@@ -26,6 +26,8 @@ const mapDtoToCategory = (dto: DanhMucDTO): Category => ({
   displayOrder: dto.thuTuHienThi || 999,
   productCount: dto.productCount || 0,
   status: dto.dangHoatDong === false ? ('Inactive' as const) : ('Active' as const),
+  createdAt: dto.ngayTao,
+  updatedAt: dto.ngayCapNhat || dto.ngayTao || undefined,
 });
 
 export const fetchCategories = createAsyncThunk('category/fetchAll', async () => {

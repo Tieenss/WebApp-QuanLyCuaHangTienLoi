@@ -40,6 +40,7 @@ import {
   type Category,
 } from '@/types';
 import { formatNumber, matchKeyword } from '@/utils/formatters';
+import { formatDateShort } from '@/utils/dateUtils';
 import { exportToExcel } from '@/utils/exportUtils';
 import { CategoryFormModal } from './components/CategoryFormModal';
 import './CategoriesPage.css';
@@ -231,9 +232,18 @@ export const CategoriesPage: FC = () => {
 
   const columns: ColumnsType<Category> = [
     {
+      title: 'Mã',
+      dataIndex: 'code',
+      width: 110,
+      fixed: 'left',
+      sorter: (a, b) => (a.code ?? '').localeCompare(b.code ?? ''),
+      render: (code: string) => <span className="mono-code">{code}</span>,
+    },
+    {
       title: 'Danh mục',
       dataIndex: 'name',
-      width: 280,
+      width: 250,
+      fixed: 'left',
       render: (name: string, row) => {
         // Map từ iconEmoji/colorHex (từ DB) - fallback về icon/color (mock cũ)
         const icon = (row as any).iconEmoji || row.icon || '📦';
@@ -255,9 +265,6 @@ export const CategoriesPage: FC = () => {
             <span className="category-cell-info">
               <Text strong className="product-name">
                 {name}
-              </Text>
-              <Text type="secondary" className="product-sub">
-                {row.code}
               </Text>
             </span>
           </Space>
@@ -298,6 +305,16 @@ export const CategoriesPage: FC = () => {
       width: 80,
       render: (order: number) => (
         <Text strong className="numeric-cell">{order}</Text>
+      ),
+    },
+    {
+      title: 'Ngày cập nhật',
+      dataIndex: 'updatedAt',
+      width: 120,
+      align: 'center',
+      sorter: (a, b) => (a.updatedAt ?? a.createdAt ?? '').localeCompare(b.updatedAt ?? b.createdAt ?? ''),
+      render: (_: unknown, row: Category) => (
+        <Text type="secondary">{formatDateShort(row.updatedAt || row.createdAt)}</Text>
       ),
     },
     {

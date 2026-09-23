@@ -22,6 +22,8 @@ export interface ChiNhanhDTO {
   dangHoatDong?: boolean;
   nguoiTao?: string;
   nguoiCapNhat?: string;
+  ngayTao?: string;
+  ngayCapNhat?: string;
 }
 
 const getHeaders = (): HeadersInit => {

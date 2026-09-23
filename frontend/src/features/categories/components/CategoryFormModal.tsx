@@ -18,6 +18,11 @@ import {
   type CategoryFormValues,
 } from '@/types';
 import { CHART_COLORS } from '@/config/brand';
+import {
+  applyFormErrors,
+  getErrorMessage,
+  isFormValidationError,
+} from '@/utils/apiError';
 import './CategoryFormModal.css';
 
 interface CategoryFormModalProps {
@@ -81,8 +86,15 @@ export const CategoryFormModal: FC<CategoryFormModalProps> = ({
         message.success('Đã thêm danh mục mới.');
       }
       onClose();
-    } catch (error: any) {
-      message.error(error?.message || 'Có lỗi xảy ra');
+    } catch (error: unknown) {
+      if (isFormValidationError(error)) return;
+      const errorMessage = getErrorMessage(error, 'Không thể lưu danh mục');
+      const handled = applyFormErrors(form, errorMessage, {
+        name: ['tên danh mục', 'tên'],
+        description: ['mô tả'],
+        status: ['trạng thái'],
+      });
+      if (!handled) message.error(errorMessage);
     }
   };
 
@@ -97,7 +109,7 @@ export const CategoryFormModal: FC<CategoryFormModalProps> = ({
       onCancel={onClose}
       destroyOnHidden
     >
-      <Form<CategoryFormValues> form={form} layout="vertical" className="category-form">
+      <Form<CategoryFormValues> form={form} layout="vertical" className="category-form" validateTrigger={['onSubmit']}>
         <Form.Item
           name="name"
           label="Tên danh mục"

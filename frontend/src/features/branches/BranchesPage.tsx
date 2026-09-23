@@ -39,7 +39,7 @@ import {
   REGION_LABEL,
   type Branch,
 } from '@/types';
-import { formatDate } from '@/utils/dateUtils';
+import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { BranchFormModal } from './components/BranchFormModal';
@@ -191,6 +191,7 @@ export const BranchesPage: FC = () => {
       dataIndex: 'code',
       width: 100,
       fixed: 'left',
+      sorter: (a, b) => (a.code ?? '').localeCompare(b.code ?? ''),
       render: (code: string) => <span className="mono-code">{code}</span>,
     },
     {
@@ -289,8 +290,17 @@ export const BranchesPage: FC = () => {
       dataIndex: 'openedAt',
       width: 110,
       sorter: (a, b) => (b.openedAt ?? '').localeCompare(a.openedAt ?? ''),
-      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
+    },
+    {
+      title: 'Ngày cập nhật',
+      dataIndex: 'updatedAt',
+      width: 120,
+      align: 'center',
+      sorter: (a, b) => (a.updatedAt ?? a.openedAt ?? '').localeCompare(b.updatedAt ?? b.openedAt ?? ''),
+      render: (_: unknown, row: Branch) => (
+        <Text type="secondary">{formatDateShort(row.updatedAt || row.openedAt)}</Text>
+      ),
     },
     {
       title: 'Trạng thái',
