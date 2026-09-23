@@ -178,33 +178,22 @@ CREATE INDEX IF NOT EXISTS idx_tai_khoan_last_login
 -- reset password khi user login lần đầu.
 -- Idempotent: ON CONFLICT DO NOTHING — nếu chạy lần 2 không lỗi.
 -- =============================================================================
+-- Dữ liệu mẫu (9 tài khoản ứng với 9 nhân viên demo)
+-- =============================================================================
 INSERT INTO tai_khoan (
     id_nhan_vien, ten_dang_nhap, mat_khau_hash, hash_algorithm,
-    trang_thai, last_login_at
-)
-SELECT
-    id,
-    ten_dang_nhap,
-    mat_khau,
-    'BCRYPT_12',  -- default algorithm
-    -- Mapping trạng thái: NV ACTIVE → TK ACTIVE; NV INACTIVE → TK DISABLED
-    CASE WHEN dang_hoat_dong = TRUE THEN 'ACTIVE' ELSE 'DISABLED' END,
-    -- Random last_login_at trong 7 ngày qua (cho dữ liệu mẫu)
-    NOW() - (random() * INTERVAL '7 days')
-FROM nhan_vien
-WHERE ten_dang_nhap IS NOT NULL  -- bỏ qua NV không có tài khoản (nếu có)
+    trang_thai, last_login_at, ly_do_khoa
+) VALUES
+    ('b2c3d4e5-0001-0000-0000-000000000001', 'admin', '$2a$10$DEMO_BCRYPT_HASH_admin_change_in_prod', 'BCRYPT_12', 'ACTIVE', NULL, NULL),
+    ('b2c3d4e5-0001-0000-0000-000000000002', 'ketoan', '$2a$10$DEMO_BCRYPT_HASH_ketoan_change_in_prod', 'BCRYPT_12', 'ACTIVE', NULL, NULL),
+    ('b2c3d4e5-0001-0000-0000-000000000003', 'thukho', '$2a$10$DEMO_BCRYPT_HASH_thukho_change_in_prod', 'BCRYPT_12', 'ACTIVE', NULL, NULL),
+    ('b2c3d4e5-0001-0000-0000-000000000004', 'quanly_bv', '$2a$10$DEMO_BCRYPT_HASH_quanly_bv_change_in_prod', 'BCRYPT_12', 'ACTIVE', NULL, NULL),
+    ('b2c3d4e5-0001-0000-0000-000000000005', 'quanly_ntmk', '$2a$10$DEMO_BCRYPT_HASH_quanly_ntmk_change_in_prod', 'BCRYPT_12', 'ACTIVE', NULL, NULL),
+    ('b2c3d4e5-0001-0000-0000-000000000006', 'thungan1_bv', '$2a$10$DEMO_BCRYPT_HASH_thungan1_bv_change_in_prod', 'BCRYPT_12', 'ACTIVE', NULL, NULL),
+    ('b2c3d4e5-0001-0000-0000-000000000007', 'thungan2_bv', '$2a$10$DEMO_BCRYPT_HASH_thungan2_bv_change_in_prod', 'BCRYPT_12', 'ACTIVE', NULL, NULL),
+    ('b2c3d4e5-0001-0000-0000-000000000008', 'thungan1_ntmk', '$2a$10$DEMO_BCRYPT_HASH_thungan1_ntmk_change_in_prod', 'BCRYPT_12', 'ACTIVE', NULL, NULL),
+    ('b2c3d4e5-0001-0000-0000-000000000009', 'nghi_viec_test', '$2a$10$DEMO_BCRYPT_HASH_nghiviec_change_in_prod', 'BCRYPT_12', 'DISABLED', NULL, 'Nhân viên đã nghỉ việc từ 2026-01-01')
 ON CONFLICT (id_nhan_vien) DO NOTHING;
-
--- =============================================================================
--- BƯỚC 3: Xoá 2 cột auth khỏi nhan_vien
--- Lưu ý: cần CASCADE nếu có VIEW/constraint phụ thuộc vào cột này.
--- =============================================================================
-ALTER TABLE nhan_vien DROP CONSTRAINT IF EXISTS nhan_vien_ten_dang_nhap_key;
-ALTER TABLE nhan_vien DROP CONSTRAINT IF EXISTS nhan_vien_mat_khau_check;
-
-ALTER TABLE nhan_vien
-    DROP COLUMN IF EXISTS ten_dang_nhap,
-    DROP COLUMN IF EXISTS mat_khau;
 
 -- =============================================================================
 -- Cập nhật comment cho nhan_vien (loại bỏ phần liên quan đến auth)
@@ -223,7 +212,7 @@ SET trang_thai = 'LOCKED',
     locked_until = NOW() + INTERVAL '15 minutes',
     failed_login_count = 5,
     ly_do_khoa = 'Nhập sai mật khẩu 5 lần liên tiếp'
-WHERE ten_dang_nhap = 'thungan_bv_2';
+WHERE ten_dang_nhap = 'thungan2_bv';
 
 -- Đánh dấu 1 tài khoản DISABLED (NV đã nghỉ việc)
 UPDATE tai_khoan

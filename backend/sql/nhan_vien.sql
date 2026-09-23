@@ -28,12 +28,6 @@ CREATE TABLE IF NOT EXISTS nhan_vien (
     -- nhanh và tránh trùng khi sinh tự động ở backend.
     ma_nhan_vien    VARCHAR(20)  NOT NULL UNIQUE,
 
-    ten_dang_nhap   VARCHAR(100) NOT NULL UNIQUE,
-
-    -- Lưu dạng HASH (BCrypt/Argon2id), TUYỆT ĐỐI không lưu plain text.
-    -- VARCHAR(255) là đủ cho BCrypt 60-char + future hash algorithm dài hơn.
-    mat_khau        VARCHAR(255) NOT NULL,
-
     ho_ten          VARCHAR(255) NOT NULL,
     so_dien_thoai   VARCHAR(20),
     email           VARCHAR(255) UNIQUE,
@@ -115,20 +109,18 @@ CREATE INDEX IF NOT EXISTS idx_nhan_vien_ca_mac_dinh
 -- để khởi tạo DB dev, sau khi login thật phải đổi mật khẩu ngay.
 -- =============================================================================
 INSERT INTO nhan_vien
-    (id, id_chi_nhanh, ma_nhan_vien, ten_dang_nhap, mat_khau, ho_ten,
+    (id, id_chi_nhanh, ma_nhan_vien, ho_ten,
      so_dien_thoai, email, vai_tro, vi_tri, loai_hop_dong, ca_mac_dinh,
      luong_theo_gio, luong_cung, so_tai_khoan, ten_ngan_hang, ngay_vao_lam,
      dang_hoat_dong)
 VALUES
     -- Quản trị + Kế toán (trụ sở, NULL chi nhánh)
     ('b2c3d4e5-0001-0000-0000-000000000001', NULL, 'NV-0001',
-     'admin', '$2a$10$DEMO_BCRYPT_HASH_admin_change_in_prod',
      'Nguyễn Minh Tuấn', '0901000001', 'admin@circlek.vn',
      'ADMIN', 'Giám đốc vận hành', 'FULL_TIME', 'MORNING',
      0, 45000000, '0123456789', 'Vietcombank', '2018-01-15', TRUE),
 
     ('b2c3d4e5-0001-0000-0000-000000000002', NULL, 'NV-0002',
-     'ketoan', '$2a$10$DEMO_BCRYPT_HASH_ketoan_change_in_prod',
      'Phạm Thị Hồng', '0901000002', 'ketoan@circlek.vn',
      'KE_TOAN', 'Kế toán trưởng', 'FULL_TIME', 'MORNING',
      0, 32000000, '0123456790', 'ACB', '2019-03-20', TRUE),
@@ -136,7 +128,6 @@ VALUES
     -- Thủ kho (Kho Tổng)
     ('b2c3d4e5-0001-0000-0000-000000000003',
      'a1b2c3d4-0001-0000-0000-000000000001', 'NV-0003',
-     'thukho', '$2a$10$DEMO_BCRYPT_HASH_thukho_change_in_prod',
      'Phạm Quốc Hưng', '0901000003', 'thukho@circlek.vn',
      'THU_KHO', 'Trưởng phòng kho', 'FULL_TIME', 'MORNING',
      0, 28000000, '0123456791', 'Techcombank', '2019-03-15', TRUE),
@@ -144,44 +135,38 @@ VALUES
     -- Quản lý chi nhánh
     ('b2c3d4e5-0001-0000-0000-000000000004',
      'a1b2c3d4-0001-0000-0000-000000000101', 'NV-0004',
-     'quanly_bv', '$2a$10$DEMO_BCRYPT_HASH_quanly_bv_change_in_prod',
      'Trần Văn Anh', '0901000004', 'quanly.bvien@circlek.vn',
      'QUAN_LY', 'Quản lý cửa hàng', 'FULL_TIME', 'MORNING',
      0, 22000000, '0123456792', 'MB Bank', '2020-06-01', TRUE),
 
     ('b2c3d4e5-0001-0000-0000-000000000005',
      'a1b2c3d4-0001-0000-0000-000000000102', 'NV-0005',
-     'quanly_tqt', '$2a$10$DEMO_BCRYPT_HASH_quanly_tqt_change_in_prod',
-     'Nguyễn Thị Kim Ngân', '0901000005', 'quanly.tqt@circlek.vn',
+     'Bùi Xuân Thành', '0901000005', 'quanly.ntminhkhai@circlek.vn',
      'QUAN_LY', 'Quản lý cửa hàng', 'FULL_TIME', 'AFTERNOON',
      0, 21000000, '0123456793', 'MB Bank', '2020-11-20', TRUE),
 
     -- Thu ngân (3 ca khác nhau)
     ('b2c3d4e5-0001-0000-0000-000000000006',
      'a1b2c3d4-0001-0000-0000-000000000101', 'NV-0006',
-     'thungan_bv_1', '$2a$10$DEMO_BCRYPT_HASH_thungan1_change_in_prod',
-     'Lê Thị Mai', '0901000006', 'thungan1@circlek.vn',
+     'Lê Thị Mai', '0901000006', 'mai.le@circlek.vn',
      'THU_NGAN', 'Nhân viên bán hàng', 'FULL_TIME', 'MORNING',
      0, 14000000, '0123456794', 'VPBank', '2021-02-15', TRUE),
 
     ('b2c3d4e5-0001-0000-0000-000000000007',
      'a1b2c3d4-0001-0000-0000-000000000101', 'NV-0007',
-     'thungan_bv_2', '$2a$10$DEMO_BCRYPT_HASH_thungan2_change_in_prod',
-     'Nguyễn Văn Hùng', '0901000007', 'thungan2@circlek.vn',
+     'Vũ Hoàng Giang', '0901000007', 'giang.vu@circlek.vn',
      'THU_NGAN', 'Nhân viên bán hàng', 'FULL_TIME', 'AFTERNOON',
      0, 14000000, '0123456795', 'VPBank', '2021-05-10', TRUE),
 
     ('b2c3d4e5-0001-0000-0000-000000000008',
-     'a1b2c3d4-0001-0000-0000-000000000101', 'NV-0008',
-     'thungan_bv_3', '$2a$10$DEMO_BCRYPT_HASH_thungan3_change_in_prod',
-     'Phạm Văn Toàn', '0901000008', 'thungan3@circlek.vn',
+     'a1b2c3d4-0001-0000-0000-000000000102', 'NV-0008',
+     'Đinh Quang Hải', '0901000008', 'hai.dinh@circlek.vn',
      'THU_NGAN', 'Nhân viên bán hàng ca đêm', 'PART_TIME', 'NIGHT',
      28000, 0, '0123456796', 'Techcombank', '2022-08-01', TRUE),
 
     -- Thu ngân của chi nhánh khác
     ('b2c3d4e5-0001-0000-0000-000000000009',
      'a1b2c3d4-0001-0000-0000-000000000201', 'NV-0009',
-     'thungan_hk_1', '$2a$10$DEMO_BCRYPT_HASH_thungan4_change_in_prod',
      'Đặng Thị Linh', '0901000009', 'thungan.hk@circlek.vn',
      'THU_NGAN', 'Nhân viên bán hàng', 'FULL_TIME', 'MORNING',
      0, 13500000, '0123456797', 'MB Bank', '2021-10-05', TRUE)
@@ -214,11 +199,6 @@ COMMENT ON TABLE nhan_vien IS
     'Tài khoản đăng nhập, phân quyền, thông tin lương & ngân hàng. '
     'Quy tắc cứng: 4 vai trò vận hành (THU_KHO/QUAN_LY/THU_NGAN) BẮT BUỘC có '
     'id_chi_nhanh, 2 vai trò trụ sở (ADMIN/KE_TOAN) cho phép NULL.';
-
-COMMENT ON COLUMN nhan_vien.mat_khau IS
-    'BẮT BUỘC lưu dạng HASH (BCrypt/Argon2id). Tuyệt đối không lưu plain text. '
-    'Các giá trị seed trong script này chỉ là placeholder, phải được thay thế '
-    'bằng hash thật khi INSERT qua backend service.';
 
 COMMENT ON COLUMN nhan_vien.vai_tro IS
     'Quyết định phân quyền toàn hệ thống. Map: ADMIN/KE_TOAN (trụ sở, NULL '

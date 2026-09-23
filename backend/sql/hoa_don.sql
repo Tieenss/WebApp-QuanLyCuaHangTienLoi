@@ -394,7 +394,7 @@ CREATE OR REPLACE FUNCTION fn_tao_hoa_don(
     p_id_thu_ngan     UUID,
     p_ca_lam_viec     VARCHAR(20),
     p_ngay_ban        TIMESTAMP DEFAULT NOW(),
-    p_hinh_thuc_tt    VARCHAR(20),
+    p_hinh_thuc_tt    VARCHAR(20) DEFAULT 'CASH',
     p_tien_khach_dua  DECIMAL(15,0) DEFAULT NULL,
     p_sdt_thanh_vien  VARCHAR(20) DEFAULT NULL,
     p_giam_gia        DECIMAL(15,0) DEFAULT 0,
@@ -562,7 +562,7 @@ $$ LANGUAGE plpgsql;
 
 -- Hoá đơn 1: COMPLETED, CASH, 3 món
 INSERT INTO hoa_don
-    (id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
+    (id, id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
      hinh_thuc_tt, tien_khach_dua, sdt_thanh_vien,
      giam_gia, ghi_chu)
 VALUES
@@ -600,7 +600,7 @@ WHERE id = '00000000-0000-0000-0000-000000000030';
 
 -- Hoá đơn 2: COMPLETED, MOMO, 1 món (không có tien_khach_dua)
 INSERT INTO hoa_don
-    (id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
+    (id, id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
      hinh_thuc_tt, sdt_thanh_vien, giam_gia)
 VALUES
     ('00000000-0000-0000-0000-000000000031',
@@ -623,7 +623,7 @@ VALUES
 
 -- Hoá đơn 3: REFUNDED, đã hoàn tiền
 INSERT INTO hoa_don
-    (id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
+    (id, id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
      hinh_thuc_tt, tien_khach_dua, sdt_thanh_vien, giam_gia,
      trang_thai, id_nguoi_hoan, ngay_hoan, ly_do_hoan, ghi_chu)
 VALUES

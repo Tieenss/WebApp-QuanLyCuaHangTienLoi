@@ -435,7 +435,7 @@ $$ LANGUAGE plpgsql;
 
 -- Phiếu 1: COMPLETED — Xuất 50 lon Coca + 30 gói Oishi từ Kho Tổng → Bùi Viện
 INSERT INTO phieu_xuat_kho
-    (id_chi_nhanh_xuat, id_chi_nhanh_nhan, id_nguoi_tao,
+    (id, id_chi_nhanh_xuat, id_chi_nhanh_nhan, id_nguoi_tao,
      ngay_yeu_cau, ngay_xuat_thuc_te, ngay_nhan_thuc_te,
      id_nguoi_duyet, id_nguoi_nhan,
      trang_thai, ghi_chu)
@@ -470,7 +470,7 @@ VALUES
 
 -- Phiếu 2: PENDING — Quản lý Bùi Viện yêu cầu 20 lon Coca, chờ thủ kho duyệt
 INSERT INTO phieu_xuat_kho
-    (id_chi_nhanh_xuat, id_chi_nhanh_nhan, id_nguoi_tao,
+    (id, id_chi_nhanh_xuat, id_chi_nhanh_nhan, id_nguoi_tao,
      ngay_yeu_cau, trang_thai, ghi_chu)
 VALUES
     ('00000000-0000-0000-0000-000000000011',

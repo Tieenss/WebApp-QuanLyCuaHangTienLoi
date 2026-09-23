@@ -131,6 +131,13 @@ public class PhieuXuatKhoController {
         pxk.setNgayXuatThucTe(null);
         pxk.setNgayNhanThucTe(null);
         pxk.setNgayYeuCau(request.getNgayYeuCau() != null ? request.getNgayYeuCau() : LocalDate.now());
+        
+        if ("COMPLETED".equals(trangThai)) {
+            if (pxk.getIdNguoiDuyet() == null) pxk.setIdNguoiDuyet(idNguoiTao);
+            if (pxk.getNgayXuatThucTe() == null) pxk.setNgayXuatThucTe(pxk.getNgayYeuCau());
+            if (pxk.getNgayNhanThucTe() == null) pxk.setNgayNhanThucTe(pxk.getNgayYeuCau());
+        }
+
         pxk.setGhiChu(request.getGhiChu());
         pxk.setNgayTao(LocalDateTime.now());
         pxk.setNgayCapNhat(LocalDateTime.now());
@@ -168,6 +175,13 @@ public class PhieuXuatKhoController {
                     if (request.getIdChiNhanhXuat() != null) pxk.setIdChiNhanhXuat(request.getIdChiNhanhXuat());
                     if (request.getIdChiNhanhNhan() != null) pxk.setIdChiNhanhNhan(request.getIdChiNhanhNhan());
                     if (request.getTrangThai() != null) pxk.setTrangThai(request.getTrangThai());
+                    
+                    if ("COMPLETED".equals(pxk.getTrangThai())) {
+                        if (pxk.getIdNguoiDuyet() == null) pxk.setIdNguoiDuyet(pxk.getIdNguoiTao());
+                        if (pxk.getNgayXuatThucTe() == null) pxk.setNgayXuatThucTe(pxk.getNgayYeuCau());
+                        if (pxk.getNgayNhanThucTe() == null) pxk.setNgayNhanThucTe(pxk.getNgayYeuCau());
+                    }
+
                     if (request.getGhiChu() != null) pxk.setGhiChu(request.getGhiChu());
                     pxk.setNgayCapNhat(LocalDateTime.now());
                     phieuXuatKhoRepository.save(pxk);

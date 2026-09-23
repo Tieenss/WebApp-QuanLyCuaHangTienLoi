@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS so_quy (
 -- Vì ma_chung_tu dùng cho cả PK và FK → đổi FK thành `ma_chung_tu_lien_quan`
 -- ALTER TABLE (thực hiện ngay sau khi tạo bảng để tránh conflict)
 ALTER TABLE so_quy
-    ADD COLUMN ma_chung_tu_lien_quan VARCHAR(50);
+    ADD COLUMN IF NOT EXISTS ma_chung_tu_lien_quan VARCHAR(50);
 
 COMMENT ON COLUMN so_quy.ma_chung_tu IS
     'Mã phiếu quỹ (PK). Dạng PT-YYYYMMDD-NNN (thu) hoặc PC-YYYYMMDD-NNN (chi). '
@@ -182,6 +182,22 @@ BEGIN
     END IF;
 
     IF TG_OP = 'UPDATE' AND NOW() > OLD.ngay_tao + INTERVAL '5 minutes' THEN
+        IF NEW.id = OLD.id AND
+           NEW.ma_chung_tu = OLD.ma_chung_tu AND
+           NEW.direction = OLD.direction AND
+           NEW.hang_muc = OLD.hang_muc AND
+           NEW.id_chi_nhanh IS NOT DISTINCT FROM OLD.id_chi_nhanh AND
+           NEW.id_nguoi_tao = OLD.id_nguoi_tao AND
+           NEW.entry_date = OLD.entry_date AND
+           NEW.ngay_tao = OLD.ngay_tao AND
+           NEW.so_tien = OLD.so_tien AND
+           NEW.hinh_thuc_tt = OLD.hinh_thuc_tt AND
+           NEW.doi_tuong = OLD.doi_tuong AND
+           NEW.dien_giai = OLD.dien_giai AND
+           NEW.ma_chung_tu_lien_quan IS NOT DISTINCT FROM OLD.ma_chung_tu_lien_quan THEN
+            RETURN NEW;
+        END IF;
+
         RAISE EXCEPTION 'Sổ quỹ bị khoá sau 5 phút. Row id=% không thể UPDATE. '
             'Hãy tạo phiếu đảo dấu để sửa.', OLD.id;
     END IF;
@@ -217,12 +233,12 @@ BEGIN
     END IF;
 
     -- Tính số dư TRƯỚC entry_date (lấy runningBalance của row gần nhất trước đó)
-    SELECT COALESCE(running_balance, 0) INTO v_balance_before
+    SELECT running_balance INTO v_balance_before
     FROM so_quy
-    WHERE ma_chung_tu <> 'OPENING'  -- không lấy row OPENING
-      AND entry_date < NEW.entry_date
+    WHERE entry_date < NEW.entry_date
     ORDER BY entry_date DESC, ngay_tao DESC
     LIMIT 1;
+    v_balance_before := COALESCE(v_balance_before, 0);
 
     -- Tính runningBalance cho row mới
     v_running := v_balance_before;
@@ -261,12 +277,12 @@ BEGIN
     SELECT * INTO v_row FROM so_quy WHERE id = p_id;
 
     -- Lấy số dư trước entry_date
-    SELECT COALESCE(running_balance, 0) INTO v_balance_before
+    SELECT running_balance INTO v_balance_before
     FROM so_quy
-    WHERE ma_chung_tu <> 'OPENING'
-      AND (entry_date, ngay_tao) < (v_row.entry_date, v_row.ngay_tao)
+    WHERE (entry_date, ngay_tao) < (v_row.entry_date, v_row.ngay_tao)
     ORDER BY entry_date DESC, ngay_tao DESC
     LIMIT 1;
+    v_balance_before := COALESCE(v_balance_before, 0);
 
     v_running := v_balance_before;
     IF v_row.direction = 'RECEIPT' THEN

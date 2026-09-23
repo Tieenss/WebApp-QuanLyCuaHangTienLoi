@@ -296,7 +296,7 @@ $$ LANGUAGE plpgsql;
 
 -- Phiếu 1: DANG_KIEM_KE — Thủ kho đang đếm tại Kho Tổng
 INSERT INTO phieu_kiem_ke
-    (id_chi_nhanh, id_nguoi_tao, ngay_kiem_ke, trang_thai, ghi_chu)
+    (id, id_chi_nhanh, id_nguoi_tao, ngay_kiem_ke, trang_thai, ghi_chu)
 VALUES
     ('00000000-0000-0000-0000-000000000020',
      'a1b2c3d4-0001-0000-0000-000000000001',  -- Kho Tổng
@@ -326,7 +326,7 @@ VALUES
 
 -- Phiếu 2: DA_CAN_BANG — Quản lý Bùi Viện kiểm kê cửa hàng, đã cân bằng
 INSERT INTO phieu_kiem_ke
-    (id_chi_nhanh, id_nguoi_tao, id_nguoi_duyet,
+    (id, id_chi_nhanh, id_nguoi_tao, id_nguoi_duyet,
      ngay_kiem_ke, ngay_can_bang, trang_thai, ghi_chu)
 VALUES
     ('00000000-0000-0000-0000-000000000021',

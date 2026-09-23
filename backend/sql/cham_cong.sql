@@ -191,7 +191,7 @@ VALUES
      (CURRENT_DATE - INTERVAL '1 day')::TIMESTAMP + TIME '06:00:00',
      (CURRENT_DATE - INTERVAL '1 day')::TIMESTAMP + TIME '14:00:00',
      NULL, NULL,  -- nghỉ phép nên không chấm công
-     NULL, 0.00, 0.00,
+     NULL, 0.00, 0.00, 0.00,
      'LEAVE', FALSE, 'Nghỉ phép năm (đã duyệt)'),
 
     -- Vắng không phép (thu ngân khác)
@@ -202,7 +202,7 @@ VALUES
      (CURRENT_DATE - INTERVAL '2 day')::TIMESTAMP + TIME '06:00:00',
      (CURRENT_DATE - INTERVAL '2 day')::TIMESTAMP + TIME '14:00:00',
      NULL, NULL,
-     NULL, 0.00, 0.00,
+     NULL, 0.00, 0.00, 0.00,
      'ABSENT', FALSE, 'Vắng không thông báo')
 ON CONFLICT (id_nhan_vien, work_date, ca_lam_viec) DO NOTHING;
 
