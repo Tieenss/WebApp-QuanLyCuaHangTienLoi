@@ -180,7 +180,7 @@ CREATE INDEX IF NOT EXISTS idx_tai_khoan_last_login
 -- =============================================================================
 INSERT INTO tai_khoan (
     id_nhan_vien, ten_dang_nhap, mat_khau_hash, hash_algorithm,
-    trang_thai, last_login_at
+    trang_thai, last_login_at, ngay_tao
 )
 SELECT
     id,
@@ -190,21 +190,23 @@ SELECT
     -- Mapping trạng thái: NV ACTIVE → TK ACTIVE; NV INACTIVE → TK DISABLED
     CASE WHEN dang_hoat_dong = TRUE THEN 'ACTIVE' ELSE 'DISABLED' END,
     -- Random last_login_at trong 7 ngày qua (cho dữ liệu mẫu)
-    NOW() - (random() * INTERVAL '7 days')
+    NOW() - (random() * INTERVAL '7 days'),
+    -- Ngày tạo tài khoản: khớp ngày vào làm của nhân viên (tránh vi phạm chk_last_login_sau_ngay_tao)
+    COALESCE(ngay_vao_lam::TIMESTAMP, NOW() - INTERVAL '30 days')
 FROM nhan_vien
 WHERE ten_dang_nhap IS NOT NULL  -- bỏ qua NV không có tài khoản (nếu có)
 ON CONFLICT (id_nhan_vien) DO NOTHING;
 
 -- =============================================================================
--- BƯỚC 3: Xoá 2 cột auth khỏi nhan_vien
--- Lưu ý: cần CASCADE nếu có VIEW/constraint phụ thuộc vào cột này.
+-- BƯỚC 3: Giữ nguyên 2 cột auth trên nhan_vien (Đồng bộ với Neon Production)
+-- Production giữ song song ten_dang_nhap, mat_khau trên nhan_vien để JPA Entity
+-- hoạt động bình thường, không DROP cột.
 -- =============================================================================
-ALTER TABLE nhan_vien DROP CONSTRAINT IF EXISTS nhan_vien_ten_dang_nhap_key;
-ALTER TABLE nhan_vien DROP CONSTRAINT IF EXISTS nhan_vien_mat_khau_check;
-
-ALTER TABLE nhan_vien
-    DROP COLUMN IF EXISTS ten_dang_nhap,
-    DROP COLUMN IF EXISTS mat_khau;
+-- ALTER TABLE nhan_vien DROP CONSTRAINT IF EXISTS nhan_vien_ten_dang_nhap_key;
+-- ALTER TABLE nhan_vien DROP CONSTRAINT IF EXISTS nhan_vien_mat_khau_check;
+-- ALTER TABLE nhan_vien
+--     DROP COLUMN IF EXISTS ten_dang_nhap,
+--     DROP COLUMN IF EXISTS mat_khau;
 
 -- =============================================================================
 -- Cập nhật comment cho nhan_vien (loại bỏ phần liên quan đến auth)
@@ -215,7 +217,7 @@ COMMENT ON TABLE nhan_vien IS
     'nhiều nhất 1 tài khoản (1-1) — xem bảng `tai_khoan`.';
 
 -- =============================================================================
--- Dữ liệu mẫu cho 2 tài khoản có trạng thái đặc biệt (test UI unlock)
+-- Dữ liệu mẫu cho tài khoản có trạng thái đặc biệt (test UI unlock)
 -- =============================================================================
 -- Khoá tạm 1 tài khoản (test case "nhập sai 5 lần")
 UPDATE tai_khoan
@@ -225,11 +227,7 @@ SET trang_thai = 'LOCKED',
     ly_do_khoa = 'Nhập sai mật khẩu 5 lần liên tiếp'
 WHERE ten_dang_nhap = 'thungan_bv_2';
 
--- Đánh dấu 1 tài khoản DISABLED (NV đã nghỉ việc)
-UPDATE tai_khoan
-SET trang_thai = 'DISABLED',
-    ly_do_khoa = 'Nhân viên nghỉ việc từ 2025-12-01'
-WHERE ten_dang_nhap = 'thukho';
+-- Lưu ý: Tài khoản thukho (Phạm Quốc Hưng) giữ ACTIVE để hỗ trợ đăng nhập kiểm thử nghiệp vụ Kho Tổng.
 
 COMMENT ON TABLE tai_khoan IS
     'Tài khoản đăng nhập hệ thống — TÁCH RIÊNG khỏi bảng `nhan_vien` (HR). '

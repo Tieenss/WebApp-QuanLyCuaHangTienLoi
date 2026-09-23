@@ -23,7 +23,7 @@ spring:
       connection-timeout: 20000
       max-lifetime: 600000
       keepalive-time: 60000
-#      initialization-fail-timeout: 0         # Cho phép app khởi động tiếp mà không crash nếu Neon đang sleep
+      initialization-fail-timeout: 0         # Cho phép app khởi động tiếp mà không crash nếu Neon đang sleep
 #      validation-timeout: 5000
   jpa:
     open-in-view: false
@@ -33,7 +33,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-#        dialect: org.hibernate.dialect.PostgreSQLDialect
 
 # JWT phải nằm ngoài spring:
 jwt:

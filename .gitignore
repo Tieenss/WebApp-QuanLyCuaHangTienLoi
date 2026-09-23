@@ -1,0 +1,9 @@
+node_modules/
+audit-context.xml
+branch_inactive_*.json
+
+# Agent & Prompting metadata
+docs/agent/
+skills/
+.agents/
+.aider*

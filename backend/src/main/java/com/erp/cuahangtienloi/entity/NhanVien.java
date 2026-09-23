@@ -65,6 +65,9 @@ public class NhanVien {
     @Column(name = "id_chi_nhanh")
     private UUID idChiNhanh;
 
+    @Column(name = "dang_hoat_dong")
+    private Boolean dangHoatDong = true;
+
     @Column(name = "trang_thai")
     private String trangThai;
 
@@ -79,4 +82,18 @@ public class NhanVien {
 
     @Column(name = "nguoi_cap_nhat")
     private String nguoiCapNhat;
+
+    public String getTrangThai() {
+        if (trangThai != null) {
+            return trangThai;
+        }
+        return Boolean.FALSE.equals(dangHoatDong) ? "INACTIVE" : "ACTIVE";
+    }
+
+    public void setTrangThai(String trangThai) {
+        this.trangThai = trangThai;
+        if (trangThai != null) {
+            this.dangHoatDong = !"INACTIVE".equalsIgnoreCase(trangThai);
+        }
+    }
 }
