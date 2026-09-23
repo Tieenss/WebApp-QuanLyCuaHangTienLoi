@@ -40,10 +40,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static com.erp.cuahangtienloi.validation.InputValidator.PAYMENT_METHODS;
 
@@ -65,7 +62,10 @@ public class HoaDonController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<List<HoaDonDTO>> getAll(HttpServletRequest request) {
-        return ResponseEntity.ok(toDTOList(findInvoicesVisibleTo(request)));
+        List<HoaDonDTO> list = findInvoicesVisibleTo(request).stream()
+                .map(this::toDTO)
+                .toList();
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
@@ -81,30 +81,33 @@ public class HoaDonController {
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<List<HoaDonDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh,
                                                            HttpServletRequest request) {
-        List<HoaDon> invoices = findInvoicesVisibleTo(request).stream()
+        List<HoaDonDTO> list = findInvoicesVisibleTo(request).stream()
                 .filter(hd -> idChiNhanh.equals(hd.getIdChiNhanh()))
+                .map(this::toDTO)
                 .toList();
-        return ResponseEntity.ok(toDTOList(invoices));
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/by-cashier/{idThuNgan}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<List<HoaDonDTO>> getByThuNgan(@PathVariable UUID idThuNgan,
                                                           HttpServletRequest request) {
-        List<HoaDon> invoices = findInvoicesVisibleTo(request).stream()
+        List<HoaDonDTO> list = findInvoicesVisibleTo(request).stream()
                 .filter(hd -> idThuNgan.equals(hd.getIdThuNgan()))
+                .map(this::toDTO)
                 .toList();
-        return ResponseEntity.ok(toDTOList(invoices));
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/by-status/{trangThai}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<List<HoaDonDTO>> getByStatus(@PathVariable String trangThai,
                                                         HttpServletRequest request) {
-        List<HoaDon> invoices = findInvoicesVisibleTo(request).stream()
+        List<HoaDonDTO> list = findInvoicesVisibleTo(request).stream()
                 .filter(hd -> trangThai.equals(hd.getTrangThai()))
+                .map(this::toDTO)
                 .toList();
-        return ResponseEntity.ok(toDTOList(invoices));
+        return ResponseEntity.ok(list);
     }
 
     @PostMapping
@@ -611,48 +614,6 @@ public class HoaDonController {
         return ResponseEntity.notFound().build();
     }
 
-    /** Batch load: 3 SELECT thay vì 2N+1 khi map danh sách hóa đơn. */
-    private List<HoaDonDTO> toDTOList(List<HoaDon> invoices) {
-        if (invoices.isEmpty()) return List.of();
-        Set<UUID> cnIds = invoices.stream().map(HoaDon::getIdChiNhanh)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        Set<UUID> nvIds = invoices.stream().map(HoaDon::getIdThuNgan)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<UUID, String> cnNames = chiNhanhRepository.findAllById(cnIds).stream()
-                .collect(Collectors.toMap(ChiNhanh::getId, ChiNhanh::getTenChiNhanh));
-        Map<UUID, String> nvNames = nhanVienRepository.findAllById(nvIds).stream()
-                .collect(Collectors.toMap(NhanVien::getId, NhanVien::getHoTen));
-        return invoices.stream().map(hd -> toDTO(hd, cnNames, nvNames)).collect(Collectors.toList());
-    }
-
-    /** Map 1 hóa đơn sang DTO dùng pre-loaded maps. */
-    private HoaDonDTO toDTO(HoaDon hd, Map<UUID, String> cnNames, Map<UUID, String> nvNames) {
-        HoaDonDTO dto = new HoaDonDTO();
-        dto.setId(hd.getId());
-        dto.setMaHoaDon(hd.getMaHoaDon());
-        dto.setIdChiNhanh(hd.getIdChiNhanh());
-        dto.setIdThuNgan(hd.getIdThuNgan());
-        dto.setCaLamViec(hd.getCaLamViec());
-        dto.setNgayBan(hd.getNgayBan());
-        dto.setHinhThucTt(hd.getHinhThucTt());
-        dto.setSdtThanhVien(hd.getSdtThanhVien());
-        dto.setSubTotal(hd.getSubTotal());
-        dto.setGiamGia(hd.getGiamGia());
-        dto.setVatTotal(hd.getVatTotal());
-        dto.setGrandTotal(hd.getGrandTotal());
-        dto.setTienKhachDua(hd.getTienKhachDua());
-        dto.setTienThoi(hd.getTienThoi());
-        dto.setTrangThai(hd.getTrangThai());
-        dto.setIdNguoiHoan(hd.getIdNguoiHoan());
-        dto.setNgayHoan(hd.getNgayHoan());
-        dto.setLyDoHoan(hd.getLyDoHoan());
-        dto.setGhiChu(hd.getGhiChu());
-        dto.setTenChiNhanh(hd.getIdChiNhanh() != null ? cnNames.get(hd.getIdChiNhanh()) : null);
-        dto.setTenThuNgan(hd.getIdThuNgan() != null ? nvNames.get(hd.getIdThuNgan()) : null);
-        return dto;
-    }
-
-    /** Dùng cho getById / create / update – 1 bản ghi, gọi DB riêng lạ vẫn OK. */
     private HoaDonDTO toDTO(HoaDon hd) {
         HoaDonDTO dto = new HoaDonDTO();
         dto.setId(hd.getId());

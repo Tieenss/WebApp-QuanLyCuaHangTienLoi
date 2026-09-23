@@ -2,8 +2,6 @@ package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.SoQuyDTO;
-import com.erp.cuahangtienloi.entity.ChiNhanh;
-import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.SoQuy;
 import com.erp.cuahangtienloi.repository.*;
 import com.erp.cuahangtienloi.service.BranchAccessService;
@@ -19,9 +17,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -41,7 +36,10 @@ public class SoQuyController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getAll(HttpServletRequest request) {
-        return ResponseEntity.ok(toDTOList(findEntriesVisibleTo(request)));
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/{id}")
@@ -58,37 +56,43 @@ public class SoQuyController {
     public ResponseEntity<List<SoQuyDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh,
                                                          HttpServletRequest request) {
         branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
-        return ResponseEntity.ok(toDTOList(soQuyRepository.findByIdChiNhanh(idChiNhanh)));
+        List<SoQuyDTO> list = soQuyRepository.findByIdChiNhanh(idChiNhanh).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/by-direction/{direction}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getByDirection(@PathVariable String direction,
                                                           HttpServletRequest request) {
-        List<SoQuy> list = findEntriesVisibleTo(request).stream()
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
                 .filter(sq -> direction.equals(sq.getDirection()))
+                .map(this::toDTO)
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(toDTOList(list));
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/by-hang-muc/{hangMuc}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getByHangMuc(@PathVariable String hangMuc,
                                                         HttpServletRequest request) {
-        List<SoQuy> list = findEntriesVisibleTo(request).stream()
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
                 .filter(sq -> hangMuc.equals(sq.getHangMuc()))
+                .map(this::toDTO)
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(toDTOList(list));
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/by-date-range")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<SoQuyDTO>> getByDateRange(
             @RequestParam LocalDate from, @RequestParam LocalDate to, HttpServletRequest request) {
-        List<SoQuy> list = findEntriesVisibleTo(request).stream()
+        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
                 .filter(sq -> !sq.getEntryDate().isBefore(from) && !sq.getEntryDate().isAfter(to))
+                .map(this::toDTO)
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(toDTOList(list));
+        return ResponseEntity.ok(list);
     }
 
     @PostMapping
@@ -208,41 +212,6 @@ public class SoQuyController {
             return ResponseEntity.ok( ApiResponse.ok("Xóa sổ quỹ thành công"));
         }
         return ResponseEntity.notFound().build();
-    }
-
-    /** Batch load: 3 SELECT thay vì 2N+1 khi map danh sách sổ quỹ. */
-    private List<SoQuyDTO> toDTOList(List<SoQuy> list) {
-        if (list.isEmpty()) return List.of();
-        Set<UUID> cnIds = list.stream().map(SoQuy::getIdChiNhanh)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        Set<UUID> nvIds = list.stream().map(SoQuy::getIdNguoiTao)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<UUID, String> cnNames = chiNhanhRepository.findAllById(cnIds).stream()
-                .collect(Collectors.toMap(ChiNhanh::getId, ChiNhanh::getTenChiNhanh));
-        Map<UUID, String> nvNames = nhanVienRepository.findAllById(nvIds).stream()
-                .collect(Collectors.toMap(NhanVien::getId, NhanVien::getHoTen));
-        return list.stream().map(sq -> toDTO(sq, cnNames, nvNames)).collect(Collectors.toList());
-    }
-
-    private SoQuyDTO toDTO(SoQuy sq, Map<UUID, String> cnNames, Map<UUID, String> nvNames) {
-        SoQuyDTO dto = new SoQuyDTO();
-        dto.setId(sq.getId());
-        dto.setMaChungTu(sq.getMaChungTu());
-        dto.setMaChungTuLienQuan(sq.getMaChungTuLienQuan());
-        dto.setIdChiNhanh(sq.getIdChiNhanh());
-        dto.setIdNguoiTao(sq.getIdNguoiTao());
-        dto.setDirection(sq.getDirection());
-        dto.setHangMuc(sq.getHangMuc());
-        dto.setHinhThucTt(sq.getHinhThucTt());
-        dto.setEntryDate(sq.getEntryDate());
-        dto.setSoTien(sq.getSoTien());
-        dto.setDoiTuong(sq.getDoiTuong());
-        dto.setDienGiai(sq.getDienGiai());
-        dto.setRunningBalance(sq.getRunningBalance());
-        dto.setTrangThai(sq.getTrangThai());
-        dto.setTenChiNhanh(sq.getIdChiNhanh() != null ? cnNames.get(sq.getIdChiNhanh()) : null);
-        dto.setTenNguoiTao(sq.getIdNguoiTao() != null ? nvNames.get(sq.getIdNguoiTao()) : null);
-        return dto;
     }
 
     private SoQuyDTO toDTO(SoQuy sq) {

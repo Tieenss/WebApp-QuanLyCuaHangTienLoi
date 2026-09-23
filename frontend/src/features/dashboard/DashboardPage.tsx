@@ -150,28 +150,19 @@ export const DashboardPage: FC = () => {
         const sorted = [...hdList]
           .sort((a, b) => (b.ngayBan ?? '').localeCompare(a.ngayBan ?? ''))
           .slice(0, 200);
-        
         const lineMap: Record<string, ChiTietHoaDonDTO[]> = {};
-        const invoiceIds = sorted.map(hd => hd.id);
-        
-        if (invoiceIds.length > 0) {
-          try {
-            const res = await apiFetch(`${API_BASE_URL}/api/chi-tiet-hoa-don/by-hoa-don-ids`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(invoiceIds)
-            });
-            if (res.ok) {
-              const allLines: ChiTietHoaDonDTO[] = await res.json();
-              for (const line of allLines) {
-                if (!lineMap[line.idHoaDon]) lineMap[line.idHoaDon] = [];
-                lineMap[line.idHoaDon].push(line);
-              }
+        await Promise.all(
+          sorted.map(async (hd) => {
+            try {
+              const res = await apiFetch(
+                `${API_BASE_URL}/api/chi-tiet-hoa-don/by-hoa-don/${hd.id}`,
+              );
+              if (res.ok) lineMap[hd.id] = await res.json();
+            } catch {
+              lineMap[hd.id] = [];
             }
-          } catch {
-            // im lặng nếu lỗi
-          }
-        }
+          }),
+        );
         if (!cancelled) setInvoiceLines(lineMap);
       } catch {
         // im lặng — dashboard vẫn render với 0

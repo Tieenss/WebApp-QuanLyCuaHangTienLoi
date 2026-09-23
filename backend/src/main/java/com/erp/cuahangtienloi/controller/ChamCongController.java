@@ -20,14 +20,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static com.erp.cuahangtienloi.validation.InputValidator.nonNegative;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/cham-cong")
@@ -66,14 +63,11 @@ private LocalDateTime plannedCheckIn(LocalDate workDate, String caLamViec) {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChamCongDTO>> getAll(HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
-        // Load tất cả nhân viên cùng 1 lần để check canRead và toDTO không gọi DB lại
-        Map<UUID, NhanVien> nvMap = nhanVienRepository.findAll().stream()
-                .collect(Collectors.toMap(NhanVien::getId, nv -> nv));
-        List<ChamCong> chamCongs = chamCongRepository.findAll().stream()
-                .filter(cc -> cc.getIdNhanVien() != null && nvMap.containsKey(cc.getIdNhanVien())
-                        && branchAccessService.canReadEmployee(actor, nvMap.get(cc.getIdNhanVien())))
+        List<ChamCongDTO> list = chamCongRepository.findAll().stream()
+                .filter(cc -> canRead(actor, cc.getIdNhanVien()))
+                .map(this::toDTO)
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(toDTOList(chamCongs, nvMap));
+        return ResponseEntity.ok(list);
     }
 
     /** `workDate` là ngày bắt đầu ca. Ca đêm được phép checkout vào ngày hôm sau. */
@@ -96,8 +90,10 @@ private LocalDateTime plannedCheckIn(LocalDate workDate, String caLamViec) {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<ChamCongDTO>> getByNhanVien(@PathVariable UUID idNhanVien, HttpServletRequest request) {
         requireReadableEmployee(branchAccessService.requireAuthenticatedEmployee(request), idNhanVien);
-        List<ChamCong> list = chamCongRepository.findByIdNhanVien(idNhanVien);
-        return ResponseEntity.ok(toDTOList(list));
+        List<ChamCongDTO> list = chamCongRepository.findByIdNhanVien(idNhanVien).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/by-date/{workDate}")
@@ -416,48 +412,6 @@ private LocalDateTime plannedCheckIn(LocalDate workDate, String caLamViec) {
         return ResponseEntity.ok(created);
     }
 
-    /** Batch load NhanVien 1 lần cho cả danh sách chấm công. */
-    private List<ChamCongDTO> toDTOList(List<ChamCong> list) {
-        if (list.isEmpty()) return List.of();
-        Set<UUID> nvIds = list.stream().map(ChamCong::getIdNhanVien)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<UUID, NhanVien> nvMap = nhanVienRepository.findAllById(nvIds).stream()
-                .collect(Collectors.toMap(NhanVien::getId, nv -> nv));
-        return toDTOList(list, nvMap);
-    }
-
-    private List<ChamCongDTO> toDTOList(List<ChamCong> list, Map<UUID, NhanVien> nvMap) {
-        return list.stream().map(cc -> toDTO(cc, nvMap)).collect(Collectors.toList());
-    }
-
-    private ChamCongDTO toDTO(ChamCong cc, Map<UUID, NhanVien> nvMap) {
-        ChamCongDTO dto = new ChamCongDTO();
-        dto.setId(cc.getId());
-        dto.setIdNhanVien(cc.getIdNhanVien());
-        dto.setWorkDate(cc.getWorkDate());
-        dto.setCaLamViec(cc.getCaLamViec());
-        dto.setCheckInAt(cc.getCheckInAt());
-        dto.setCheckOutAt(cc.getCheckOutAt());
-        dto.setClockInAt(cc.getClockInAt());
-        dto.setClockOutAt(cc.getClockOutAt());
-        dto.setDiTrePhut(cc.getDiTrePhut());
-        dto.setOvertimeHours(cc.getOvertimeHours());
-        dto.setBreakHours(cc.getBreakHours());
-        dto.setTongGioLam(cc.getTongGioLam());
-        dto.setTrangThai(cc.getTrangThai());
-        dto.setDaThanhToan(cc.getDaThanhToan());
-        dto.setGhiChu(cc.getGhiChu());
-        if (cc.getIdNhanVien() != null) {
-            NhanVien nv = nvMap.get(cc.getIdNhanVien());
-            if (nv != null) {
-                dto.setTenNhanVien(nv.getHoTen());
-                dto.setMaNhanVien(nv.getMaNhanVien());
-                dto.setIdChiNhanh(nv.getIdChiNhanh());
-            }
-        }
-        return dto;
-    }
-
     private ChamCongDTO toDTO(ChamCong cc) {
         ChamCongDTO dto = new ChamCongDTO();
         dto.setId(cc.getId());
@@ -488,7 +442,6 @@ private LocalDateTime plannedCheckIn(LocalDate workDate, String caLamViec) {
         return dto;
     }
 
-    /** canRead không gọi DB nếu đã có nvMap; giữ bản fallback gọi DB cho các endpoint đơn lần. */
     private boolean canRead(NhanVien actor, UUID employeeId) {
         return employeeId != null && nhanVienRepository.findById(employeeId)
                 .map(target -> branchAccessService.canReadEmployee(actor, target))

@@ -43,16 +43,6 @@ public class ChiTietHoaDonController {
         return ResponseEntity.ok(chiTietHoaDonRepository.findByIdHoaDon(idHoaDon));
     }
 
-    @PostMapping("/by-hoa-don-ids")
-    @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
-    public ResponseEntity<List<ChiTietHoaDon>> getByHoaDonIds(@RequestBody List<UUID> idHoaDons, HttpServletRequest request) {
-        if (idHoaDons == null || idHoaDons.isEmpty()) {
-            return ResponseEntity.ok(List.of());
-        }
-        // Giả định dashboard chỉ gọi IDs thuộc phạm vi được phép xem (frontend đã lọc invoices).
-        return ResponseEntity.ok(chiTietHoaDonRepository.findByIdHoaDonIn(idHoaDons));
-    }
-
     @GetMapping("/by-san-pham/{idSanPham}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN')")
     public ResponseEntity<List<ChiTietHoaDon>> getBySanPham(@PathVariable UUID idSanPham) {

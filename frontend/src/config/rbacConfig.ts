@@ -19,38 +19,28 @@ export const PERMISSIONS = {
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
-import type { AuthUser, UserRole } from '@/types';
-import { USER_ROLE } from '@/types';
+export type RoleKey = 'admin' | 'manager' | 'cashier' | 'warehouse';
+
+export interface AuthUser {
+    username: string;
+    fullName: string;
+    role: RoleKey;
+}
 
 interface RoleDefinition {
-    key: UserRole;
+    key: RoleKey;
     label: string;
     permissions: Permission[];
 }
 
-export const ROLES: Record<UserRole, RoleDefinition> = {
-    [USER_ROLE.Admin]: {
-        key: USER_ROLE.Admin,
+export const ROLES: Record<RoleKey, RoleDefinition> = {
+    admin: {
+        key: 'admin',
         label: 'Quản Trị Viên Hệ Thống',
         permissions: Object.values(PERMISSIONS),
     },
-    [USER_ROLE.Accountant]: {
-        key: USER_ROLE.Accountant,
-        label: 'Kế toán',
-        permissions: [
-            PERMISSIONS.DASHBOARD_VIEW,
-            PERMISSIONS.PRODUCTS_VIEW,
-            PERMISSIONS.INVENTORY_VIEW,
-            PERMISSIONS.INVENTORY_EXPORT,
-            PERMISSIONS.SUPPLIERS_VIEW,
-            PERMISSIONS.ORDERS_VIEW,
-            PERMISSIONS.CUSTOMERS_VIEW,
-            PERMISSIONS.REPORTS_VIEW,
-            PERMISSIONS.BRANCHES_VIEW,
-        ],
-    },
-    [USER_ROLE.StoreManager]: {
-        key: USER_ROLE.StoreManager,
+    manager: {
+        key: 'manager',
         label: 'Quản Lý Chi Nhánh',
         permissions: [
             PERMISSIONS.DASHBOARD_VIEW,
@@ -65,8 +55,8 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
             PERMISSIONS.BRANCHES_VIEW,
         ],
     },
-    [USER_ROLE.WarehouseKeeper]: {
-        key: USER_ROLE.WarehouseKeeper,
+    warehouse: {
+        key: 'warehouse',
         label: 'Thủ Kho',
         permissions: [
             PERMISSIONS.DASHBOARD_VIEW,
@@ -75,16 +65,16 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
             PERMISSIONS.INVENTORY_EXPORT,
         ],
     },
-    [USER_ROLE.Cashier]: {
-        key: USER_ROLE.Cashier,
+    cashier: {
+        key: 'cashier',
         label: 'Thu Ngân',
         permissions: [PERMISSIONS.DASHBOARD_VIEW, PERMISSIONS.POS_VIEW],
     },
 };
 
-export const ROLE_LABEL: Record<UserRole, string> = Object.fromEntries(
+export const ROLE_LABEL: Record<RoleKey, string> = Object.fromEntries(
     Object.values(ROLES).map((r) => [r.key, r.label])
-) as Record<UserRole, string>;
+) as Record<RoleKey, string>;
 
 export const hasPermission = (
     user: AuthUser | null | undefined,

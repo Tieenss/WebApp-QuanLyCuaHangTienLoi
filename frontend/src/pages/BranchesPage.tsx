@@ -3,7 +3,7 @@ import { Card, Typography, Button, Input, Row, Col } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../store';
-import { setBranchModalOpen } from '../store/slices/branchSlice';
+import { setModalOpen, setSearchQuery } from '../store/slices/branchSlice';
 import { hasPermission, PERMISSIONS } from '../config/rbacConfig';
 import { BranchStatCards } from '../features/branches/components/BranchStatCards';
 import { BranchListTable } from '../features/branches/components/BranchListTable';
@@ -16,7 +16,7 @@ export const BranchesPage: React.FC = () => {
     const dispatch = useDispatch();
     const user = useSelector((state: RootState) => state.auth.user);
     const canManage = hasPermission(user, PERMISSIONS.BRANCHES_MANAGE);
-    const [searchQuery, setSearchQuery] = React.useState('');
+    const { searchQuery } = useSelector((state: RootState) => state.branch);
 
     return (
         <div className="page-stack">
@@ -37,7 +37,7 @@ export const BranchesPage: React.FC = () => {
                             type="primary"
                             size="large"
                             icon={<PlusOutlined />}
-                            onClick={() => dispatch(setBranchModalOpen(true))}
+                            onClick={() => dispatch(setModalOpen(true))}
                             className="add-branch-btn"
                         >
                             Thêm Chi Nhánh Mới
@@ -57,13 +57,13 @@ export const BranchesPage: React.FC = () => {
                             placeholder="Tìm theo mã CN, tên chi nhánh, quản lý..."
                             prefix={<SearchOutlined className="branch-search-icon" />}
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => dispatch(setSearchQuery(e.target.value))}
                             allowClear
                         />
                     </Col>
                 </Row>
 
-                <BranchListTable searchQuery={searchQuery} />
+                <BranchListTable />
             </Card>
 
             <BranchFormModal />
