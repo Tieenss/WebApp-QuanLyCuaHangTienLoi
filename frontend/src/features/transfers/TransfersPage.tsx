@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState, type FC, type ReactElement } from 'react'
 import { isInitialLoading } from '@/utils/tableLoading';
 import { API_BASE_URL } from '@/config/api';
 import { apiFetch } from '@/api/http';
-import { chiTietPhieuXuatApi, type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
-import { nhanVienApi} from '@/api/nhanVien';
+import { type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
 import { App as AntdApp, Button, Card, Descriptions, Popconfirm, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { ArrowRightOutlined, PlusOutlined } from '@ant-design/icons';
@@ -43,8 +42,8 @@ export const TransfersPage: FC = () => {
   const branches = useAppSelector((state) => state.branch.branches);
 
   const [isFormOpen, setFormOpen] = useState(false);
-  const [detailsCache, setDetailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
-  const [usersCache, setUsersCache] = useState<Record<string, string>>({});
+  const [detailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
+
 
   const [search, setSearch] = useState('');
   const [toFilter, setToFilter] = useState<string | null>(null);
@@ -75,21 +74,7 @@ export const TransfersPage: FC = () => {
       [transfers, branches],
   );
 
-  useEffect(() => {
-    transfers.forEach((t) => {
-      if (detailsCache[t.id] === undefined) {
-        chiTietPhieuXuatApi.getByPhieuXuat(t.id)
-            .then((data) => setDetailsCache((prev) => ({ ...prev, [t.id]: data })))
-            .catch(() => setDetailsCache((prev) => ({ ...prev, [t.id]: [] })));
-      }
-      const createdById = t.createdById;
-      if (createdById && !usersCache[createdById]) {
-        nhanVienApi.getById(createdById)
-            .then((nv) => setUsersCache((prev) => ({ ...prev, [createdById]: nv.hoTen })))
-            .catch(() => setUsersCache((prev) => ({ ...prev, [createdById]: '' })));
-      }
-    });
-  }, [transfers.length]);
+  // Lazy loading will be handled when expanding a row
 
   const scoped = useMemo(() => {
     const list = enrichedTransfers.filter((t) => {

@@ -143,21 +143,16 @@ export const SalesOrdersPage: FC = () => {
           branches.find((b) => b.id === id)?.name ?? '';
         const cashierNameOf = (id: string) =>
           employees.find((e) => e.id === id)?.fullName ?? 'Thu ngân';
-        const mapped = await Promise.all(
-          list.map(async (dto) => {
-            const detailDtos = await chiTietHoaDonApi.getByHoaDon(dto.id).catch(() => []);
+        const mapped = list.map((dto) => {
             return {
               ...mapDtoToOrder(
                 dto,
                 branchNameOf(dto.idChiNhanh),
                 cashierNameOf(dto.idThuNgan),
               ),
-              lines: detailDtos.map((line, index) =>
-                mapDtoToOrderLine(line, index, products),
-              ),
+              lines: [], // Lazy load later when viewed
             };
-          }),
-        );
+          });
         if (!cancelled) setApiOrders(mapped);
       } catch {
         // im lặng — vẫn hiện đơn trong session
