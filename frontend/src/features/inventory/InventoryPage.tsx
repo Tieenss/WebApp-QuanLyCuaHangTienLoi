@@ -661,8 +661,9 @@ export const InventoryPage: FC = () => {
                     loading={isInitialLoading(stockLoading, allBalances)}
                     scroll={{ x: 1800 }}
                     pagination={{
-                      pageSize: 15,
+                      defaultPageSize: 10,
                       showSizeChanger: true,
+                      pageSizeOptions: ['10', '20', '50', '100'],
                       showTotal: (total) => `${total} dòng tồn kho`,
                     }}
                   />
@@ -691,8 +692,9 @@ export const InventoryPage: FC = () => {
                     scroll={{ x: 1900 }}
                     className="dense-table"
                     pagination={{
-                      pageSize: 15,
+                      defaultPageSize: 10,
                       showSizeChanger: true,
+                      pageSizeOptions: ['10', '20', '50', '100'],
                       showTotal: (total) => `${total} biến động`,
                     }}
                   />

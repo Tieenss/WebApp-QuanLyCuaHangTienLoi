@@ -686,8 +686,9 @@ export const SalesOrdersPage: FC = () => {
             style: { cursor: 'pointer' },
           })}
           pagination={{
-            pageSize: 15,
+            defaultPageSize: 10,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total) => `${total} hoá đơn`,
           }}
         />

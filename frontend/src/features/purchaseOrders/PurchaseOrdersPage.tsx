@@ -607,8 +607,9 @@ export const PurchaseOrdersPage: FC = () => {
             },
           }}
           pagination={{
-            pageSize: 10,
+            defaultPageSize: 10,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total) => `${total} phiếu nhập`,
           }}
         />

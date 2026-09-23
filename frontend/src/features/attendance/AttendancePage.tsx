@@ -1000,8 +1000,9 @@ export const AttendancePage: FC = () => {
                     size="small"
                     scroll={{ x: 1000 }}
                     pagination={{
-                      pageSize: 15,
+                      defaultPageSize: 10,
                       showSizeChanger: true,
+                      pageSizeOptions: ['10', '20', '50', '100'],
                       showTotal: (total) => `${total} bản ghi`,
                     }}
                     locale={{ emptyText: 'Chưa có dữ liệu chấm công ca của bạn.' }}
@@ -1047,8 +1048,9 @@ export const AttendancePage: FC = () => {
                     size="small"
                     scroll={{ x: 1420 }}
                     pagination={{
-                      pageSize: 15,
+                      defaultPageSize: 10,
                       showSizeChanger: true,
+                      pageSizeOptions: ['10', '20', '50', '100'],
                       showTotal: (total) => `${total} bản ghi`,
                     }}
                   />
@@ -1134,8 +1136,9 @@ export const AttendancePage: FC = () => {
                       }),
                     }}
                     pagination={{
-                      pageSize: 15,
+                      defaultPageSize: 10,
                       showSizeChanger: true,
+                      pageSizeOptions: ['10', '20', '50', '100'],
                       showTotal: (total) => `${total} nhân sự`,
                     }}
                     summary={(rows) => {

@@ -403,7 +403,12 @@ export const BranchesPage: FC = () => {
           size="middle"
           loading={isInitialLoading(loading, branches)}
           scroll={{ x: 1560 }}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `${total} điểm bán` }}
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: (total) => `${total} điểm bán`,
+          }}
         />
       </Card>
 

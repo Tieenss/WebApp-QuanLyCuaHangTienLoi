@@ -180,7 +180,12 @@ export const InternalExportListTable: React.FC = () => {
             columns={columns}
             dataSource={filteredExports}
             rowKey="id"
-            pagination={{ pageSize: 10, showSizeChanger: true }}
+            pagination={{
+                defaultPageSize: 10,
+                showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                showTotal: (total) => `${total} phiếu xuất nội bộ`,
+            }}
             size="middle"
             scroll={{ x: 1100 }}
             expandable={{

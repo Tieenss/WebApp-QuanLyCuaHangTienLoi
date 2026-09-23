@@ -451,8 +451,9 @@ export const TransfersPage: FC = () => {
           scroll={{ x: canSeeActions ? 2200 : 2050 }}
           expandable={{ expandedRowRender: renderDetail, columnWidth: 44 }}
           pagination={{
-            pageSize: 10,
+            defaultPageSize: 10,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total) => `${total} phiếu luân chuyển`,
           }}
         />
