@@ -143,7 +143,12 @@ export const BranchListTable: React.FC<BranchListTableProps> = ({ searchQuery })
             columns={columns}
             dataSource={filteredBranches}
             rowKey="id"
-            pagination={{ pageSize: 10, showSizeChanger: true }}
+            pagination={{
+                defaultPageSize: 10,
+                showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                showTotal: (total) => `${total} chi nhánh`,
+            }}
             size="middle"
         />
     );

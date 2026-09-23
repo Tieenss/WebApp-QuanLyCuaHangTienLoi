@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type FC, type ReactElement } from 'react';
 import { isInitialLoading } from '@/utils/tableLoading';
 import { chiTietPhieuXuatApi, type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
-import { nhanVienApi } from '@/api/nhanVien';
 import { tonKhoApi } from '@/api/tonKho';
 import {
   App as AntdApp,
@@ -56,7 +55,7 @@ export const TransfersPage: FC = () => {
   const balances = useAppSelector((state) => state.stock.balances);
 
   const [isFormOpen, setFormOpen] = useState(false);
-  const [detailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
+  const [detailsCache, setDetailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
 
 
   const [rejectTarget, setRejectTarget] = useState<StockTransfer | null>(null);
@@ -614,8 +613,9 @@ export const TransfersPage: FC = () => {
           scroll={{ x: canSeeActions ? 2200 : 2050 }}
           expandable={{ expandedRowRender: renderDetail, columnWidth: 44 }}
           pagination={{
-            pageSize: 10,
+            defaultPageSize: 10,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total) => `${total} phiếu luân chuyển`,
           }}
         />

@@ -453,8 +453,9 @@ export const EmployeesPage: FC = () => {
           loading={isInitialLoading(loading, employees)}
           scroll={{ x: 1700 }}
           pagination={{
-            pageSize: 12,
+            defaultPageSize: 10,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total) => `${total} nhân sự`,
           }}
         />
