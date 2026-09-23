@@ -12,6 +12,7 @@ import {
   Select,
   Space,
   Table,
+  Tooltip,
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -241,6 +242,18 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         return;
       }
 
+      if (isRequest && values.toBranchId) {
+        const overLimit = validRows.find((row) => {
+          const tb = balances.find((b) => b.branchId === values.toBranchId && b.productId === row.productId);
+          return tb && tb.maxStock > 0 && ((tb.quantity + row.quantity) > tb.maxStock);
+        });
+        if (overLimit) {
+          const p = sellableProducts.find((item) => item.id === overLimit.productId);
+          const tb = balances.find((b) => b.branchId === values.toBranchId && b.productId === overLimit.productId);
+          message.warning(`Cảnh báo: Sản phẩm "${p?.name || ''}" sẽ vượt mức tồn tối đa (${tb?.maxStock}) của chi nhánh nhận.`);
+        }
+      }
+
       let created: PhieuXuatKhoDTO;
 
       // 1) Tạo header PENDING + dòng chi tiết xuống DB. Việc trừ/cộng tồn do
@@ -268,17 +281,21 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         created = await response.json();
 
         await chiTietPhieuXuatApi.createBatch(
-          validRows.map((row, index) => ({
-            id: '',
-            idPhieuXuat: created.id,
-            idSanPham: row.productId,
-            soLuongYeuCau: row.quantity,
-            soLuongXuat: 0,
-            soLuongNhan: 0,
-            donGiaVon: 0,
-            thanhTien: 0,
-            thuTu: index,
-          })),
+          validRows.map((row, index) => {
+            const prod = products.find((p) => p.id === row.productId);
+            const cost = prod?.costPrice ?? 0;
+            return {
+              id: '',
+              idPhieuXuat: created.id,
+              idSanPham: row.productId,
+              soLuongYeuCau: row.quantity,
+              soLuongXuat: 0,
+              soLuongNhan: 0,
+              donGiaVon: cost,
+              thanhTien: cost * row.quantity,
+              thuTu: index,
+            };
+          }),
         );
 
         // 2) Thủ kho/Admin lập phiếu trực tiếp: tự chạy luôn bước xuất + nhận
@@ -373,38 +390,58 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       title: 'Tồn cửa hàng',
       key: 'targetStock',
       align: 'right',
-      width: 120,
-      render: (_, row) =>
-        row.productId === '' || toBranchId === null ? (
-          <Text type="secondary">—</Text>
-        ) : (
-          <Text className="numeric-cell">
-            {stockOf(balances, toBranchId, row.productId)}
-          </Text>
-        ),
+      width: 130,
+      render: (_, row) => {
+        if (row.productId === '' || toBranchId === null) {
+          return <Text type="secondary">—</Text>;
+        }
+        const targetBalance = balances.find((b) => b.branchId === toBranchId && b.productId === row.productId);
+        return (
+          <div>
+            <Text className="numeric-cell">
+              {stockOf(balances, toBranchId, row.productId)}
+            </Text>
+            {targetBalance && targetBalance.maxStock > 0 && (
+              <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                Tối đa: {targetBalance.maxStock}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: isRequest ? 'Số lượng yêu cầu' : 'Số lượng xuất',
       dataIndex: 'quantity',
       align: 'right',
-      width: 130,
+      width: 140,
       render: (value: number, row) => {
         const available =
           row.productId === ''
             ? 0
-              : distributionCenterStockOf(row.productId);
+            : distributionCenterStockOf(row.productId);
+
+        const targetBalance = toBranchId
+          ? balances.find((b) => b.branchId === toBranchId && b.productId === row.productId)
+          : null;
+        const currentTargetQty = targetBalance?.quantity ?? 0;
+        const maxStock = targetBalance?.maxStock ?? 0;
+        const isOverCapacity = isRequest && maxStock > 0 && (value + currentTargetQty > maxStock);
+
         return (
-          <InputNumber<number>
-            className="transfer-line-input"
-            min={0}
-            // BR-01: chặn xuất vượt tồn ngay tại ô nhập.
-            max={available}
-            step={1}
-            value={value}
-            disabled={row.productId === ''}
-            status={value > available ? 'error' : undefined}
-            onChange={(quantity) => updateRow(row.key, { quantity: quantity ?? 0 })}
-          />
+          <Tooltip title={isOverCapacity ? `Vượt mức định mức tồn tối đa của chi nhánh (${maxStock})` : undefined}>
+            <InputNumber<number>
+              className="transfer-line-input"
+              min={0}
+              // BR-01: chặn xuất vượt tồn ngay tại ô nhập.
+              max={available}
+              step={1}
+              value={value}
+              disabled={row.productId === ''}
+              status={value > available ? 'error' : isOverCapacity ? 'warning' : undefined}
+              onChange={(quantity) => updateRow(row.key, { quantity: quantity ?? 0 })}
+            />
+          </Tooltip>
         );
       },
     },
