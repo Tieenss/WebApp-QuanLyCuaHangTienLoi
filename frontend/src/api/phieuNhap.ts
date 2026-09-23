@@ -84,7 +84,7 @@ export const phieuNhapApi = {
     }
     return response.json();
   },
-  /** Kế toán xác nhận trả NCC: PENDING_PAYMENT → COMPLETED + cộng tồn Kho Tổng. */
+  /** Kế toán xác nhận trả NCC: PENDING_PAYMENT → PENDING (Chờ nhận hàng). */
   pay: async (id: string, daThanhToan?: number): Promise<PhieuNhapDTO> => {
     const response = await fetch(`${API_BASE_URL}/api/phieu-nhap/${id}/pay`, {
       method: 'PUT',
@@ -94,6 +94,18 @@ export const phieuNhapApi = {
     if (!response.ok) {
       const error = await response.json().catch(() => null);
       throw new Error(error?.message || 'Lỗi thanh toán phiếu nhập');
+    }
+    return response.json();
+  },
+  /** Thủ kho xác nhận nhận hàng: PENDING → COMPLETED + cộng tồn Kho Tổng + tính HSD theo ngày nhận. */
+  receive: async (id: string): Promise<PhieuNhapDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-nhap/${id}/receive`, {
+      method: 'PUT',
+      headers: { ...getHeaders() },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.message || 'Lỗi nhận hàng phiếu nhập');
     }
     return response.json();
   },
