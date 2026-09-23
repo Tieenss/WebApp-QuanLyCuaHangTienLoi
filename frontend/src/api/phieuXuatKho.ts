@@ -19,6 +19,8 @@ export interface PhieuXuatKhoDTO {
   tenNguoiTao?: string;
   tenNguoiDuyet?: string;
   tenNguoiNhan?: string;
+  tenChiNhanhXuat?: string;
+  tenChiNhanhNhan?: string;
 }
 
 export interface ChiTietPhieuXuatDTO {
