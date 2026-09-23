@@ -130,7 +130,7 @@ export const EmployeesPage: FC = () => {
       },
       {
         key: 'fulltime',
-        title: 'Toàn thời gian',
+        title: 'Lương cứng',
         value: formatNumber(fullTime.length),
         suffix: `/ ${active.length}`,
       },
@@ -181,7 +181,7 @@ export const EmployeesPage: FC = () => {
     },
     {
       key: 'type',
-      placeholder: 'Loại hợp đồng',
+      placeholder: 'Hình thức trả lương',
       value: typeFilter,
       onChange: setTypeFilter,
       options: Object.values(EMPLOYMENT_TYPE).map((type) => ({
@@ -254,7 +254,7 @@ export const EmployeesPage: FC = () => {
       ),
     },
     {
-      title: 'Hợp đồng',
+      title: 'Hình thức trả lương',
       dataIndex: 'employmentType',
       width: 130,
       render: (type: Employee['employmentType']) => (
@@ -357,7 +357,7 @@ export const EmployeesPage: FC = () => {
         { header: 'Vai trò', accessor: (row) => USER_ROLE_LABEL[row.role] },
         { header: 'Ca mặc định', accessor: (row) => SHIFT_SHORT_LABEL[row.defaultShift] },
         {
-          header: 'Hợp đồng',
+          header: 'Hình thức trả lương',
           accessor: (row) => EMPLOYMENT_TYPE_LABEL[row.employmentType],
         },
         { header: 'Lương giờ', accessor: (row) => row.hourlyWage },
