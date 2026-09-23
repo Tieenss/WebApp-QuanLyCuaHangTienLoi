@@ -46,6 +46,27 @@ const STATUS_OPTIONS = [
 
 type BranchEditorValues = BranchFormValues & { managerId?: string };
 
+const generateNextBranchCode = (branches: Array<{ code: string }>): string => {
+  let maxNum = 100;
+  for (const b of branches) {
+    if (!b.code) continue;
+    const match = b.code.trim().match(/^CK-(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+  }
+  let nextNum = maxNum + 1;
+  let candidate = `CK-${String(nextNum).padStart(4, '0')}`;
+  while (branches.some((b) => b.code?.toUpperCase() === candidate)) {
+    nextNum += 1;
+    candidate = `CK-${String(nextNum).padStart(4, '0')}`;
+  }
+  return candidate;
+};
+
 export const BranchFormModal: FC = () => {
   const [form] = Form.useForm<BranchEditorValues>();
   const dispatch = useAppDispatch();
@@ -56,6 +77,7 @@ export const BranchFormModal: FC = () => {
   );
   const isEditing = selectedBranch !== null;
   const employees = useAppSelector((state) => state.employee.employees);
+  const branches = useAppSelector((state) => state.branch.branches);
   const selectedKind = Form.useWatch('kind', form);
   const selectedStatus = Form.useWatch('status', form);
 
@@ -67,12 +89,16 @@ export const BranchFormModal: FC = () => {
       return;
     }
     form.resetFields();
+    
+    const autoCode = generateNextBranchCode(branches);
+    
     form.setFieldsValue({
+      code: autoCode,
       kind: BRANCH_KIND.Store,
       status: RECORD_STATUS.Active,
       region: REGION.South,
     });
-  }, [isModalOpen, selectedBranch, form]);
+  }, [isModalOpen, selectedBranch, branches, form]);
 
   const handleSubmit = async (): Promise<void> => {
     try {
@@ -122,7 +148,7 @@ export const BranchFormModal: FC = () => {
               label="Mã chi nhánh"
               rules={[{ required: true, message: 'Vui lòng nhập mã chi nhánh.' }]}
             >
-              <Input placeholder="VD: CK-0101" />
+              <Input placeholder="VD: CK-0101" disabled />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>

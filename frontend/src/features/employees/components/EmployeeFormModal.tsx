@@ -44,12 +44,33 @@ const ROLE_OPTIONS = Object.values(USER_ROLE).map((role) => ({
   label: USER_ROLE_LABEL[role],
 }));
 
+const generateNextEmployeeCode = (employees: Array<{ code: string }>): string => {
+  let maxNum = 0;
+  for (const emp of employees) {
+    if (!emp.code) continue;
+    const match = emp.code.trim().match(/^NV-(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+  }
+  let nextNum = maxNum + 1;
+  let candidate = `NV-${String(nextNum).padStart(4, '0')}`;
+  while (employees.some((e) => e.code?.toUpperCase() === candidate)) {
+    nextNum += 1;
+    candidate = `NV-${String(nextNum).padStart(4, '0')}`;
+  }
+  return candidate;
+};
+
 export const EmployeeFormModal: FC = () => {
   const [form] = Form.useForm<EmployeeFormValues>();
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
 
-  const { isModalOpen, selectedEmployee } = useAppSelector(
+  const { isModalOpen, selectedEmployee, employees } = useAppSelector(
     (state) => state.employee,
   );
   const branches = useAppSelector((state) => state.branch.branches);
@@ -124,7 +145,9 @@ export const EmployeeFormModal: FC = () => {
     // Form thêm mới
     form.resetFields();
 
+    const autoCode = generateNextEmployeeCode(employees);
     form.setFieldsValue({
+      code: autoCode,
       position: 'Thu ngân',
       employmentType: EMPLOYMENT_TYPE.FullTime,
       defaultShift: SHIFT_CODE.Morning,
@@ -134,7 +157,7 @@ export const EmployeeFormModal: FC = () => {
       baseSalary: 0,
       branchId: isManager ? user?.branchId ?? null : null,
     });
-  }, [isModalOpen, selectedEmployee, form, isManager, user?.branchId]);
+  }, [isModalOpen, selectedEmployee, employees, form, isManager, user?.branchId]);
 
   const handleSubmit = async (): Promise<void> => {
     try {
@@ -226,7 +249,7 @@ export const EmployeeFormModal: FC = () => {
                 { required: true, message: 'Vui lòng nhập mã nhân viên.' },
               ]}
             >
-              <Input placeholder="VD: NV-0042" />
+              <Input placeholder="VD: NV-0042" disabled />
             </Form.Item>
           </Col>
         </Row>

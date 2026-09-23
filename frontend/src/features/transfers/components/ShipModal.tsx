@@ -104,10 +104,21 @@ export const ShipModal: FC<ShipModalProps> = ({ open, transfer, onClose }) => {
     (row) => row.shipQty > row.stockAtSource || row.shipQty > row.requested,
   );
 
+  const shortageRows = rows.filter(
+    (row) => row.requested > row.stockAtSource,
+  );
+
   const handleConfirm = async (): Promise<void> => {
     if (transfer === null || user === null) return;
     if (rows.length === 0) {
       message.error('Phiếu không có dòng chi tiết — không thể xuất.');
+      return;
+    }
+    if (shortageRows.length > 0) {
+      const r = shortageRows[0];
+      message.error(
+        `Tổng lượng hàng trong kho không đủ để duyệt phiếu - Tổng kho của hàng ${r.productName} hiện tại: ${r.stockAtSource}`,
+      );
       return;
     }
     if (overStockRows.length > 0) {
@@ -209,7 +220,7 @@ export const ShipModal: FC<ShipModalProps> = ({ open, transfer, onClose }) => {
       okText="Xác nhận xuất kho"
       cancelText="Huỷ"
       confirmLoading={submitting}
-      okButtonProps={{ disabled: loading || rows.length === 0 || overStockRows.length > 0 }}
+      okButtonProps={{ disabled: loading || rows.length === 0 || overStockRows.length > 0 || shortageRows.length > 0 }}
       onOk={handleConfirm}
       onCancel={onClose}
       width={860}
@@ -220,7 +231,23 @@ export const ShipModal: FC<ShipModalProps> = ({ open, transfer, onClose }) => {
         style={{ marginBottom: 12 }}
         message="Thủ kho kiểm đếm hàng thực tế rồi xác nhận số xuất. Sau khi xuất, phiếu ở trạng thái “Chờ nhận hàng” cho tới khi chi nhánh xác nhận đã nhận."
       />
-      {overStockRows.length > 0 && (
+      {shortageRows.length > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={
+            <div>
+              {shortageRows.map((r) => (
+                <div key={r.productId}>
+                  Tổng lượng hàng trong kho không đủ để duyệt phiếu - Tổng kho của hàng {r.productName} hiện tại: {r.stockAtSource}
+                </div>
+              ))}
+            </div>
+          }
+        />
+      )}
+      {overStockRows.length > 0 && shortageRows.length === 0 && (
         <Alert
           type="error"
           showIcon

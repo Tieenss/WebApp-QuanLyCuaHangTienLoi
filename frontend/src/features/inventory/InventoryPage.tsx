@@ -1,7 +1,21 @@
-import { useEffect, useMemo, type FC } from 'react';
-import { Button, Card, Progress, Space, Switch, Table, Tabs, Tag, Tooltip, Typography } from 'antd';
+import { useEffect, useMemo, useState, type FC } from 'react';
+import {
+  App as AntdApp,
+  Button,
+  Card,
+  Popconfirm,
+  Progress,
+  Space,
+  Switch,
+  Table,
+  Tabs,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { HistoryOutlined } from '@ant-design/icons';
+import { DeleteOutlined, HistoryOutlined, InboxOutlined } from '@ant-design/icons';
+import { tonKhoApi } from '@/api/tonKho';
 import { PageHeader } from '@/components/PageHeader';
 import { ProductThumb } from '@/components/ProductThumb';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
@@ -39,11 +53,12 @@ import {
   resolveStockLevel,
   totalStockValue,
 } from '@/store/slices/stockSlice';
-import { daysUntil, formatDate, formatDateTime } from '@/utils/dateUtils';
+import { daysUntil, formatDate, formatDateTime, today } from '@/utils/dateUtils';
 import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import type { CSSProperties } from 'react';
 import { LedgerDrawer } from './components/LedgerDrawer';
+import { LotDrawer } from './components/LotDrawer';
 import './InventoryPage.css';
 
 const { Text } = Typography;
@@ -62,6 +77,8 @@ const NEAR_EXPIRY_DAYS = 7;
  */
 export const InventoryPage: FC = () => {
   const dispatch = useAppDispatch();
+  const { message } = AntdApp.useApp();
+  const [lotTarget, setLotTarget] = useState<StockBalance | null>(null);
   const {
     activeTab,
     branchFilter,
@@ -305,6 +322,28 @@ export const InventoryPage: FC = () => {
         },
   ];
 
+  const handleDiscardExpired = async (row: StockBalance): Promise<void> => {
+    try {
+      const performedBy = user ? `${user.fullName} (${user.employeeCode})` : 'Hệ thống';
+      const refCode = `HUY-HSD-${today().replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+
+      await tonKhoApi.adjust({
+        idSanPham: row.productId,
+        idChiNhanh: row.branchId,
+        soLuong: -row.quantity,
+        maChungTu: refCode,
+        nguoiThucHien: performedBy,
+        hanSuDung: row.nearestExpiryDate,
+        ghiChu: `Xuất huỷ lô hàng quá hạn ngày ${row.nearestExpiryDate ? formatDate(row.nearestExpiryDate) : ''} và cân bằng kho`,
+      });
+
+      message.success(`Đã xoá lô hàng hết hạn và cân bằng kho thành công cho sản phẩm "${row.productName}".`);
+      dispatch(fetchStock());
+    } catch (err: any) {
+      message.error(err?.message || 'Có lỗi xảy ra khi cân bằng kho');
+    }
+  };
+
   const balanceColumns: ColumnsType<StockBalance> = [
     {
       title: 'Sản phẩm',
@@ -404,38 +443,38 @@ export const InventoryPage: FC = () => {
     {
       title: 'HSD gần nhất',
       dataIndex: 'nearestExpiryDate',
-      width: 140,
-      render: (value: string | null) => {
-        if (value === null) {
+      width: 250,
+      render: (value: string | null, row: StockBalance) => {
+        if (value === null || row.quantity <= 0) {
           return <Text type="secondary">—</Text>;
         }
         const remaining = daysUntil(value);
         if (remaining === null) return <Text type="secondary">—</Text>;
 
-        // Quá hạn và cận hạn cần bật màu cảnh báo để nhân viên xử lý ngay.
-        const color =
-          remaining < 0
-            ? BRAND.error
-            : remaining <= NEAR_EXPIRY_DAYS
-              ? BRAND.warning
-              : undefined;
+        // Quá hạn: hiển thị thông báo đỏ
+        if (remaining < 0) {
+          return (
+            <Tag
+              color="error"
+              style={{ fontWeight: 600, padding: '2px 8px', borderRadius: 4, cursor: 'pointer' }}
+              onClick={() => setLotTarget(row)}
+            >
+              Sản phẩm/Lô hàng hết hạn vào {formatDate(value)}
+            </Tag>
+          );
+        }
 
+        const isNear = remaining <= NEAR_EXPIRY_DAYS;
         return (
-          <Tooltip
-            title={
-              remaining < 0
-                ? `Đã quá hạn ${Math.abs(remaining)} ngày`
-                : `Còn ${remaining} ngày`
-            }
-          >
+          <Tooltip title={`Còn ${remaining} ngày`}>
             <Text
               className="inv-expiry-text"
-              style={{ '--expiry-color': color ?? 'inherit' } as CSSProperties}
+              style={{ '--expiry-color': isNear ? BRAND.warning : 'inherit' } as CSSProperties}
             >
               {formatDate(value)}
-              {remaining <= NEAR_EXPIRY_DAYS && (
-                <Tag color={remaining < 0 ? 'red' : 'orange'} className="expiry-tag">
-                  {remaining < 0 ? 'Quá hạn' : `${remaining}n`}
+              {isNear && (
+                <Tag color="orange" className="expiry-tag">
+                  Còn {remaining}n
                 </Tag>
               )}
             </Text>
@@ -454,20 +493,56 @@ export const InventoryPage: FC = () => {
       ),
     },
     {
-      title: '',
+      title: 'Thao tác',
       key: 'action',
       align: 'center',
-      width: 110,
+      width: 180,
       fixed: 'right',
-      render: (_, row) => (
-        <Button
-          size="small"
-          icon={<HistoryOutlined />}
-          onClick={() => dispatch(openLedgerDrawer(row.productId))}
-        >
-          Thẻ kho
-        </Button>
-      ),
+      render: (_, row: StockBalance) => {
+        const remaining = row.nearestExpiryDate ? daysUntil(row.nearestExpiryDate) : null;
+        const isExpired = remaining !== null && remaining < 0 && row.quantity > 0;
+
+        return (
+          <Space size={6}>
+            <Button
+              size="small"
+              icon={<InboxOutlined />}
+              onClick={() => setLotTarget(row)}
+            >
+              Lô hàng
+            </Button>
+            <Button
+              size="small"
+              icon={<HistoryOutlined />}
+              onClick={() => dispatch(openLedgerDrawer(row.productId))}
+            >
+              Thẻ kho
+            </Button>
+            {isExpired && (
+              <Popconfirm
+                title="Xác nhận huỷ & cân bằng kho?"
+                description={
+                  <div style={{ maxWidth: 280 }}>
+                    Hàng đã hết hạn sử dụng. Bạn có chắc muốn xoá toàn bộ lô hàng hết hạn ({formatNumber(row.quantity)} đơn vị) và cân bằng kho về 0 không?
+                  </div>
+                }
+                okText="Huỷ & Cân bằng"
+                cancelText="Bỏ qua"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => handleDiscardExpired(row)}
+              >
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                >
+                  Cân bằng
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -706,6 +781,12 @@ export const InventoryPage: FC = () => {
       </Card>
 
       <LedgerDrawer />
+      <LotDrawer
+        open={lotTarget !== null}
+        onClose={() => setLotTarget(null)}
+        balance={lotTarget}
+        onLotDisposed={() => dispatch(fetchStock())}
+      />
     </>
   );
 };

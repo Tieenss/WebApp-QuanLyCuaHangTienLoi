@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useState, type FC, type ReactElement } from 'react';
 import { isInitialLoading } from '@/utils/tableLoading';
-import { API_BASE_URL } from '@/config/api';
-import { apiFetch } from '@/api/http';
-import { type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
-import { App as AntdApp, Button, Card, Descriptions, Popconfirm, Space, Table, Tag, Typography } from 'antd';
+import { chiTietPhieuXuatApi, type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
+import { nhanVienApi } from '@/api/nhanVien';
+import { tonKhoApi } from '@/api/tonKho';
+import {
+  App as AntdApp,
+  Button,
+  Card,
+  Descriptions,
+  Input,
+  Modal,
+  Popconfirm,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { ArrowRightOutlined, PlusOutlined } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
@@ -16,7 +28,7 @@ import {
   fetchTransfers,
   rejectTransfer,
 } from '@/store/slices/transferSlice';
-import { fetchStock } from '@/store/slices/stockSlice';
+import { fetchStock, stockOf } from '@/store/slices/stockSlice';
 import { phieuXuatKhoApi } from '@/api/phieuXuatKho';
 import {
   DOCUMENT_STATUS,
@@ -40,10 +52,16 @@ export const TransfersPage: FC = () => {
   const { user} = useAppSelector((state) => state.auth);
   const { transfers, loading } = useAppSelector((state) => state.transfer);
   const branches = useAppSelector((state) => state.branch.branches);
+  const products = useAppSelector((state) => state.product.products);
+  const balances = useAppSelector((state) => state.stock.balances);
 
   const [isFormOpen, setFormOpen] = useState(false);
   const [detailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
 
+
+  const [rejectTarget, setRejectTarget] = useState<StockTransfer | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
 
   const [search, setSearch] = useState('');
   const [toFilter, setToFilter] = useState<string | null>(null);
@@ -106,12 +124,28 @@ export const TransfersPage: FC = () => {
   );
 
   const summary = useMemo<SummaryItem[]>(() => {
-    const totalValue = scoped.reduce((sum, t) => sum + (t.totalValue || 0), 0);
-    const totalItems = scoped.reduce((sum, t) => sum + (t.lines || []).length, 0);
+    const calculateRowValue = (t: StockTransfer): number => {
+      const details = detailsCache[t.id];
+      if (details && details.length > 0) {
+        return details.reduce((sum, d) => {
+          const qty = (d.soLuongXuat && d.soLuongXuat > 0) ? d.soLuongXuat : (d.soLuongYeuCau || 0);
+          const prod = products.find((p) => p.id === d.idSanPham);
+          const cost = (d.donGiaVon && d.donGiaVon > 0) ? d.donGiaVon : (prod?.costPrice || 0);
+          return sum + cost * qty;
+        }, 0);
+      }
+      return t.totalValue || 0;
+    };
+
+    const totalValue = scoped.reduce((sum, t) => sum + calculateRowValue(t), 0);
+    const totalItems = scoped.reduce((sum, t) => {
+      const details = detailsCache[t.id];
+      return sum + (details ? details.length : (t.lines || []).length);
+    }, 0);
     const pendingAmount = scoped
       .filter((t) => t.status === DOCUMENT_STATUS.Pending)
-      .reduce((sum, t) => sum + (t.totalValue || 0), 0);
-    // const servedBranches = new Set(scoped.map((t) => t.toBranchId));
+      .reduce((sum, t) => sum + calculateRowValue(t), 0);
+
     return [
       {
         key: 'orders',
@@ -140,32 +174,84 @@ export const TransfersPage: FC = () => {
         color: BRAND.warning,
       },
     ];
-  }, [scoped, filtered, pendingCount]);
+  }, [scoped, filtered, pendingCount, detailsCache, products]);
 
-  /** Bước 2 của luồng: Thủ kho bấm Duyệt → mở form xác nhận xuất kho. */
+  /** Bước 2 của luồng: Thủ kho bấm Duyệt → kiểm tra tồn kho trước khi mở form xác nhận. */
   const [shipTarget, setShipTarget] = useState<StockTransfer | null>(null);
 
-  const handleApprove = (transfer: StockTransfer): void => {
+  const handleApprove = async (transfer: StockTransfer): Promise<void> => {
+    let details = detailsCache[transfer.id];
+    if (!details) {
+      try {
+        details = await chiTietPhieuXuatApi.getByPhieuXuat(transfer.id);
+        setDetailsCache((prev) => ({ ...prev, [transfer.id]: details }));
+      } catch {
+        message.error('Không tải được chi tiết phiếu');
+        return;
+      }
+    }
+
+    if (details.length === 0) {
+      message.error('Phiếu không có dòng chi tiết — không thể xuất.');
+      return;
+    }
+
+    // Lấy tồn kho thực tế từ backend để kiểm tra tức thời
+    let currentStockMap: Record<string, number> = {};
+    try {
+      const stockList = await tonKhoApi.getByBranch(transfer.fromBranchId);
+      stockList.forEach((st) => {
+        currentStockMap[st.idSanPham] = st.soLuongTon ?? 0;
+      });
+    } catch {
+      details.forEach((d) => {
+        currentStockMap[d.idSanPham] = stockOf(balances, transfer.fromBranchId, d.idSanPham);
+      });
+    }
+
+    // Kiểm tra từng sản phẩm yêu cầu
+    for (const d of details) {
+      const requested = d.soLuongYeuCau || 0;
+      const currentStock = currentStockMap[d.idSanPham] ?? 0;
+      if (requested > currentStock) {
+        const prod = products.find((p) => p.id === d.idSanPham);
+        const prodName = prod?.name || 'sản phẩm';
+        message.error(
+          `Tổng lượng hàng trong kho không đủ để duyệt phiếu - Tổng kho của hàng ${prodName} hiện tại: ${currentStock}`,
+        );
+        return;
+      }
+    }
+
     setShipTarget(transfer);
   };
 
-  const handleReject = (transfer: StockTransfer): void => {
-    if (user === null) return;
-    apiFetch(`${API_BASE_URL}/api/phieu-xuat-kho/${transfer.id}/reject`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...{},
-      },
-      body: JSON.stringify({ lyDo: `Từ chối bởi ${user.fullName}` }),
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error('Lỗi từ chối');
-        message.success(`Đã từ chối phiếu ${transfer.code}`);
-        dispatch(fetchTransfers());
-        dispatch(rejectTransfer({ id: transfer.id, rejectedBy: `${user.fullName} (${user.employeeCode})` }));
-      })
-      .catch((e) => message.error(e.message || 'Lỗi từ chối phiếu'));
+  const handleOpenReject = (transfer: StockTransfer): void => {
+    setRejectTarget(transfer);
+    setRejectReason('Hết hàng');
+  };
+
+  const handleConfirmReject = async (): Promise<void> => {
+    if (!rejectTarget || user === null) return;
+    if (!rejectReason.trim()) {
+      message.warning('Vui lòng nhập lý do từ chối');
+      return;
+    }
+    setRejectSubmitting(true);
+    try {
+      await phieuXuatKhoApi.reject(rejectTarget.id, {
+        lyDo: rejectReason.trim(),
+      });
+      message.success(`Đã từ chối phiếu ${rejectTarget.code}`);
+      dispatch(rejectTransfer({ id: rejectTarget.id, rejectedBy: `${user.fullName} (${user.employeeCode})` }));
+      dispatch(fetchTransfers());
+      setRejectTarget(null);
+      setRejectReason('');
+    } catch (e) {
+      message.error((e as Error).message || 'Lỗi từ chối phiếu');
+    } finally {
+      setRejectSubmitting(false);
+    }
   };
 
   /** Bước 3 của luồng: chi nhánh xác nhận đã nhận → SHIPPED thành COMPLETED. */
@@ -226,8 +312,12 @@ export const TransfersPage: FC = () => {
       align: 'right',
       render: (_, row) => {
         const details = detailsCache[row.id];
-        if (details === undefined || details.length === 0) return <Text type="secondary">—</Text>;
-        const total = details.reduce((sum, d) => sum + (d.soLuongXuat || 0), 0);
+        if (details === undefined) return <Text type="secondary">...</Text>;
+        if (details.length === 0) return <Text type="secondary">—</Text>;
+        const total = details.reduce(
+          (sum, d) => sum + ((d.soLuongXuat && d.soLuongXuat > 0) ? d.soLuongXuat : (d.soLuongYeuCau || 0)),
+          0,
+        );
         return <Text strong>{formatNumber(total)}</Text>;
       },
     },
@@ -237,21 +327,24 @@ export const TransfersPage: FC = () => {
       align: 'right',
       render: (_, row) => {
         const details = detailsCache[row.id];
-        if (details === undefined || details.length === 0) return <Text type="secondary">—</Text>;
-        const total = details.reduce(
-          (sum, d) => sum + (d.donGiaVon || 0) * (d.soLuongXuat || 0),
-          0,
-        );
+        if (details === undefined) return <Text type="secondary">...</Text>;
+        if (details.length === 0) return <Text type="secondary">—</Text>;
+        const total = details.reduce((sum, d) => {
+          const qty = (d.soLuongXuat && d.soLuongXuat > 0) ? d.soLuongXuat : (d.soLuongYeuCau || 0);
+          const prod = products.find((p) => p.id === d.idSanPham);
+          const cost = (d.donGiaVon && d.donGiaVon > 0) ? d.donGiaVon : (prod?.costPrice || 0);
+          return sum + cost * qty;
+        }, 0);
         return <Text strong>{formatVND(total)}</Text>;
       },
     },
     {
       title: 'Ngày xuất kho',
-      dataIndex: 'requestDate',
-      width: 125,
-      sorter: (a, b) => a.requestDate.localeCompare(b.requestDate),
-      defaultSortOrder: 'descend',
-      render: (value: string) => formatDate(value),
+      dataIndex: 'shippedDate',
+      width: 130,
+      align: 'center',
+      sorter: (a, b) => (a.shippedDate || '').localeCompare(b.shippedDate || ''),
+      render: (value: string | null) => (value ? formatDate(value) : <Text type="secondary">—</Text>),
     },
     {
       title: 'Người yêu cầu',
@@ -295,18 +388,9 @@ export const TransfersPage: FC = () => {
               </Button>
             )}
             {approving && (
-              <Popconfirm
-                title="Từ chối yêu cầu xuất kho?"
-                description={`Phiếu ${row.code} sẽ chuyển sang trạng thái "Đã huỷ".`}
-                okText="Từ chối"
-                cancelText="Đóng"
-                okButtonProps={{ danger: true }}
-                onConfirm={() => handleReject(row)}
-              >
-                <Button danger size="small">
-                  Từ chối
-                </Button>
-              </Popconfirm>
+              <Button danger size="small" onClick={() => handleOpenReject(row)}>
+                Từ chối
+              </Button>
             )}
             {receiving && (
               <Popconfirm
@@ -329,34 +413,113 @@ export const TransfersPage: FC = () => {
 
   const renderDetail = (transfer: StockTransfer): ReactElement => {
     const details = detailsCache[transfer.id] || [];
-    // const lineColumns: ColumnsType<TransferLine> = [
-    //   {
-    //     title: 'Sản phẩm',
-    //     dataIndex: 'productId',
-    //     render: (value: string) => {
-    //       const product = products.find((p) => p.id === value);
-    //       return product ? product.name : value;
-    //     },
-    //   },
-    //   { title: 'Số lượng yêu cầu', dataIndex: 'requestedQuantity' },
-    //   { title: 'Số lượng xuất', dataIndex: 'shippedQuantity' },
-    //   { title: 'Số lượng nhận', dataIndex: 'receivedQuantity' },
-    //   { title: 'Đơn giá vốn', dataIndex: 'unitCost', render: (v: number) => formatVND(v) },
-    //   { title: 'Thành tiền', dataIndex: 'lineTotal', render: (v: number) => formatVND(v) },
-    // ];
+
+    const detailColumns: ColumnsType<ChiTietPhieuXuatDTO> = [
+      {
+        title: 'STT',
+        key: 'index',
+        width: 55,
+        align: 'center',
+        render: (_1, _2, index) => index + 1,
+      },
+      {
+        title: 'Tên sản phẩm',
+        key: 'productName',
+        render: (_, d) => {
+          const prod = products.find((p) => p.id === d.idSanPham);
+          return (
+            <div>
+              <Text strong>{prod?.name || d.idSanPham}</Text>
+              {prod?.sku && <div style={{ fontSize: 12, color: '#8c8c8c' }}>Mã: {prod.sku}</div>}
+            </div>
+          );
+        },
+      },
+      {
+        title: 'SL yêu cầu',
+        dataIndex: 'soLuongYeuCau',
+        key: 'soLuongYeuCau',
+        width: 110,
+        align: 'right',
+        render: (qty: number) => <Text strong>{formatNumber(qty || 0)}</Text>,
+      },
+      {
+        title: 'SL xuất',
+        dataIndex: 'soLuongXuat',
+        key: 'soLuongXuat',
+        width: 110,
+        align: 'right',
+        render: (qty: number) => (qty && qty > 0 ? formatNumber(qty) : <Text type="secondary">—</Text>),
+      },
+      {
+        title: 'Đơn giá vốn',
+        key: 'donGiaVon',
+        width: 130,
+        align: 'right',
+        render: (_, d) => {
+          const prod = products.find((p) => p.id === d.idSanPham);
+          const price = (d.donGiaVon && d.donGiaVon > 0) ? d.donGiaVon : (prod?.costPrice || 0);
+          return formatVND(price);
+        },
+      },
+      {
+        title: 'Thành tiền',
+        key: 'thanhTien',
+        width: 140,
+        align: 'right',
+        render: (_, d) => {
+          const prod = products.find((p) => p.id === d.idSanPham);
+          const price = (d.donGiaVon && d.donGiaVon > 0) ? d.donGiaVon : (prod?.costPrice || 0);
+          const qty = (d.soLuongXuat && d.soLuongXuat > 0) ? d.soLuongXuat : (d.soLuongYeuCau || 0);
+          return <Text strong>{formatVND(price * qty)}</Text>;
+        },
+      },
+      {
+        title: 'Hạn sử dụng',
+        dataIndex: 'hanSuDung',
+        key: 'hanSuDung',
+        width: 120,
+        align: 'center',
+        render: (hsd: string) => (hsd ? <Tag color="green">{formatDate(hsd)}</Tag> : <Text type="secondary">—</Text>),
+      },
+    ];
+
     return (
-      <Descriptions bordered size="small" column={3}>
-        <Descriptions.Item label="Kho xuất">{transfer.fromBranchName}</Descriptions.Item>
-        <Descriptions.Item label="Cửa hàng nhận">{transfer.toBranchName}</Descriptions.Item>
-        <Descriptions.Item label="Trạng thái"><DocumentStatusTag status={transfer.status} /></Descriptions.Item>
-        <Descriptions.Item label="Số dòng hàng" span={3}>
-          {details.length === 0 ? '—' : `${details.length} dòng`}
-        </Descriptions.Item>
-      </Descriptions>
+      <div style={{ padding: '8px 12px', background: '#fafafa', borderRadius: 6 }}>
+        <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }} style={{ marginBottom: 12 }}>
+          <Descriptions.Item label="Kho xuất">{transfer.fromBranchName}</Descriptions.Item>
+          <Descriptions.Item label="Cửa hàng nhận">{transfer.toBranchName}</Descriptions.Item>
+          <Descriptions.Item label="Trạng thái"><DocumentStatusTag status={transfer.status} /></Descriptions.Item>
+          <Descriptions.Item label="Ngày yêu cầu">{formatDate(transfer.requestDate)}</Descriptions.Item>
+          <Descriptions.Item label="Ngày xuất kho">
+            {transfer.shippedDate ? formatDate(transfer.shippedDate) : <Text type="secondary">— (Chưa xuất kho)</Text>}
+          </Descriptions.Item>
+          <Descriptions.Item label="Người yêu cầu">{transfer.requestedBy || transfer.createdByName || '—'}</Descriptions.Item>
+          <Descriptions.Item label="Ghi chú" span={3}>
+            {transfer.note ? (
+              <Text strong style={{ color: transfer.status === DOCUMENT_STATUS.Cancelled ? '#cf1322' : 'inherit' }}>
+                {transfer.note}
+              </Text>
+            ) : (
+              <Text type="secondary">—</Text>
+            )}
+          </Descriptions.Item>
+        </Descriptions>
+
+        <div style={{ marginBottom: 6 }}>
+          <Text strong>Danh sách sản phẩm xuất kho ({details.length} mặt hàng):</Text>
+        </div>
+        <Table<ChiTietPhieuXuatDTO>
+          columns={detailColumns}
+          dataSource={details}
+          rowKey={(r) => r.id || r.idSanPham}
+          size="small"
+          pagination={false}
+          bordered
+        />
+      </div>
     );
   };
-
-  // const products = useAppSelector((state) => state.product.products);
 
   const filters: ToolbarFilter[] = [
     {
@@ -468,6 +631,32 @@ export const TransfersPage: FC = () => {
         transfer={shipTarget}
         onClose={() => setShipTarget(null)}
       />
+      <Modal
+        open={rejectTarget !== null}
+        title={`Từ chối yêu cầu xuất kho - ${rejectTarget?.code}`}
+        okText="Gửi"
+        cancelText="Huỷ"
+        okButtonProps={{ danger: true, loading: rejectSubmitting }}
+        onOk={handleConfirmReject}
+        onCancel={() => {
+          setRejectTarget(null);
+          setRejectReason('');
+        }}
+      >
+        <div style={{ marginBottom: 12 }}>
+          <Text>
+            Vui lòng điền lý do từ chối yêu cầu xuất kho sang <strong>{rejectTarget?.toBranchName}</strong>:
+          </Text>
+        </div>
+        <Input.TextArea
+          rows={3}
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          placeholder="Nhập lý do từ chối (ví dụ: Hết hàng trong kho tổng, không đủ số lượng tồn...)"
+          maxLength={255}
+          showCount
+        />
+      </Modal>
     </>
   );
 };

@@ -46,5 +46,28 @@ export const tonKhoApi = {
     if (!response.ok) throw new Error('Failed to fetch transfer stock');
     return response.json();
   },
+
+  adjust: async (data: {
+    idSanPham: string;
+    idChiNhanh: string;
+    soLuong: number;
+    donGia?: number;
+    maChungTu?: string;
+    nguoiThucHien?: string;
+    hanSuDung?: string | null;
+    ghiChu?: string;
+    ngayPhatSinh?: string;
+  }): Promise<TonKhoDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/ton-kho/adjust`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getHeaders() },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'Lỗi điều chỉnh tồn kho');
+    }
+    return response.json();
+  },
 };
 
