@@ -99,6 +99,19 @@ export const phieuXuatKhoApi = {
     }
     return response.json();
   },
+  /** Từ chối yêu cầu xuất kho: PENDING → CANCELLED kèm lý do. */
+  reject: async (id: string, body: { lyDo: string }): Promise<PhieuXuatKhoDTO> => {
+    const response = await fetch(`${API_BASE_URL}/api/phieu-xuat-kho/${id}/reject`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.message || 'Lỗi từ chối phiếu xuất');
+    }
+    return response.json();
+  },
 };
 
 export const chiTietPhieuXuatApi = {
