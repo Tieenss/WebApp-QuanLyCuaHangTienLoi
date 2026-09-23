@@ -240,7 +240,14 @@ public class PhieuXuatKhoController {
                     UUID idNguoiDuyet = branchAccessService.requireAuthenticatedEmployee(httpRequest).getId();
                     pxk.setTrangThai("CANCELLED");
                     pxk.setIdNguoiDuyet(idNguoiDuyet);
-                    pxk.setGhiChu(body != null && body.lyDo() != null ? body.lyDo() : pxk.getGhiChu());
+                    String lyDo = body != null && body.lyDo() != null ? body.lyDo().trim() : "";
+                    String oldNote = pxk.getGhiChu();
+                    if (!lyDo.isEmpty()) {
+                        String newNote = (oldNote != null && !oldNote.isBlank())
+                                ? oldNote + " | Lý do từ chối: " + lyDo
+                                : "Lý do từ chối: " + lyDo;
+                        pxk.setGhiChu(newNote);
+                    }
                     pxk.setNgayCapNhat(LocalDateTime.now());
                     phieuXuatKhoRepository.save(pxk);
                     return ResponseEntity.ok(toDTO(pxk));
@@ -327,8 +334,10 @@ public class PhieuXuatKhoController {
                         .map(t -> t.getSoLuongTon() == null ? 0 : t.getSoLuongTon())
                         .orElse(0);
                 if (xuat > ton) {
+                    SanPham sp = sanPhamRepository.findById(ct.getIdSanPham()).orElse(null);
+                    String tenSp = sp != null ? sp.getTenSanPham() : "sản phẩm";
                     return ResponseEntity.badRequest().body( ApiResponse.err(
-                            "Không đủ tồn kho tại kho xuất (tồn " + ton + ", cần " + xuat + ")"));
+                            "Tổng lượng hàng trong kho không đủ để duyệt phiếu - Tổng kho của hàng " + tenSp + " hiện tại: " + ton));
                 }
                 BigDecimal giaVon = tonKhoRepository
                         .findByIdSanPhamAndIdChiNhanh(ct.getIdSanPham(), pxk.getIdChiNhanhXuat())

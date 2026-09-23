@@ -281,17 +281,21 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         created = await response.json();
 
         await chiTietPhieuXuatApi.createBatch(
-          validRows.map((row, index) => ({
-            id: '',
-            idPhieuXuat: created.id,
-            idSanPham: row.productId,
-            soLuongYeuCau: row.quantity,
-            soLuongXuat: 0,
-            soLuongNhan: 0,
-            donGiaVon: 0,
-            thanhTien: 0,
-            thuTu: index,
-          })),
+          validRows.map((row, index) => {
+            const prod = products.find((p) => p.id === row.productId);
+            const cost = prod?.costPrice ?? 0;
+            return {
+              id: '',
+              idPhieuXuat: created.id,
+              idSanPham: row.productId,
+              soLuongYeuCau: row.quantity,
+              soLuongXuat: 0,
+              soLuongNhan: 0,
+              donGiaVon: cost,
+              thanhTien: cost * row.quantity,
+              thuTu: index,
+            };
+          }),
         );
 
         // 2) Thủ kho/Admin lập phiếu trực tiếp: tự chạy luôn bước xuất + nhận
