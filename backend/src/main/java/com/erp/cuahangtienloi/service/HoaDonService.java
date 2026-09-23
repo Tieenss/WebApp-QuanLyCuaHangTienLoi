@@ -12,8 +12,10 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -580,5 +582,81 @@ public class HoaDonService {
         }
 
         return dto;
+    }
+
+    @Transactional
+    public HoaDonDTO refund(UUID id, String lyDoHoan, NhanVien actor) {
+        HoaDon hd = hoaDonRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy hoá đơn"));
+        if (!"COMPLETED".equals(hd.getTrangThai())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ hoàn tiền được hoá đơn ở trạng thái COMPLETED");
+        }
+
+        if ("QUAN_LY".equals(actor.getVaiTro()) || "THU_NGAN".equals(actor.getVaiTro())) {
+            if (actor.getIdChiNhanh() != null && !actor.getIdChiNhanh().equals(hd.getIdChiNhanh())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Không thể hoàn hoá đơn khác chi nhánh");
+            }
+        }
+
+        String lyDo = (lyDoHoan != null && !lyDoHoan.trim().isEmpty())
+                ? lyDoHoan.trim()
+                : "Khách trả hàng hoàn tiền";
+
+        String nguoiThucHien = (actor.getHoTen() != null && !actor.getHoTen().trim().isEmpty())
+                ? actor.getHoTen()
+                : "Hệ thống";
+
+        jdbcTemplate.query(
+                "SELECT fn_hoan_hoa_don(?::uuid, ?::uuid, ?::text, ?::varchar)",
+                rs -> { }, hd.getId(), actor.getId(), lyDo, nguoiThucHien
+        );
+
+        hd.setTrangThai("REFUNDED");
+        hd.setIdNguoiHoan(actor.getId());
+        hd.setNgayHoan(LocalDateTime.now());
+        hd.setLyDoHoan(lyDo);
+        hd.setNgayCapNhat(LocalDateTime.now());
+
+        return toDTO(hd);
+    }
+
+    @Transactional
+    public HoaDonDTO cancel(UUID id, String lyDoHoan, NhanVien actor) {
+        HoaDon hd = hoaDonRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy hoá đơn"));
+        if (!"COMPLETED".equals(hd.getTrangThai())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ huỷ được hoá đơn ở trạng thái COMPLETED");
+        }
+
+        if ("QUAN_LY".equals(actor.getVaiTro()) || "THU_NGAN".equals(actor.getVaiTro())) {
+            if (actor.getIdChiNhanh() != null && !actor.getIdChiNhanh().equals(hd.getIdChiNhanh())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Không thể huỷ hoá đơn khác chi nhánh");
+            }
+        }
+
+        String lyDo = (lyDoHoan != null && !lyDoHoan.trim().isEmpty())
+                ? lyDoHoan.trim()
+                : "Huỷ đơn hàng";
+
+        String nguoiThucHien = (actor.getHoTen() != null && !actor.getHoTen().trim().isEmpty())
+                ? actor.getHoTen()
+                : "Hệ thống";
+
+        hd.setTrangThai("CANCELLED");
+        hd.setIdNguoiHoan(actor.getId());
+        hd.setNgayHoan(LocalDateTime.now());
+        hd.setLyDoHoan(lyDo);
+        hd.setNgayCapNhat(LocalDateTime.now());
+        hoaDonRepository.saveAndFlush(hd);
+
+        List<ChiTietHoaDon> lines = chiTietHoaDonRepository.findByIdHoaDon(id);
+        for (ChiTietHoaDon line : lines) {
+            jdbcTemplate.query(
+                    "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, 'SALE_RETURN'::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, NULL::date, ?::text, NOW()::timestamp)",
+                    rs -> { }, line.getIdSanPham(), hd.getIdChiNhanh(), line.getSoLuong(), line.getDonGiaVon(),
+                    hd.getMaHoaDon(), nguoiThucHien, "Huỷ đơn hàng: " + hd.getMaHoaDon());
+        }
+
+        return toDTO(hd);
     }
 }

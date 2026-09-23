@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type FC, type ReactElement } from 'react';
 import { isInitialLoading } from '@/utils/tableLoading';
 import { chiTietPhieuXuatApi, type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
-import { nhanVienApi } from '@/api/nhanVien';
 import { tonKhoApi } from '@/api/tonKho';
 import {
   App as AntdApp,
@@ -56,7 +55,7 @@ export const TransfersPage: FC = () => {
   const balances = useAppSelector((state) => state.stock.balances);
 
   const [isFormOpen, setFormOpen] = useState(false);
-  const [detailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
+  const [detailsCache, setDetailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
 
 
   const [rejectTarget, setRejectTarget] = useState<StockTransfer | null>(null);
