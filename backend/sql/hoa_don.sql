@@ -541,14 +541,14 @@ BEGIN
         PERFORM fn_ghi_the_kho_va_dieu_chinh_ton(
             v_line.id_san_pham,
             v_hoa_don.id_chi_nhanh,
-            'SALE_RETURN',
+            'SALE_RETURN'::varchar,
             v_line.so_luong,  -- SALE_RETURN: SL dương
             v_line.don_gia_von,
             v_ma_chung_tu,
             p_nguoi_thuc_hien,
-            NULL,
+            NULL::date,
             'Hoàn tiền hoá đơn ' || v_ma_chung_tu,
-            NOW()
+            NOW()::timestamp
         );
     END LOOP;
 

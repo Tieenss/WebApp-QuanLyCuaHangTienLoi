@@ -113,6 +113,29 @@ class CriticalFlowRegressionTest {
         assertThrows(IllegalArgumentException.class, () -> controller.create(cashInvoice));
     }
 
+    @Test
+    void refundRejectsNonCompletedInvoice() {
+        HoaDonRepository hoaDonRepository = mock(HoaDonRepository.class);
+        HoaDonController controller = new HoaDonController(
+                hoaDonRepository,
+                mock(ChiNhanhRepository.class),
+                mock(NhanVienRepository.class),
+                mock(ChiTietHoaDonRepository.class),
+                mock(SanPhamRepository.class),
+                mock(TonKhoRepository.class),
+                mock(SoQuyRepository.class),
+                mock(JdbcTemplate.class)
+        );
+        UUID invoiceId = UUID.randomUUID();
+        HoaDon hd = new HoaDon();
+        hd.setId(invoiceId);
+        hd.setTrangThai("CANCELLED");
+        when(hoaDonRepository.findById(invoiceId)).thenReturn(java.util.Optional.of(hd));
+
+        var response = controller.refund(invoiceId, new HoaDonController.RefundRequest(null), mock(HttpServletRequest.class));
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
     private HoaDon invoice(UUID branchId, String method, BigDecimal total) {
         HoaDon request = new HoaDon();
         request.setIdChiNhanh(branchId);

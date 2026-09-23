@@ -131,6 +131,7 @@ export const SalesOrdersPage: FC = () => {
   const [paymentFilter, setPaymentFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [apiOrders, setApiOrders] = useState<SalesOrder[]>([]);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   // Nạp hoá đơn từ DB (hoa_don) khi vào trang — hợp nhất với đơn trong session.
   useEffect(() => {
@@ -418,6 +419,8 @@ export const SalesOrdersPage: FC = () => {
                       danger
                       size="small"
                       icon={<RollbackOutlined />}
+                      loading={actionLoadingId === row.id}
+                      disabled={actionLoadingId !== null}
                     >
                       Hoàn tiền
                     </Button>
@@ -438,7 +441,12 @@ export const SalesOrdersPage: FC = () => {
                       okButtonProps={{ danger: true }}
                       onConfirm={() => handleCancel(row)}
                     >
-                      <Button size="small" icon={<StopOutlined />}>
+                      <Button
+                        size="small"
+                        icon={<StopOutlined />}
+                        loading={actionLoadingId === row.id}
+                        disabled={actionLoadingId !== null}
+                      >
                         Huỷ đơn
                       </Button>
                     </Popconfirm>
@@ -504,38 +512,119 @@ export const SalesOrdersPage: FC = () => {
   };
 
   /**
-   * Hoàn tiền hoá đơn: dispatch `orderRefunded` để 3 slice xử lý song song:
-   *   - salesOrderSlice → set status = REFUNDED, ghi lại dấu thời gian
-   *   - stockSlice       → cộng lại tồn + ghi thẻ kho SALE_RETURN
-   *   - cashbookSlice    → tạo phiếu chi HOAN_TIEN (tiền mặt)
+   * Hoàn tiền hoá đơn:
+   *   1. Nạp lines nếu chưa có để đảm bảo Redux stockSlice nhận diện đúng mặt hàng hoàn tồn.
+   *   2. Gọi API hoaDonApi.refund để cập nhật trạng thái DB thành REFUNDED và hoàn kho trong DB.
+   *   3. Dispatch `orderRefunded` để các slice Redux xử lý (stockSlice, cashbookSlice, cashbookPersistence).
+   *   4. Cập nhật state `apiOrders` ngay trên UI để trạng thái chuyển thành 'Đã hoàn tiền'.
    */
-  const handleRefund = (order: SalesOrder): void => {
-    if (user === null) return;
+  const handleRefund = async (order: SalesOrder): Promise<void> => {
+    if (user === null || actionLoadingId !== null) return;
     const performedBy = `${user.fullName} (${user.employeeCode})`;
     const refundedAt = new Date().toISOString();
 
-    dispatch(orderRefunded({ order, performedBy, refundedAt }));
-    message.success(
-      `Đã hoàn tiền hoá đơn ${order.code}. Tồn kho đã được cộng lại, sổ quỹ đã ghi phiếu chi.`,
-    );
+    setActionLoadingId(order.id);
+    try {
+      let orderWithLines = order;
+      if (order.lines.length === 0) {
+        try {
+          const lines = await chiTietHoaDonApi.getByHoaDon(order.id);
+          orderWithLines = {
+            ...order,
+            lines: lines.map((line, index) =>
+              mapDtoToOrderLine(line, index, products),
+            ),
+          };
+        } catch {
+          // tiếp tục với order gốc nếu nạp lines thất bại
+        }
+      }
+
+      await hoaDonApi.refund(order.id, 'Khách trả hàng hoàn tiền');
+
+      dispatch(orderRefunded({ order: orderWithLines, performedBy, refundedAt }));
+
+      const refundStamp = `[Hoàn ${refundedAt.slice(0, 16).replace('T', ' ')} bởi ${performedBy}]`;
+      setApiOrders((prev) =>
+        prev.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                lines: orderWithLines.lines,
+                status: ORDER_STATUS.Refunded,
+                note: item.note === '' ? refundStamp : `${item.note}\n${refundStamp}`,
+              }
+            : item,
+        ),
+      );
+
+      message.success(
+        `Đã hoàn tiền hoá đơn ${order.code}. Tồn kho đã được cộng lại, sổ quỹ đã ghi phiếu chi.`,
+      );
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Không thể hoàn tiền hoá đơn';
+      message.error(errMsg);
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   /**
-   * Huỷ đơn (lỗi nhập / khách đổi ý trong ngày): dispatch `orderCancelled`
-   * để 2 slice xử lý:
-   *   - salesOrderSlice → set status = CANCELLED, ghi dấu
-   *   - stockSlice       → cộng lại tồn + ghi thẻ kho SALE_RETURN
-   *   - cashbookSlice    KHÔNG lắng nghe — không phát sinh phiếu chi.
+   * Huỷ đơn (lỗi nhập / khách đổi ý trong ngày):
+   *   1. Nạp lines nếu chưa có để đảm bảo Redux stockSlice hoàn tồn.
+   *   2. Gọi API hoaDonApi.cancel để cập nhật trạng thái DB thành CANCELLED.
+   *   3. Dispatch `orderCancelled` để stockSlice hoàn tồn.
+   *   4. Cập nhật state `apiOrders` trên UI để chuyển thành 'Đã huỷ'.
    */
-  const handleCancel = (order: SalesOrder): void => {
-    if (user === null) return;
+  const handleCancel = async (order: SalesOrder): Promise<void> => {
+    if (user === null || actionLoadingId !== null) return;
     const performedBy = `${user.fullName} (${user.employeeCode})`;
     const cancelledAt = new Date().toISOString();
 
-    dispatch(orderCancelled({ order, performedBy, cancelledAt }));
-    message.success(
-      `Đã huỷ đơn ${order.code}. Tồn kho đã được cộng lại.`,
-    );
+    setActionLoadingId(order.id);
+    try {
+      let orderWithLines = order;
+      if (order.lines.length === 0) {
+        try {
+          const lines = await chiTietHoaDonApi.getByHoaDon(order.id);
+          orderWithLines = {
+            ...order,
+            lines: lines.map((line, index) =>
+              mapDtoToOrderLine(line, index, products),
+            ),
+          };
+        } catch {
+          // tiếp tục với order gốc nếu nạp lines thất bại
+        }
+      }
+
+      await hoaDonApi.cancel(order.id, 'Huỷ đơn hàng');
+
+      dispatch(orderCancelled({ order: orderWithLines, performedBy, cancelledAt }));
+
+      const cancelStamp = `[Huỷ ${cancelledAt.slice(0, 16).replace('T', ' ')} bởi ${performedBy}]`;
+      setApiOrders((prev) =>
+        prev.map((item) =>
+          item.id === order.id
+            ? {
+                ...item,
+                lines: orderWithLines.lines,
+                status: ORDER_STATUS.Cancelled,
+                note: item.note === '' ? cancelStamp : `${item.note}\n${cancelStamp}`,
+              }
+            : item,
+        ),
+      );
+
+      message.success(
+        `Đã huỷ đơn ${order.code}. Tồn kho đã được cộng lại.`,
+      );
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Không thể huỷ đơn hàng';
+      message.error(errMsg);
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const selectedOrder = useMemo(

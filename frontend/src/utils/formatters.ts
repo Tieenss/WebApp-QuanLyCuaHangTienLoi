@@ -1,6 +1,6 @@
-/**
 import type { VND } from '@/types';
 
+/**
  * Định dạng số tiền sang VND đầy đủ ký hiệu.
  * @example formatVND(48520000) // "48.520.000 ₫"
  */
