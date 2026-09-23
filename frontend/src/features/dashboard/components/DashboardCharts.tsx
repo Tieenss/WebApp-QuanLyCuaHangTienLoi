@@ -151,22 +151,35 @@ interface CategoryRevenueChartProps {
   data: CategoryRevenueSlice[];
 }
 
+const RADIAN = Math.PI / 180;
+
 /**
- * Nhãn phần trăm cho biểu đồ donut.
- *
- * Recharts khai báo `PieLabelRenderProps` là một union rất rộng, nên nhận
- * `props` dạng object rồi tự đọc `percent` là cách gọn nhất mà vẫn an toàn kiểu.
+ * Nhãn phần trăm hiển thị chính giữa từng miếng donut.
  */
-const renderPercentLabel = (props: PieLabelRenderProps): string => {
-  const { percent } = props;
-  return typeof percent === 'number' && percent > 0.06
-    ? `${(percent * 100).toFixed(0)}%`
-    : '';
+const renderCustomizedLabel = (props: PieLabelRenderProps) => {
+  const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;
+  if (typeof percent !== 'number' || percent < 0.05) return null;
+  const radius = Number(innerRadius) + (Number(outerRadius) - Number(innerRadius)) * 0.5;
+  const x = Number(cx) + radius * Math.cos(-Number(midAngle) * RADIAN);
+  const y = Number(cy) + radius * Math.sin(-Number(midAngle) * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#ffffff"
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={11}
+      fontWeight={600}
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
 };
 
 /** Tỷ trọng doanh thu theo danh mục — donut để thấy cả tổng thể và từng phần. */
 export const CategoryRevenueChart: FC<CategoryRevenueChartProps> = ({ data }) => {
-  // Ẩn nhãn của miếng quá nhỏ, nếu không chữ sẽ chồng lên nhau.
   const chartData = useMemo(
     () => data.map((slice) => ({ ...slice, name: slice.categoryName })),
     [data],
@@ -179,11 +192,10 @@ export const CategoryRevenueChart: FC<CategoryRevenueChartProps> = ({ data }) =>
           data={chartData}
           dataKey="revenue"
           nameKey="name"
-          innerRadius="52%"
+          innerRadius="48%"
           outerRadius="78%"
           paddingAngle={2}
-          // Ẩn nhãn của miếng nhỏ (<6%) để chữ không chồng lên nhau.
-          label={renderPercentLabel}
+          label={renderCustomizedLabel}
           labelLine={false}
         >
           {chartData.map((slice) => (
@@ -191,12 +203,15 @@ export const CategoryRevenueChart: FC<CategoryRevenueChartProps> = ({ data }) =>
           ))}
         </Pie>
         <ChartTooltip
-          formatter={currencyFormatter}
+          formatter={(value: any, name: any, item: any) => [
+            `${currencyFormatter(Number(value))} (${(item?.payload?.percentage ?? (Number(item?.payload?.percent ?? 0) * 100)).toFixed(1)}%)`,
+            name,
+          ]}
           contentStyle={{ borderRadius: 8, fontSize: 12, borderColor: BRAND.border }}
         />
         <Legend
           verticalAlign="bottom"
-          wrapperStyle={{ fontSize: 11.5, lineHeight: '18px' }}
+          wrapperStyle={{ fontSize: 11.5, lineHeight: '20px', paddingTop: 8 }}
         />
       </PieChart>
     </ResponsiveContainer>

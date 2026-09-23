@@ -27,6 +27,7 @@ import {
   Tooltip as ChartTooltip,
   XAxis,
   YAxis,
+  type PieLabelRenderProps,
 } from 'recharts';
 import { ChartCard } from '@/components/ChartCard';
 import { PageHeader } from '@/components/PageHeader';
@@ -59,26 +60,39 @@ import './ReportsPage.css';
 const { Text } = Typography;
 
 const AXIS_STYLE = { fontSize: 11, fill: BRAND.textSecondary } as const;
+const RADIAN = Math.PI / 180;
+
+/**
+ * Nhãn phần trăm hiển thị chính giữa từng miếng donut.
+ */
+const renderCustomizedLabel = (props: PieLabelRenderProps) => {
+  const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;
+  if (typeof percent !== 'number' || percent < 0.05) return null;
+  const radius = Number(innerRadius) + (Number(outerRadius) - Number(innerRadius)) * 0.5;
+  const x = Number(cx) + radius * Math.cos(-Number(midAngle) * RADIAN);
+  const y = Number(cy) + radius * Math.sin(-Number(midAngle) * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#ffffff"
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={11}
+      fontWeight={600}
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
 
 interface CategoryRevenueData {
   categoryId: string;
   categoryName: string;
   revenue: number;
+  percentage: number;
   color: string;
-}
-
-interface DashboardMetricsData {
-  revenue: number;
-  previousRevenue: number;
-  orderCount: number;
-  previousOrderCount: number;
-  averageOrderValue: number;
-  previousAverageOrderValue: number;
-  grossProfit: number;
-  previousGrossProfit: number;
-  itemsSold: number;
-  stockValue: number;
-  lowStockCount: number;
 }
 
 interface DashboardMetricsData {
@@ -131,6 +145,8 @@ export const ReportsPage: FC = () => {
   const branches = useAppSelector((state) => state.branch.branches);
   const products = useAppSelector((state) => state.product.products);
   const balances = useAppSelector((state) => state.stock.balances);
+  const categories = useAppSelector((state) => state.category.categories);
+  const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   const [branchId, setBranchId] = useState<string | null>(activeBranchId);
   const [range, setRange] = useState<TimeRange>('30days');
@@ -360,14 +376,18 @@ export const ReportsPage: FC = () => {
   }, [invoices, periodInvoices, invoiceLines, costByProduct, branchId, branches]);
 
   const categoryRevenue = useMemo<CategoryRevenueData[]>(() => {
-    const map = new Map<string, { name: string; revenue: number }>();
+    const map = new Map<string, { name: string; revenue: number; color?: string }>();
+    let total = 0;
     for (const hd of periodInvoices) {
       const lines = invoiceLines[hd.id] ?? [];
       for (const line of lines) {
         const product = productById(line.idSanPham);
-        const catId = product?.categoryId ?? 'unknown';
-        const prev = map.get(catId) ?? { name: product?.categoryName || 'Khác', revenue: 0 };
+        const catId = product?.categoryId || 'unknown';
+        const cat = categoryMap.get(catId);
+        const catName = cat?.name || product?.categoryName || (catId === 'unknown' ? 'Khác' : 'Khác');
+        const prev = map.get(catId) ?? { name: catName, revenue: 0, color: cat?.color };
         prev.revenue += line.thanhTien;
+        total += line.thanhTien;
         map.set(catId, prev);
       }
     }
@@ -376,11 +396,13 @@ export const ReportsPage: FC = () => {
         categoryId,
         categoryName: v.name,
         revenue: v.revenue,
-        color: CHART_COLORS[index % CHART_COLORS.length] ?? BRAND.primaryRed,
+        percentage: total === 0 ? 0 : (v.revenue / total) * 100,
+        color: (v.color && v.color !== '#000000') ? v.color : (CHART_COLORS[index % CHART_COLORS.length] ?? BRAND.primaryRed),
       }))
+      .filter((item) => item.revenue > 0)
       .sort((a, b) => b.revenue - a.revenue);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodInvoices, invoiceLines, products]);
+  }, [periodInvoices, invoiceLines, products, categoryMap]);
 
   // ── Báo cáo 2: Lợi nhuận ──────────────────────────────────────────────────────
   const categoryProfit = useMemo<ProfitReportRow[]>(() => {
@@ -389,8 +411,10 @@ export const ReportsPage: FC = () => {
       const lines = invoiceLines[hd.id] ?? [];
       for (const line of lines) {
         const product = productById(line.idSanPham);
-        const catId = product?.categoryId ?? 'unknown';
-        const prev = map.get(catId) ?? { name: product?.categoryName || 'Khác', revenue: 0, cogs: 0 };
+        const catId = product?.categoryId || 'unknown';
+        const cat = categoryMap.get(catId);
+        const catName = cat?.name || product?.categoryName || (catId === 'unknown' ? 'Khác' : 'Khác');
+        const prev = map.get(catId) ?? { name: catName, revenue: 0, cogs: 0 };
         prev.revenue += line.thanhTien;
         prev.cogs += line.soLuong * (costByProduct.get(line.idSanPham) ?? 0);
         map.set(catId, prev);
@@ -409,7 +433,7 @@ export const ReportsPage: FC = () => {
       }))
       .sort((a, b) => b.revenue - a.revenue);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodInvoices, invoiceLines, costByProduct, products]);
+  }, [periodInvoices, invoiceLines, costByProduct, products, categoryMap]);
 
   // ── Báo cáo 3: Hàng bán chạy ──────────────────────────────────────────────────
   const topSelling = useMemo<TopSellingRow[]>(() => {
@@ -429,7 +453,7 @@ export const ReportsPage: FC = () => {
           rank: 0,
           sku: product?.sku ?? '',
           productName: product?.name ?? '',
-          categoryName: product?.categoryName ?? '',
+          categoryName: product?.categoryName || categoryMap.get(product?.categoryId ?? '')?.name || '',
           imageUrl: product?.imageUrl ?? '',
           quantitySold: v.qty,
           revenue: v.revenue,
@@ -442,7 +466,7 @@ export const ReportsPage: FC = () => {
       .slice(0, 20)
       .map((row, index) => ({ ...row, rank: index + 1 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productStats, balances, products]);
+  }, [productStats, balances, products, categoryMap]);
 
   // ── Báo cáo 4: Hao hụt / huỷ hàng (từ the_kho các giao dịch điều chỉnh) ──────
   const shrinkage = useMemo<ShrinkageReportRow[]>(() => {
@@ -470,7 +494,7 @@ export const ReportsPage: FC = () => {
           branchName: branch?.name ?? '',
           sku: product?.sku ?? '',
           productName: product?.name ?? '',
-          categoryName: product?.categoryName ?? '',
+          categoryName: product?.categoryName || categoryMap.get(product?.categoryId ?? '')?.name || '',
           reason: 'LOST' as ShrinkageReason,
           quantity: qty,
           unitCost,
@@ -922,23 +946,26 @@ export const ReportsPage: FC = () => {
                               }))}
                               dataKey="revenue"
                               nameKey="name"
-                              innerRadius="50%"
-                              outerRadius="76%"
+                              innerRadius="48%"
+                              outerRadius="78%"
                               paddingAngle={2}
+                              label={renderCustomizedLabel}
+                              labelLine={false}
                             >
                               {categoryRevenue.map((slice) => (
                                 <Cell key={slice.categoryId} fill={slice.color} />
                               ))}
                             </Pie>
                             <ChartTooltip
-                              formatter={(value: number | string) =>
-                                formatVND(Number(value))
-                              }
+                              formatter={(value: any, name: any, item: any) => [
+                                `${formatVND(Number(value))} (${(item?.payload?.percentage ?? (Number(item?.payload?.percent ?? 0) * 100)).toFixed(1)}%)`,
+                                name,
+                              ]}
                               contentStyle={{ borderRadius: 8, fontSize: 12 }}
                             />
                             <Legend
                               verticalAlign="bottom"
-                              wrapperStyle={{ fontSize: 11.5, lineHeight: '18px' }}
+                              wrapperStyle={{ fontSize: 11.5, lineHeight: '20px', paddingTop: 8 }}
                             />
                           </PieChart>
                         </ResponsiveContainer>

@@ -18,7 +18,7 @@ export const BranchStatCards: React.FC = () => {
     const totalBranches = branches.length;
     const activeBranches = branches.filter((b) => b.status === 'Active').length;
     const inactiveBranches = totalBranches - activeBranches;
-    const totalStaff = branches.reduce((sum, b) => sum + b.staffCount, 0);
+    const totalStaff = branches.reduce((sum, b) => sum + b.employeeCount, 0);
 
     const stats = [
         {

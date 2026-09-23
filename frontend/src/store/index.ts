@@ -15,6 +15,7 @@ import transferReducer from './slices/transferSlice';
 import employeeReducer from './slices/employeeSlice';
 import categoryReducer from './slices/categorySlice';
 import salesOrderReducer from './slices/salesOrderSlice';
+import internalExportReducer from './slices/internalExportSlice';
 import { cashbookPersistence } from './cashbookPersistence';
 
 export const store = configureStore({
@@ -36,6 +37,7 @@ export const store = configureStore({
     product: productReducer,
     category: categoryReducer,
     salesOrder: salesOrderReducer,
+    internalExport: internalExportReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().prepend(cashbookPersistence.middleware),
