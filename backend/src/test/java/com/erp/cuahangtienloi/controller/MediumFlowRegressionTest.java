@@ -15,6 +15,7 @@ import com.erp.cuahangtienloi.service.BranchProductStatusService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -114,10 +115,10 @@ class MediumFlowRegressionTest {
     @Test
     void stocktakeWriteEndpointsDeclareRolesExplicitly() throws NoSuchMethodException {
         List<Method> writeMethods = List.of(
-                ChiTietKiemKeController.class.getDeclaredMethod("create", ChiTietKiemKe.class),
-                ChiTietKiemKeController.class.getDeclaredMethod("createBatch", List.class),
-                ChiTietKiemKeController.class.getDeclaredMethod("delete", UUID.class),
-                ChiTietKiemKeController.class.getDeclaredMethod("deleteByPhieuKiemKe", UUID.class)
+                ChiTietKiemKeController.class.getDeclaredMethod("create", ChiTietKiemKe.class, HttpServletRequest.class),
+                ChiTietKiemKeController.class.getDeclaredMethod("createBatch", List.class, HttpServletRequest.class),
+                ChiTietKiemKeController.class.getDeclaredMethod("delete", UUID.class, HttpServletRequest.class),
+                ChiTietKiemKeController.class.getDeclaredMethod("deleteByPhieuKiemKe", UUID.class, HttpServletRequest.class)
         );
 
         for (Method method : writeMethods) {

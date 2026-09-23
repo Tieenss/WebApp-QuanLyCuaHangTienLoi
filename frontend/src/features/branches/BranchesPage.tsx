@@ -12,11 +12,12 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  DeleteOutlined,
   EditOutlined,
   EnvironmentOutlined,
   PhoneOutlined,
   PlusOutlined,
+  StopOutlined,
+  UndoOutlined,
 } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
@@ -29,6 +30,7 @@ import {
   fetchBranches,
   setBranchModalOpen,
   setSelectedBranch,
+  updateBranchThunk,
 } from '@/store/slices/branchSlice';
 import { fetchEmployees } from '@/store/slices/employeeSlice';
 import {
@@ -185,6 +187,28 @@ export const BranchesPage: FC = () => {
     dispatch(deleteBranchThunk(id));
   };
 
+  const handleRestore = (branch: Branch): void => {
+    dispatch(
+      updateBranchThunk({
+        id: branch.id,
+        values: {
+          code: branch.code,
+          name: branch.name,
+          kind: branch.kind,
+          region: branch.region,
+          province: branch.province,
+          district: branch.district,
+          addressLine: branch.addressLine,
+          phone: branch.phone,
+          openingHours: branch.openingHours,
+          areaSqm: branch.areaSqm,
+          openedAt: branch.openedAt,
+          status: RECORD_STATUS.Active,
+        },
+      }),
+    );
+  };
+
   const columns: ColumnsType<Branch> = [
     {
       title: 'Mã',
@@ -318,21 +342,45 @@ export const BranchesPage: FC = () => {
       fixed: 'right',
       render: (_, row) => (
         <Space size={0}>
-          <Button
-            type="text"
-            icon={<EditOutlined className="action-edit-icon" />}
-            onClick={() => handleEdit(row)}
-          />
-          <Popconfirm
-            title="Ngừng hoạt động chi nhánh?"
-            description={`Ngừng hoạt động "${row.name}"? Lịch sử và dữ liệu vẫn được giữ lại.`}
-            okText="Ngừng hoạt động"
-            cancelText="Huỷ"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(row.id)}
-          >
-            <Button type="text" icon={<DeleteOutlined className="action-delete-icon" />} />
-          </Popconfirm>
+          <Tooltip title="Chỉnh sửa chi nhánh">
+            <Button
+              type="text"
+              icon={<EditOutlined className="action-edit-icon" />}
+              onClick={() => handleEdit(row)}
+            />
+          </Tooltip>
+          {row.status === 'Active' ? (
+            <Popconfirm
+              title="Ngừng hoạt động chi nhánh?"
+              description={`Ngừng hoạt động "${row.name}"? Lịch sử và dữ liệu vẫn được giữ lại.`}
+              okText="Ngừng hoạt động"
+              cancelText="Huỷ"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDelete(row.id)}
+            >
+              <Tooltip title="Ngừng hoạt động">
+                <Button
+                  type="text"
+                  icon={<StopOutlined style={{ color: '#faad14' }} />}
+                />
+              </Tooltip>
+            </Popconfirm>
+          ) : (
+            <Popconfirm
+              title="Kích hoạt lại chi nhánh?"
+              description={`Mở lại hoạt động cho chi nhánh "${row.name}"?`}
+              okText="Kích hoạt"
+              cancelText="Huỷ"
+              onConfirm={() => handleRestore(row)}
+            >
+              <Tooltip title="Kích hoạt lại chi nhánh">
+                <Button
+                  type="text"
+                  icon={<UndoOutlined style={{ color: '#52c41a' }} />}
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
