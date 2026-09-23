@@ -399,17 +399,19 @@ export const ProductsPage: FC = () => {
       title: 'Thao tác',
       key: 'actions',
       align: 'center',
-      width: isAdmin ? 140 : 100,
+      width: isAdmin ? 140 : 80,
       fixed: 'right',
       render: (_, row) => (
         <Space size={0}>
-          <Tooltip title="Chỉnh sửa sản phẩm">
-            <Button
-              type="text"
-              icon={<EditOutlined className="action-edit-icon" />}
-              onClick={() => handleEdit(row)}
-            />
-          </Tooltip>
+          {isAdmin && (
+            <Tooltip title="Chỉnh sửa sản phẩm">
+              <Button
+                type="text"
+                icon={<EditOutlined className="action-edit-icon" />}
+                onClick={() => handleEdit(row)}
+              />
+            </Tooltip>
+          )}
 
           {isAdmin ? (
             <>
@@ -535,9 +537,11 @@ export const ProductsPage: FC = () => {
         description="Danh sách SKU, mã vạch, giá bán và biên lợi nhuận. Quản lý danh mục hàng hoá ở trang riêng."
         extra={
           <Space wrap>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              Thêm sản phẩm
-            </Button>
+            {isAdmin && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                Thêm sản phẩm
+              </Button>
+            )}
             <Tag color="red" className="tag-no-margin">
               {filtered.length} / {products.length} SKU
             </Tag>

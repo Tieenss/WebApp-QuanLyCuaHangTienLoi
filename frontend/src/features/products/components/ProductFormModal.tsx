@@ -104,12 +104,18 @@ export const ProductFormModal: FC = () => {
     dispatch(fetchCategories());
     dispatch(fetchSuppliers());
     if (selectedProduct !== null) {
-      form.setFieldsValue(selectedProduct);
+      // Khi chỉnh sửa: nếu sku bắt đầu bằng CK-, bóc tách tiền tố để hiển thị trong input có addonBefore="CK-"
+      const rawSku = selectedProduct.sku || '';
+      const displaySku = rawSku.startsWith('CK-') ? rawSku.substring(3) : rawSku;
+      form.setFieldsValue({
+        ...selectedProduct,
+        sku: displaySku,
+      });
       return;
     }
     form.resetFields();
     form.setFieldsValue({
-      sku: 'CK-',
+      sku: '',
       unit: PRODUCT_UNIT.Piece,
       vatPercent: 8,
       minStock: 10,
@@ -123,12 +129,20 @@ export const ProductFormModal: FC = () => {
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
+      const rawSku = values.sku?.trim() || '';
+      const formattedSku = rawSku.startsWith('CK-') ? rawSku : `CK-${rawSku}`;
+
+      const normalizedValues: ProductFormValues = {
+        ...values,
+        sku: formattedSku,
+      };
+
       if (isEditing && selectedProduct) {
-        await dispatch(updateProductThunk({ id: selectedProduct.id, values })).unwrap();
+        await dispatch(updateProductThunk({ id: selectedProduct.id, values: normalizedValues })).unwrap();
         message.success('Đã cập nhật thông tin sản phẩm.');
       } else {
         const payload: ProductFormValues = {
-          ...values,
+          ...normalizedValues,
           barcode: values.barcode?.trim() || generateUniqueBarcode(),
         };
         await dispatch(createProduct(payload)).unwrap();
@@ -180,19 +194,11 @@ export const ProductFormModal: FC = () => {
               name="sku"
               label="SKU"
               rules={[
-                { required: true, whitespace: true, message: 'Vui lòng nhập SKU.' },
-                {
-                  validator: (_rule, value: string) => {
-                    if (!value || value.trim() === 'CK-' || value.trim() === 'CK') {
-                      return Promise.reject(new Error('Vui lòng nhập mã SKU theo định dạng <Danh mục>-<Mã>.'));
-                    }
-                    return Promise.resolve();
-                  },
-                },
-                { max: 50, message: 'SKU tối đa 50 ký tự.' },
+                { required: true, whitespace: true, message: 'Vui lòng nhập SKU theo định dạng <Danh mục>-<Mã>.' },
+                { max: 47, message: 'Phần mã SKU tối đa 47 ký tự.' },
               ]}
             >
-              <Input placeholder="<Danh mục>-<Mã>" />
+              <Input addonBefore="CK-" placeholder="<Danh mục>-<Mã>" />
             </Form.Item>
           </Col>
         </Row>
