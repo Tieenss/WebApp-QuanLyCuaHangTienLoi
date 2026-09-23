@@ -58,6 +58,7 @@ public class HoaDonController {
     private final TonKhoRepository tonKhoRepository;
     private final SoQuyRepository soQuyRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final com.erp.cuahangtienloi.service.LoHangService loHangService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY', 'THU_NGAN')")
@@ -360,6 +361,7 @@ public class HoaDonController {
                     "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, 'SALE_OUT'::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, NULL::date, ?::text, NOW()::timestamp)",
                     rs -> { }, line.productId(), request.getIdChiNhanh(), -line.quantity(), line.unitCost(),
                     saved.getMaHoaDon(), cashier.getHoTen(), "Bán hàng POS: " + saved.getMaHoaDon());
+            loHangService.xuatKhoFEFO(line.productId(), request.getIdChiNhanh(), line.quantity());
         }
 
         if (soQuyRepository.existsByMaChungTuLienQuanAndDirectionAndHangMuc(

@@ -35,7 +35,7 @@ import {
   type PurchaseOrder,
   type PurchaseOrderLine,
 } from '@/types';
-import { formatDate, today } from '@/utils/dateUtils';
+import { formatDate } from '@/utils/dateUtils';
 import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { PurchaseFormModal } from './components/PurchaseFormModal';
@@ -117,19 +117,22 @@ export const PurchaseOrdersPage: FC = () => {
   const [isFormOpen, setFormOpen] = useState(false);
 
   /** Chỉ Kế toán (và Admin) được bấm "Thanh toán" trả NCC. */
+  /** Kế toán (và Admin) được bấm "Thanh toán" trả NCC. */
   const isPayer =
     user?.role === USER_ROLE.Accountant || user?.role === USER_ROLE.Admin;
+  /** Thủ kho (và Admin) được bấm "Đã nhận hàng". */
+  const canReceive =
+    user?.role === USER_ROLE.WarehouseKeeper || user?.role === USER_ROLE.Admin;
 
   const isAwaitingPayment = (status: DocumentStatus): boolean =>
-    status === DOCUMENT_STATUS.PendingPayment || status === DOCUMENT_STATUS.Pending;
+    status === DOCUMENT_STATUS.PendingPayment;
+
+  const [receiving, setReceiving] = useState<string | null>(null);
 
   /**
-   * Bước 2 của luồng nhập kho: Kế toán kiểm tra phiếu (mở rộng dòng xem chi
-   * tiết) rồi bấm Thanh toán. Backend (`/pay`) trong MỘT transaction: trả
-   * NCC đủ grand_total, cộng tồn Kho Tổng + ghi thẻ kho PURCHASE_IN, đổi
-   * PENDING_PAYMENT → COMPLETED. Frontend sau đó refetch phiếu + tồn kho từ
-   * DB và dispatch `purchaseReceived` để cashbookPersistence lập phiếu chi
-   * "Trả NCC" trong sổ quỹ.
+   * Bước 2: Kế toán bấm Thanh toán: ghi nhận chi tiền trả NCC,
+   * chuyển PENDING_PAYMENT → PENDING ("Chờ nhận hàng").
+   * Chưa cộng tồn kho và chưa tạo lô hàng.
    */
   const handlePay = async (order: PurchaseOrder): Promise<void> => {
     if (user === null) return;
@@ -139,8 +142,7 @@ export const PurchaseOrdersPage: FC = () => {
       const details = detailsCache[order.id] ?? [];
       const withLines: PurchaseOrder = {
         ...order,
-        status: DOCUMENT_STATUS.Completed,
-        receivedDate: updated.ngayNhanThucTe ?? today(),
+        status: DOCUMENT_STATUS.Pending,
         paidAmount: updated.daThanhToan ?? order.grandTotal,
         lines: details.map((d) => {
           const product = products.find((p) => p.id === d.idSanPham);
@@ -159,19 +161,37 @@ export const PurchaseOrdersPage: FC = () => {
           } as PurchaseOrderLine;
         }),
       };
-      // Local + sổ quỹ (listener cashbookPersistence) — tồn kho DB đã cập nhật
-      // xong nên fetchStock bên dưới sẽ ghi đè số đúng của server.
       dispatch(purchaseReceived({ order: withLines, performedBy: user.fullName }));
       message.success(
-        `Đã trả NCC ${formatVND(order.grandTotal)} cho phiếu ${order.code}. ` +
-          'Tồn kho Kho Tổng đã tăng theo số thực nhận.',
+        `Đã thanh toán ${formatVND(order.grandTotal)} cho phiếu ${order.code}. Phiếu chuyển sang trạng thái "Chờ nhận hàng".`,
       );
       dispatch(fetchPurchaseOrders());
-      dispatch(fetchStock());
     } catch (e) {
       message.error((e as Error).message || 'Lỗi thanh toán phiếu nhập');
     } finally {
       setPaying(null);
+    }
+  };
+
+  /**
+   * Bước 3: Thủ kho bấm "Đã nhận hàng" khi xe giao đến kho:
+   * Backend lấy ngày nhận là hôm nay, tự động cộng tồn kho Kho Tổng
+   * và tính hạn sử dụng các lô hàng: ngày nhận + han_su_dung_ngay.
+   */
+  const handleReceive = async (order: PurchaseOrder): Promise<void> => {
+    if (user === null) return;
+    setReceiving(order.id);
+    try {
+      await phieuNhapApi.receive(order.id);
+      message.success(
+        `Nhận hàng thành công cho phiếu ${order.code}! Tồn kho Kho Tổng đã tăng và hạn sử dụng các lô hàng đã được tính từ ngày hôm nay.`,
+      );
+      dispatch(fetchPurchaseOrders());
+      dispatch(fetchStock());
+    } catch (e) {
+      message.error((e as Error).message || 'Lỗi nhận hàng phiếu nhập');
+    } finally {
+      setReceiving(null);
     }
   };
 
@@ -366,9 +386,14 @@ export const PurchaseOrdersPage: FC = () => {
       dataIndex: 'status',
       align: 'center',
       width: 150,
-      render: (status: DocumentStatus) => <DocumentStatusTag status={status} />,
+      render: (status: DocumentStatus) => {
+        if (status === DOCUMENT_STATUS.Pending) {
+          return <Tag color="blue">Chờ nhận hàng</Tag>;
+        }
+        return <DocumentStatusTag status={status} />;
+      },
     },
-    ...(isPayer
+    ...((isPayer || canReceive)
       ? [
           {
             title: 'Thao tác',
@@ -377,31 +402,56 @@ export const PurchaseOrdersPage: FC = () => {
             width: 160,
             fixed: 'right' as const,
             render: (_: unknown, row: PurchaseOrder) => {
-              if (!isAwaitingPayment(row.status)) return null;
-              return (
-                <Popconfirm
-                  title="Thanh toán phiếu nhập cho NCC?"
-                  description={
-                    <span>
-                      Trả <strong>{formatVND(row.grandTotal)}</strong>. Hệ thống
-                      sẽ cộng tồn Kho Tổng theo số thực nhận và lập phiếu chi sổ
-                      quỹ trả NCC.
-                    </span>
-                  }
-                  okText="Xác nhận thanh toán"
-                  cancelText="Đóng"
-                  onConfirm={() => void handlePay(row)}
-                >
-                  <Button
+              if (isAwaitingPayment(row.status) && isPayer) {
+                return (
+                  <Popconfirm
+                    title="Thanh toán phiếu nhập cho NCC?"
+                    description={
+                      <span>
+                        Trả <strong>{formatVND(row.grandTotal)}</strong>. Phiếu
+                        chuyển sang trạng thái "Chờ nhận hàng" và lập phiếu chi
+                        sổ quỹ.
+                      </span>
+                    }
+                    okText="Xác nhận thanh toán"
+                    cancelText="Đóng"
+                    onConfirm={() => void handlePay(row)}
+                  >
+                    <Button
                       type="primary"
                       size="small"
                       loading={paying === row.id}
-                      disabled={paying !== null}
+                      disabled={paying !== null || receiving !== null}
+                    >
+                      Thanh toán
+                    </Button>
+                  </Popconfirm>
+                );
+              }
+
+              if (row.status === DOCUMENT_STATUS.Pending && canReceive) {
+                return (
+                  <Popconfirm
+                    title="Xác nhận đã nhận hàng về kho?"
+                    description="Ghi nhận ngày nhận là hôm nay, tự động cộng tồn kho Kho Tổng và tính hạn sử dụng các lô hàng theo từng sản phẩm."
+                    okText="Đã nhận hàng"
+                    cancelText="Đóng"
+                    onConfirm={() => void handleReceive(row)}
                   >
-                    Thanh toán
-                  </Button>
-                </Popconfirm>
-              );
+                    <Button
+                      type="primary"
+                      size="small"
+                      style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                      loading={receiving === row.id}
+                      disabled={paying !== null || receiving !== null}
+                    >
+                      Đã nhận hàng
+                    </Button>
+                  </Popconfirm>
+                );
+              }
+
+              return null;
             },
           } as ColumnsType<PurchaseOrder>[number],
         ]

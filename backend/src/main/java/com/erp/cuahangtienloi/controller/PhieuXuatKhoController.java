@@ -5,6 +5,7 @@ import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuXuat;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuXuatKho;
+import com.erp.cuahangtienloi.entity.SanPham;
 import com.erp.cuahangtienloi.repository.*;
 import com.erp.cuahangtienloi.service.BranchAccessService;
 import jakarta.persistence.EntityManager;
@@ -37,8 +38,10 @@ public class PhieuXuatKhoController {
     private final ChiNhanhRepository chiNhanhRepository;
     private final ChiTietPhieuXuatRepository chiTietPhieuXuatRepository;
     private final TonKhoRepository tonKhoRepository;
+    private final SanPhamRepository sanPhamRepository;
     private final JdbcTemplate jdbcTemplate;
     private final BranchAccessService branchAccessService;
+    private final com.erp.cuahangtienloi.service.LoHangService loHangService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -339,6 +342,17 @@ public class PhieuXuatKhoController {
                 chiTietPhieuXuatRepository.save(ct);
 
                 if (xuat > 0) {
+                    java.time.LocalDate exp = loHangService.xuatKhoFEFO(ct.getIdSanPham(), pxk.getIdChiNhanhXuat(), xuat);
+                    if (exp == null) {
+                        SanPham sp = sanPhamRepository.findById(ct.getIdSanPham()).orElse(null);
+                        if (sp != null && sp.getHanSuDungNgay() != null && sp.getHanSuDungNgay() >= 0) {
+                            exp = ngayXuat.plusDays(sp.getHanSuDungNgay());
+                        }
+                    }
+                    if (exp != null) {
+                        ct.setHanSuDung(exp);
+                        chiTietPhieuXuatRepository.save(ct);
+                    }
                     jdbcTemplate.query(
                             "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, ?::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, ?::date, ?::text, NOW()::timestamp)",
                             rs -> { },
@@ -404,13 +418,26 @@ public class PhieuXuatKhoController {
                 chiTietPhieuXuatRepository.save(ct);
 
                 if (nhan > 0) {
+                    LocalDate hsdNhan = ct.getHanSuDung();
+                    if (hsdNhan == null) {
+                        SanPham sp = sanPhamRepository.findById(ct.getIdSanPham()).orElse(null);
+                        if (sp != null && sp.getHanSuDungNgay() != null && sp.getHanSuDungNgay() >= 0) {
+                            LocalDate baseDate = pxk.getNgayXuatThucTe() != null ? pxk.getNgayXuatThucTe() : LocalDate.now();
+                            hsdNhan = baseDate.plusDays(sp.getHanSuDungNgay());
+                            ct.setHanSuDung(hsdNhan);
+                            chiTietPhieuXuatRepository.save(ct);
+                        }
+                    }
                     jdbcTemplate.query(
                             "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, ?::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, ?::date, ?::text, NOW()::timestamp)",
                             rs -> { },
                             ct.getIdSanPham(), pxk.getIdChiNhanhNhan(), "TRANSFER_IN", nhan,
                             ct.getDonGiaVon() == null ? BigDecimal.ZERO : ct.getDonGiaVon(),
-                            pxk.getMaPhieu(), "Hệ thống", ct.getHanSuDung(),
+                            pxk.getMaPhieu(), "Hệ thống", hsdNhan,
                             "Nhận hàng luân chuyển từ kho tổng: phiếu " + pxk.getMaPhieu());
+                    loHangService.taoHoacCapNhatLoHang(
+                            ct.getIdSanPham(), pxk.getIdChiNhanhNhan(), nhan,
+                            ct.getDonGiaVon(), hsdNhan, null, null);
                 }
             }
 
