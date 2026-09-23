@@ -29,10 +29,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: none
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
 # JWT phải nằm ngoài spring:
 jwt:
@@ -49,5 +49,5 @@ cors:
 logging:
   level:
     root: INFO
-    com.erp.cuahangtienloi: DEBUG
-    org.hibernate.SQL: DEBUG
+    com.erp.cuahangtienloi: INFO
+    org.hibernate.SQL: ERROR
