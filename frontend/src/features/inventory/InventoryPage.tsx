@@ -10,6 +10,7 @@ import { LedgerTypeTag, StockLevelTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchStock } from '@/store/slices/stockSlice';
+import { isInitialLoading } from '@/utils/tableLoading';
 import {
   openLedgerDrawer,
   resetInventoryFilters,
@@ -657,7 +658,7 @@ export const InventoryPage: FC = () => {
                     dataSource={balances}
                     rowKey="id"
                     size="middle"
-                    loading={stockLoading}
+                    loading={isInitialLoading(stockLoading, allBalances)}
                     scroll={{ x: 1800 }}
                     pagination={{
                       pageSize: 15,
