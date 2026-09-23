@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FC, type ReactElement } from 'react';
+import { isInitialLoading } from '@/utils/tableLoading';
 import { Alert, Button, Card, Descriptions, Modal, Space, Statistic, Table, Tag, Typography, message } from 'antd';
 const { Paragraph } = Typography;
 import type { ColumnsType } from 'antd/es/table';
@@ -659,7 +660,7 @@ export const StocktakesPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          loading={loading}
+          loading={isInitialLoading(loading, stocktakes)}
           scroll={{ x: 1500 }}
           expandable={{ expandedRowRender: renderDetail, columnWidth: 44 }}
           pagination={{

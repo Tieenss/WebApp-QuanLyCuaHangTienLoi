@@ -24,6 +24,7 @@ import {
   getErrorMessage,
 } from '@/utils/apiError';
 import { compareDateDescWithId, matchKeyword } from '@/utils/formatters';
+import { isInitialLoading } from '@/utils/tableLoading';
 
 const VAI_TRO_OPTIONS = [
   { value: 'ADMIN', label: 'Admin / Giám đốc' },
@@ -309,7 +310,7 @@ export const AccountManagementPage = () => {
         columns={columns}
         dataSource={filteredAccounts}
         rowKey="id"
-        loading={loading}
+        loading={isInitialLoading(loading, data)}
         pagination={{ pageSize: 10 }}
       />
 

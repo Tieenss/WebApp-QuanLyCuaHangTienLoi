@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FC, type ReactElement } from 'react';
+import { isInitialLoading } from '@/utils/tableLoading';
 import { API_BASE_URL } from '@/config/api';
 import { apiFetch } from '@/api/http';
 import { chiTietPhieuXuatApi, type ChiTietPhieuXuatDTO } from '@/api/phieuXuatKho';
@@ -461,7 +462,7 @@ export const TransfersPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          loading={loading}
+          loading={isInitialLoading(loading, transfers)}
           scroll={{ x: canSeeActions ? 2200 : 2050 }}
           expandable={{ expandedRowRender: renderDetail, columnWidth: 44 }}
           pagination={{

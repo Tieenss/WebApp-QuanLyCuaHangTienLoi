@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FC } from 'react';
+import { isInitialLoading } from '@/utils/tableLoading';
 import {
   Button,
   Card,
@@ -71,10 +72,9 @@ const marginPercent = (product: Product): number =>
 export const ProductsPage: FC = () => {
   const dispatch = useAppDispatch();
   const { products, loading } = useAppSelector((state) => state.product);
-
-  useEffect(() => {
-    dispatch(fetchProducts());
-  }, [dispatch]);
+  // useEffect(() => {
+  //   dispatch(fetchProducts());
+  // }, [dispatch]);
   const categories = useAppSelector((state) => state.category.categories);
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
   const balances = useAppSelector((state) => state.stock.balances);
@@ -458,7 +458,7 @@ export const ProductsPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          loading={loading}
+          loading={isInitialLoading(loading, products)}
           scroll={{ x: 1900 }}
           pagination={{
             pageSize: 12,
