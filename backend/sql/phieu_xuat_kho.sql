@@ -456,15 +456,17 @@ SET ma_phieu = 'PX-' || TO_CHAR(ngay_yeu_cau, 'YYYYMMDD') || '-001'
 WHERE id = '00000000-0000-0000-0000-000000000010';
 
 INSERT INTO chi_tiet_phieu_xuat
-    (id_phieu_xuat, id_san_pham, so_luong_yeu_cau, so_luong_xuat, so_luong_nhan,
+    (id, id_phieu_xuat, id_san_pham, so_luong_yeu_cau, so_luong_xuat, so_luong_nhan,
      don_gia_von, han_su_dung, thu_tu)
 VALUES
     -- 50 lon Coca (xuất = nhận = 50)
-    ('00000000-0000-0000-0000-000000000010',
+    ('00000000-0000-0000-0000-000000000110',
+     '00000000-0000-0000-0000-000000000010',
      'f6a7b8c9-0001-0000-0000-000000000010', 50, 50, 50,
      9500, CURRENT_DATE + 180, 1),
     -- 30 gói Oishi
-    ('00000000-0000-0000-0000-000000000010',
+    ('00000000-0000-0000-0000-000000000111',
+     '00000000-0000-0000-0000-000000000010',
      'f6a7b8c9-0001-0000-0000-000000000030', 30, 30, 30,
      6500, NULL, 2);
 
@@ -485,10 +487,11 @@ SET ma_phieu = 'PX-' || TO_CHAR(ngay_yeu_cau, 'YYYYMMDD') || '-002'
 WHERE id = '00000000-0000-0000-0000-000000000011';
 
 INSERT INTO chi_tiet_phieu_xuat
-    (id_phieu_xuat, id_san_pham, so_luong_yeu_cau, so_luong_xuat, so_luong_nhan,
+    (id, id_phieu_xuat, id_san_pham, so_luong_yeu_cau, so_luong_xuat, so_luong_nhan,
      don_gia_von, han_su_dung, thu_tu)
 VALUES
-    ('00000000-0000-0000-0000-000000000011',
+    ('00000000-0000-0000-0000-000000000112',
+     '00000000-0000-0000-0000-000000000011',
      'f6a7b8c9-0001-0000-0000-000000000010', 20, 0, 0,
      9500, CURRENT_DATE + 180, 1);
 

@@ -10,9 +10,11 @@ import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import com.erp.cuahangtienloi.repository.SanPhamRepository;
 import com.erp.cuahangtienloi.repository.SoQuyRepository;
 import com.erp.cuahangtienloi.repository.TonKhoRepository;
+import com.erp.cuahangtienloi.service.BranchAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -36,7 +38,8 @@ class CriticalFlowRegressionTest {
         SoQuyController controller = new SoQuyController(
                 soQuyRepository,
                 chiNhanhRepository,
-                nhanVienRepository
+                nhanVienRepository,
+                mock(BranchAccessService.class)
         );
 
         UUID creatorId = UUID.randomUUID();
@@ -70,7 +73,9 @@ class CriticalFlowRegressionTest {
                 mock(NhanVienRepository.class),
                 mock(ChiTietHoaDonRepository.class),
                 mock(SanPhamRepository.class),
-                mock(TonKhoRepository.class)
+                mock(TonKhoRepository.class),
+                mock(SoQuyRepository.class),
+                mock(JdbcTemplate.class)
         );
         UUID branchId = UUID.randomUUID();
         when(chiNhanhRepository.existsById(branchId)).thenReturn(true);
@@ -95,7 +100,9 @@ class CriticalFlowRegressionTest {
                 mock(NhanVienRepository.class),
                 mock(ChiTietHoaDonRepository.class),
                 mock(SanPhamRepository.class),
-                mock(TonKhoRepository.class)
+                mock(TonKhoRepository.class),
+                mock(SoQuyRepository.class),
+                mock(JdbcTemplate.class)
         );
         UUID branchId = UUID.randomUUID();
         when(chiNhanhRepository.existsById(branchId)).thenReturn(true);

@@ -45,7 +45,7 @@ export const ProductFormModal: FC = () => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
 
-  const { isModalOpen, selectedProduct } = useAppSelector(
+  const { isModalOpen, selectedProduct, products } = useAppSelector(
     (state) => state.product,
   );
   const categories = useAppSelector((state) => state.category.categories);
@@ -73,17 +73,49 @@ export const ProductFormModal: FC = () => {
     return matched.map((s) => ({ value: s.id, label: `${s.code} - ${s.name}` }));
   }, [suppliers, selectedCategoryId, selectedSupplierId]);
 
+  /** Sinh ngẫu nhiên mã vạch EAN-13 gồm 13 chữ số hợp lệ và không trùng lặp */
+  const generateUniqueBarcode = (): string => {
+    const existingBarcodes = new Set(products.map((p) => p.barcode).filter(Boolean));
+    for (let attempts = 0; attempts < 1000; attempts++) {
+      // 12 số đầu tiên (bắt đầu bằng 893 cho mã Việt Nam)
+      let code12 = '893';
+      for (let i = 0; i < 9; i++) {
+        code12 += Math.floor(Math.random() * 10).toString();
+      }
+      // Tính check digit EAN-13
+      let sum = 0;
+      for (let i = 0; i < 12; i++) {
+        const digit = parseInt(code12[i], 10);
+        sum += i % 2 === 0 ? digit : digit * 3;
+      }
+      const checkDigit = (10 - (sum % 10)) % 10;
+      const barcode = code12 + checkDigit.toString();
+      if (!existingBarcodes.has(barcode)) {
+        return barcode;
+      }
+    }
+    // Fallback nếu trùng nhiều
+    return '893' + Date.now().toString().slice(-10);
+  };
+
   useEffect(() => {
     if (!isModalOpen) return;
     // Load dropdown data
     dispatch(fetchCategories());
     dispatch(fetchSuppliers());
     if (selectedProduct !== null) {
-      form.setFieldsValue(selectedProduct);
+      // Khi chỉnh sửa: nếu sku bắt đầu bằng CK-, bóc tách tiền tố để hiển thị trong input có addonBefore="CK-"
+      const rawSku = selectedProduct.sku || '';
+      const displaySku = rawSku.startsWith('CK-') ? rawSku.substring(3) : rawSku;
+      form.setFieldsValue({
+        ...selectedProduct,
+        sku: displaySku,
+      });
       return;
     }
     form.resetFields();
     form.setFieldsValue({
+      sku: '',
       unit: PRODUCT_UNIT.Piece,
       vatPercent: 8,
       minStock: 10,
@@ -97,11 +129,23 @@ export const ProductFormModal: FC = () => {
   const handleSubmit = async (): Promise<void> => {
     try {
       const values = await form.validateFields();
+      const rawSku = values.sku?.trim() || '';
+      const formattedSku = rawSku.startsWith('CK-') ? rawSku : `CK-${rawSku}`;
+
+      const normalizedValues: ProductFormValues = {
+        ...values,
+        sku: formattedSku,
+      };
+
       if (isEditing && selectedProduct) {
-        await dispatch(updateProductThunk({ id: selectedProduct.id, values })).unwrap();
+        await dispatch(updateProductThunk({ id: selectedProduct.id, values: normalizedValues })).unwrap();
         message.success('Đã cập nhật thông tin sản phẩm.');
       } else {
-        await dispatch(createProduct(values)).unwrap();
+        const payload: ProductFormValues = {
+          ...normalizedValues,
+          barcode: values.barcode?.trim() || generateUniqueBarcode(),
+        };
+        await dispatch(createProduct(payload)).unwrap();
         message.success('Đã thêm sản phẩm mới.');
       }
       dispatch(setProductModalOpen(false));
@@ -112,6 +156,7 @@ export const ProductFormModal: FC = () => {
         barcode: ['mã vạch'],
         sku: ['sku'],
         salePrice: ['giá bán'],
+        costPrice: ['giá nhập'],
         maxStock: ['tồn tối đa'],
       });
       if (!handled) message.error(errorMessage);
@@ -133,7 +178,7 @@ export const ProductFormModal: FC = () => {
       onCancel={() => dispatch(setProductModalOpen(false))}
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" className="product-form">
+      <Form form={form} layout="vertical" className="product-form" validateTrigger={['onSubmit']}>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -149,29 +194,31 @@ export const ProductFormModal: FC = () => {
               name="sku"
               label="SKU"
               rules={[
-                { required: true, whitespace: true, message: 'Vui lòng nhập SKU.' },
-                { max: 50, message: 'SKU tối đa 50 ký tự.' },
+                { required: true, whitespace: true, message: 'Vui lòng nhập SKU theo định dạng <Danh mục>-<Mã>.' },
+                { max: 47, message: 'Phần mã SKU tối đa 47 ký tự.' },
               ]}
             >
-              <Input placeholder="VD: CK-FROSTER-01" />
+              <Input addonBefore="CK-" placeholder="<Danh mục>-<Mã>" />
             </Form.Item>
           </Col>
         </Row>
 
         <Row gutter={16}>
-          <Col xs={24} md={12}>
-            <Form.Item
-              name="barcode"
-              label="Mã vạch"
-              rules={[
-                { required: true, whitespace: true, message: 'Vui lòng nhập mã vạch.' },
-                { pattern: /^\d{13}$/, message: 'Mã vạch phải đúng 13 chữ số.' },
-              ]}
-            >
-              <Input placeholder="8934567000011" maxLength={13} />
-            </Form.Item>
-          </Col>
-          <Col xs={24} md={12}>
+          {isEditing && (
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="barcode"
+                label="Mã vạch"
+                rules={[
+                  { required: true, whitespace: true, message: 'Vui lòng nhập mã vạch.' },
+                  { pattern: /^\d{13}$/, message: 'Mã vạch phải đúng 13 chữ số.' },
+                ]}
+              >
+                <Input placeholder="8934567000011" maxLength={13} disabled />
+              </Form.Item>
+            </Col>
+          )}
+          <Col xs={24} md={isEditing ? 12 : 24}>
             <Form.Item
               name="categoryId"
               label="Danh mục"
@@ -239,13 +286,17 @@ export const ProductFormModal: FC = () => {
               label="Giá nhập (đồng)"
               rules={[
                 {
+                  required: true,
+                  message: 'Vui lòng nhập giá nhập.',
+                },
+                {
                   type: 'number',
-                  min: 0,
-                  message: 'Giá nhập phải >= 0.',
+                  min: 1001,
+                  message: 'Giá nhập phải lớn hơn 1.000 VNĐ.',
                 },
               ]}
             >
-              <InputNumber className="product-amount-input" min={0} step={100} addonAfter="₫" />
+              <InputNumber className="product-amount-input" step={100} addonAfter="₫" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
@@ -259,12 +310,12 @@ export const ProductFormModal: FC = () => {
                 },
                 {
                   type: 'number',
-                  min: 1,
-                  message: 'Giá bán phải lớn hơn 0.',
+                  min: 1001,
+                  message: 'Giá bán phải lớn hơn 1.000 VNĐ.',
                 },
               ]}
             >
-              <InputNumber className="product-amount-input" min={1} step={100} addonAfter="₫" />
+              <InputNumber className="product-amount-input" step={100} addonAfter="₫" />
             </Form.Item>
           </Col>
         </Row>

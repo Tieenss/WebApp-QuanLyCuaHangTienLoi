@@ -27,6 +27,21 @@ export const SHIFT_SHORT_LABEL: Record<ShiftCode, string> = {
   NIGHT: 'Đêm',
 };
 
+// Chức vụ hiển thị (nhan_vien.vi_tri) → Vai trò hệ thống (nhan_vien.vai_tro)
+export const POSITION_ROLE_MAP: Record<string, UserRole> = {
+  'Giám đốc': USER_ROLE.Admin,
+  'Kế toán': USER_ROLE.Accountant,
+  'Thủ kho': USER_ROLE.WarehouseKeeper,
+  'Quản lý chi nhánh': USER_ROLE.StoreManager,
+  'Thu ngân': USER_ROLE.Cashier,
+};
+
+export const EMPLOYEE_POSITIONS = Object.keys(POSITION_ROLE_MAP);
+
+export const positionForRole = (role: UserRole): string =>
+    EMPLOYEE_POSITIONS.find((position) => POSITION_ROLE_MAP[position] === role) ??
+    EMPLOYEE_POSITIONS[0];
+
 /** Hệ số lương theo ca — ca đêm được phụ cấp cao hơn. */
 export const SHIFT_RATE_MULTIPLIER: Record<ShiftCode, number> = {
   MORNING: 1,
@@ -34,7 +49,14 @@ export const SHIFT_RATE_MULTIPLIER: Record<ShiftCode, number> = {
   NIGHT: 1.3,
 };
 
-/** Loại hợp đồng, ảnh hưởng tới cách tính lương (theo giờ hoặc theo tháng). */
+/**
+ * Hình thức trả lương:
+ * - FULL_TIME: lương cứng theo tháng
+ * - PART_TIME: lương theo giờ
+ *
+ * Tái sử dụng giá trị loai_hop_dong hiện có để không cần
+ * thay đổi DB/backend.
+ */
 export const EMPLOYMENT_TYPE = {
   FullTime: 'FULL_TIME',
   PartTime: 'PART_TIME',
@@ -43,8 +65,8 @@ export const EMPLOYMENT_TYPE = {
 export type EmploymentType = (typeof EMPLOYMENT_TYPE)[keyof typeof EMPLOYMENT_TYPE];
 
 export const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
-  FULL_TIME: 'Toàn thời gian',
-  PART_TIME: 'Bán thời gian',
+  FULL_TIME: 'Lương cứng (theo tháng)',
+  PART_TIME: 'Lương giờ',
 };
 
 export interface Employee {
@@ -68,9 +90,11 @@ export interface Employee {
   joinedAt: string;
   status: RecordStatus;
   avatarText: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export type EmployeeFormValues = Omit<Employee, 'id' | 'avatarText' | 'branchName'>;
+export type EmployeeFormValues = Omit<Employee, 'id' | 'avatarText' | 'branchName' | 'createdAt' | 'updatedAt'>;
 
 /**
  * Module 11 — Bản ghi chấm công của 1 nhân viên trong 1 ca.

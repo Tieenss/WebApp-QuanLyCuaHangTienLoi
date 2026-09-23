@@ -1,0 +1,10 @@
+{
+  "name": "erp-cuahangtienloi-tools",
+  "version": "1.0.0",
+  "scripts": {
+    "seed": "node seed_database.js"
+  },
+  "dependencies": {
+    "pg": "^8.23.0"
+  }
+}

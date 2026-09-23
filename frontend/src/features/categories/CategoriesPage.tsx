@@ -9,23 +9,38 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  EditOutlined,
+  PlusOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
+  StopOutlined,
+  UndoOutlined,
+} from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { RecordStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { deleteCategoryThunk, fetchCategories } from '@/store/slices/categorySlice';
+import {
+  deleteCategoryThunk,
+  fetchCategories,
+  moveCategoryUp,
+  moveCategoryDown,
+  restoreCategoryThunk,
+} from '@/store/slices/categorySlice';
 import {
   RECORD_STATUS,
   USER_ROLE,
   type Category,
 } from '@/types';
-import { compareDateDescWithId, formatNumber, matchKeyword } from '@/utils/formatters';
+import { formatNumber, matchKeyword } from '@/utils/formatters';
+import { formatDateShort } from '@/utils/dateUtils';
 import { exportToExcel } from '@/utils/exportUtils';
 import { CategoryFormModal } from './components/CategoryFormModal';
 import './CategoriesPage.css';
@@ -42,7 +57,7 @@ const { Text } = Typography;
  */
 export const CategoriesPage: FC = () => {
   const dispatch = useAppDispatch();
-  const { modal } = AntdApp.useApp();
+  const { modal, message } = AntdApp.useApp();
 
   const user = useAppSelector((state) => state.auth.user);
   const categories = useAppSelector((state) => state.category.categories);
@@ -75,16 +90,18 @@ export const CategoriesPage: FC = () => {
 
   const filtered = useMemo(
     () =>
-      categories.filter((category) => {
-        const matchSearch = matchKeyword(search, [
-          category.name,
-          category.code,
-          category.description,
-        ]);
-        const matchStatus =
-          statusFilter === null || category.status === statusFilter;
-        return matchSearch && matchStatus;
-      }).sort((a, b) => compareDateDescWithId(a, b, () => undefined)),
+      categories
+        .filter((category) => {
+          const matchSearch = matchKeyword(search, [
+            category.name,
+            category.code,
+            category.description,
+          ]);
+          const matchStatus =
+            statusFilter === null || category.status === statusFilter;
+          return matchSearch && matchStatus;
+        })
+        .sort((a, b) => a.displayOrder - b.displayOrder),
     [categories, search, statusFilter],
   );
 
@@ -154,25 +171,79 @@ export const CategoriesPage: FC = () => {
     setFormOpen(true);
   };
 
+  const isAdmin = user?.role === USER_ROLE.Admin;
+
   const handleDelete = (category: Category): void => {
     const count = actualProductCount.get(category.id) ?? 0;
+    const isGlobal = isAdmin;
+    const scopeText = isGlobal ? 'toàn bộ hệ thống (tất cả chi nhánh)' : 'chi nhánh này';
+
     if (count > 0) {
       modal.confirm({
-        title: 'Không thể xoá danh mục đang có sản phẩm',
-        content: `Danh mục "${category.name}" đang có ${count} SKU. Hãy chuyển các sản phẩm sang danh mục khác trước khi xoá.`,
-        okText: 'Đã hiểu',
-        cancelButtonProps: { style: { display: 'none' } },
+        title: isGlobal ? 'Ngừng kinh doanh danh mục toàn hệ thống' : 'Ngừng kinh doanh danh mục tại chi nhánh',
+        content: `Danh mục "${category.name}" đang có ${count} SKU. Khi ngừng kinh doanh tại ${scopeText}, toàn bộ các sản phẩm thuộc danh mục này cũng sẽ chuyển sang ngừng kinh doanh và không hiển thị trên POS. Bạn có chắc muốn tiếp tục?`,
+        okText: 'Xác nhận ngừng kinh doanh',
+        cancelText: 'Huỷ',
+        okButtonProps: { danger: true },
+        onOk: async () => {
+          const res = await dispatch(deleteCategoryThunk(category.id)).unwrap();
+          message.success(res?.message || 'Đã ngừng kinh doanh danh mục thành công');
+          dispatch(fetchCategories());
+        },
       });
       return;
     }
-    dispatch(deleteCategoryThunk(category.id));
+
+    modal.confirm({
+      title: 'Ngừng kinh doanh danh mục',
+      content: `Ngừng kinh doanh danh mục "${category.name}" tại ${scopeText}?`,
+      okText: 'Xác nhận',
+      cancelText: 'Huỷ',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        const res = await dispatch(deleteCategoryThunk(category.id)).unwrap();
+        message.success(res?.message || 'Đã ngừng kinh doanh danh mục thành công');
+        dispatch(fetchCategories());
+      },
+    });
+  };
+
+  const handleRestore = async (category: Category): Promise<void> => {
+    const isGlobal = isAdmin;
+    const scopeText = isGlobal ? 'toàn hệ thống' : 'chi nhánh này';
+    try {
+      const res = await dispatch(restoreCategoryThunk(category.id)).unwrap();
+      message.success(res?.message || `Đã kích hoạt lại danh mục tại ${scopeText}`);
+      dispatch(fetchCategories());
+    } catch (err: any) {
+      message.error(err.message || 'Không thể khôi phục danh mục');
+    }
+  };
+
+  const handleMoveUp = async (category: Category): Promise<void> => {
+    await dispatch(moveCategoryUp(category.id));
+    dispatch(fetchCategories());
+  };
+
+  const handleMoveDown = async (category: Category): Promise<void> => {
+    await dispatch(moveCategoryDown(category.id));
+    dispatch(fetchCategories());
   };
 
   const columns: ColumnsType<Category> = [
     {
+      title: 'Mã',
+      dataIndex: 'code',
+      width: 110,
+      fixed: 'left',
+      sorter: (a, b) => (a.code ?? '').localeCompare(b.code ?? ''),
+      render: (code: string) => <span className="mono-code">{code}</span>,
+    },
+    {
       title: 'Danh mục',
       dataIndex: 'name',
-      width: 280,
+      width: 250,
+      fixed: 'left',
       render: (name: string, row) => {
         // Map từ iconEmoji/colorHex (từ DB) - fallback về icon/color (mock cũ)
         const icon = (row as any).iconEmoji || row.icon || '📦';
@@ -194,9 +265,6 @@ export const CategoriesPage: FC = () => {
             <span className="category-cell-info">
               <Text strong className="product-name">
                 {name}
-              </Text>
-              <Text type="secondary" className="product-sub">
-                {row.code}
               </Text>
             </span>
           </Space>
@@ -234,9 +302,20 @@ export const CategoriesPage: FC = () => {
       title: 'Thứ tự',
       dataIndex: 'displayOrder',
       align: 'center',
-      width: 90,
-      sorter: (a, b) => a.displayOrder - b.displayOrder,
-      defaultSortOrder: 'ascend',
+      width: 80,
+      render: (order: number) => (
+        <Text strong className="numeric-cell">{order}</Text>
+      ),
+    },
+    {
+      title: 'Ngày cập nhật',
+      dataIndex: 'updatedAt',
+      width: 120,
+      align: 'center',
+      sorter: (a, b) => (a.updatedAt ?? a.createdAt ?? '').localeCompare(b.updatedAt ?? b.createdAt ?? ''),
+      render: (_: unknown, row: Category) => (
+        <Text type="secondary">{formatDateShort(row.updatedAt || row.createdAt)}</Text>
+      ),
     },
     {
       title: 'Trạng thái',
@@ -245,34 +324,89 @@ export const CategoriesPage: FC = () => {
       width: 140,
       render: (status: Category['status']) => <RecordStatusTag status={status} />,
     },
-    ...(canEdit
+    ...(isAdmin
       ? [
           {
-            title: '',
-            key: 'actions',
+            title: 'Sắp xếp',
+            key: 'order_actions',
             align: 'center' as const,
-            width: 100,
-            fixed: 'right' as const,
+            width: 90,
             render: (_: unknown, row: Category) => (
               <Space size={0}>
                 <Button
                   type="text"
-                  icon={<EditOutlined className="action-edit-icon" />}
-                  onClick={() => handleEdit(row)}
+                  size="small"
+                  icon={<ArrowUpOutlined />}
+                  title="Lên trên"
+                  onClick={() => handleMoveUp(row)}
                 />
-                <Popconfirm
-                  title="Xoá danh mục?"
-                  description={`Xoá nhóm hàng "${row.name}"?`}
-                  okText="Xoá"
-                  cancelText="Huỷ"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={() => handleDelete(row)}
-                >
-                  <Button
-                    type="text"
-                    icon={<DeleteOutlined className="action-delete-icon" />}
-                  />
-                </Popconfirm>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<ArrowDownOutlined />}
+                  title="Xuống dưới"
+                  onClick={() => handleMoveDown(row)}
+                />
+              </Space>
+            ),
+          },
+        ]
+      : []),
+    ...(canEdit
+      ? [
+          {
+            title: 'Thao tác',
+            key: 'actions',
+            align: 'center' as const,
+            width: isAdmin ? 110 : 80,
+            fixed: 'right' as const,
+            render: (_: unknown, row: Category) => (
+              <Space size={0}>
+                {isAdmin && (
+                  <Tooltip title="Chỉnh sửa danh mục">
+                    <Button
+                      type="text"
+                      icon={<EditOutlined className="action-edit-icon" />}
+                      onClick={() => handleEdit(row)}
+                    />
+                  </Tooltip>
+                )}
+                {row.status === 'Active' ? (
+                  <Popconfirm
+                    title={isAdmin ? "Ngừng kinh doanh toàn chuỗi?" : "Ngừng kinh doanh tại chi nhánh?"}
+                    description={
+                      isAdmin
+                        ? `Danh mục "${row.name}" và các sản phẩm thuộc danh mục sẽ ngừng bán trên toàn hệ thống.`
+                        : `Danh mục "${row.name}" và các sản phẩm thuộc danh mục sẽ ngừng bán tại chi nhánh này.`
+                    }
+                    okText="Ngừng bán"
+                    cancelText="Huỷ"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={() => handleDelete(row)}
+                  >
+                    <Tooltip title={isAdmin ? "Ngừng kinh doanh toàn chuỗi" : "Ngừng kinh doanh tại chi nhánh"}>
+                      <Button
+                        type="text"
+                        icon={<StopOutlined style={{ color: '#faad14' }} />}
+                      />
+                    </Tooltip>
+                  </Popconfirm>
+                ) : (
+                  <Popconfirm
+                    title={isAdmin ? "Kích hoạt lại cho toàn chuỗi?" : "Kích hoạt lại tại chi nhánh?"}
+                    description={`Mở lại kinh doanh danh mục "${row.name}"?`}
+                    okText="Kích hoạt"
+                    cancelText="Huỷ"
+                    onConfirm={() => handleRestore(row)}
+                  >
+                    <Tooltip title="Kích hoạt kinh doanh lại">
+                      <Button
+                        type="text"
+                        icon={<UndoOutlined style={{ color: '#52c41a' }} />}
+                      />
+                    </Tooltip>
+                  </Popconfirm>
+                )}
               </Space>
             ),
           },
@@ -309,7 +443,7 @@ export const CategoriesPage: FC = () => {
             <Tag color="red" className="tag-no-margin">
               {filtered.length} / {categories.length} nhóm
             </Tag>
-            {canEdit && (
+            {isAdmin && (
               <Button
                 type="primary"
                 icon={<PlusOutlined />}

@@ -10,6 +10,7 @@ import com.erp.cuahangtienloi.repository.TaiKhoanRepository;
 import com.erp.cuahangtienloi.service.BranchAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -72,8 +73,11 @@ public class NhanVienController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> create(@RequestBody NhanVien request) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    public ResponseEntity<?> create(@RequestBody NhanVien request, HttpServletRequest httpRequest) {
+        NhanVien actor =
+                branchAccessService.requireAuthenticatedEmployee(httpRequest);
+
         request.setHoTen(requireText(request.getHoTen(), "Họ tên", 1, 255));
         optionalEmail(request.getEmail());
         optionalPhone(request.getSoDienThoai(), "Số điện thoại");
@@ -88,6 +92,17 @@ public class NhanVienController {
         }
         if (request.getMaNhanVien() != null && nhanVienRepository.existsByMaNhanVien(request.getMaNhanVien())) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Mã nhân viên đã tồn tại"));
+        }
+
+        String scopeError = managerScopeError(
+                actor,
+                request.getVaiTro(),
+                request.getIdChiNhanh()
+        );
+
+        if (scopeError != null) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.err(scopeError));
         }
 
         NhanVien nv = new NhanVien();
@@ -131,10 +146,49 @@ public class NhanVienController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody NhanVien request) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody NhanVien request, HttpServletRequest httpRequest) {
+        NhanVien actor =
+                branchAccessService.requireAuthenticatedEmployee(httpRequest);
+
         return nhanVienRepository.findById(id)
                 .map(nv -> {
+                    if ("QUAN_LY".equals(actor.getVaiTro())) {
+                        UUID ownBranch = branchAccessService.requiredOwnBranch(actor);
+
+                        String scopeError = managerScopeError(
+                                actor,
+                                nv.getVaiTro(),
+                                nv.getIdChiNhanh()
+                        );
+
+                        if (scopeError != null) {
+                            return ResponseEntity
+                                    .status(HttpStatus.FORBIDDEN)
+                                    .body(ApiResponse.err(scopeError));
+                        }
+
+                        if (request.getVaiTro() != null
+                                && !"THU_NGAN".equals(request.getVaiTro())) {
+
+                            return ResponseEntity
+                                    .badRequest()
+                                    .body(ApiResponse.err(
+                                            "Quản lý không được đổi vai trò khác THU_NGAN"
+                                    ));
+                        }
+
+                        if (request.getIdChiNhanh() != null
+                                && !ownBranch.equals(request.getIdChiNhanh())) {
+
+                            return ResponseEntity
+                                    .badRequest()
+                                    .body(ApiResponse.err(
+                                            "Quản lý không được điều chuyển thu ngân sang chi nhánh khác"
+                                    ));
+                        }
+                    }
+
                     if (request.getHoTen() != null) {
                         request.setHoTen(requireText(request.getHoTen(), "Họ tên", 1, 255));
                     }
@@ -201,8 +255,28 @@ public class NhanVienController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> delete(@PathVariable UUID id) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    public ResponseEntity<?> delete(@PathVariable UUID id, HttpServletRequest httpRequest) {
+        NhanVien actor =
+                branchAccessService.requireAuthenticatedEmployee(httpRequest);
+
+        NhanVien target =
+                nhanVienRepository.findById(id).orElse(null);
+
+        if (target != null) {
+            String scopeError = managerScopeError(
+                    actor,
+                    target.getVaiTro(),
+                    target.getIdChiNhanh()
+            );
+
+            if (scopeError != null) {
+                return ResponseEntity
+                        .status(HttpStatus.FORBIDDEN)
+                        .body(ApiResponse.err(scopeError));
+            }
+        }
+
         if (chiNhanhRepository.findByIdQuanLy(id).isPresent()) {
             return ResponseEntity.badRequest().body(ApiResponse.err(
                     "Không thể xóa người phụ trách; hãy thay thế hoặc bỏ phân công trước"));
@@ -242,6 +316,27 @@ public class NhanVienController {
         return null;
     }
 
-//    record ErrorResponse(String message) {}
-//    record SuccessResponse(String message) {}
+    private String managerScopeError(
+            NhanVien actor,
+            String targetRole,
+            UUID targetBranchId
+    ) {
+        if (!"QUAN_LY".equals(actor.getVaiTro())) {
+            return null;
+        }
+
+        if (!"THU_NGAN".equals(targetRole)) {
+            return "Quản lý chỉ được quản lý nhân viên thu ngân (THU_NGAN)";
+        }
+
+        UUID ownBranch = branchAccessService.requiredOwnBranch(actor);
+
+        if (targetBranchId == null || !ownBranch.equals(targetBranchId)) {
+            return "Quản lý chỉ được quản lý nhân viên tại chi nhánh của mình";
+        }
+
+        return null;
+    }
+
+
 }

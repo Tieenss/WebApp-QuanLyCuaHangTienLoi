@@ -88,3 +88,11 @@ button {
 .tag-no-margin {
   margin: 0;
 }
+
+/* Đảm bảo dòng chữ báo lỗi validate dưới các trường input hiển thị rõ màu đỏ thương hiệu */
+.ant-form-item-explain-error {
+  color: var(--circlek-red) !important;
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-top: 3px;
+}

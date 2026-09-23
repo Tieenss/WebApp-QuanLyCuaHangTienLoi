@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FC } from 'react';
 import { isInitialLoading } from '@/utils/tableLoading';
 import {
+  App as AntdApp,
   Button,
   Card,
   Popconfirm,
@@ -17,6 +18,8 @@ import {
   DeleteOutlined,
   EditOutlined,
   PlusOutlined,
+  StopOutlined,
+  UndoOutlined,
 } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { ProductThumb } from '@/components/ProductThumb';
@@ -28,6 +31,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   deleteProductThunk,
   fetchProducts,
+  restoreProductThunk,
   setProductModalOpen,
   setSelectedProduct,
 } from '@/store/slices/productSlice';
@@ -37,6 +41,7 @@ import { totalStockOf } from '@/store/slices/stockSlice';
 import {
   PRODUCT_UNIT_LABEL,
   RECORD_STATUS,
+  USER_ROLE,
   type Product,
 } from '@/types';
 import {
@@ -47,6 +52,7 @@ import {
   matchKeyword,
 } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
+import { formatDateShort } from '@/utils/dateUtils';
 import { ProductFormModal } from './components/ProductFormModal';
 import './ProductsPage.css';
 
@@ -71,10 +77,14 @@ const marginPercent = (product: Product): number =>
  */
 export const ProductsPage: FC = () => {
   const dispatch = useAppDispatch();
+  const { message } = AntdApp.useApp();
   const { products, loading } = useAppSelector((state) => state.product);
-  // useEffect(() => {
-  //   dispatch(fetchProducts());
-  // }, [dispatch]);
+  const user = useAppSelector((state) => state.auth.user);
+  const isAdmin = user?.role === USER_ROLE.Admin;
+
+  useEffect(() => {
+    dispatch(fetchProducts());
+  }, [dispatch]);
   const categories = useAppSelector((state) => state.category.categories);
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
   const balances = useAppSelector((state) => state.stock.balances);
@@ -85,14 +95,19 @@ export const ProductsPage: FC = () => {
     dispatch(fetchSuppliers());
   }, [dispatch]);
 
-  // Enrich products với categoryName và supplierName từ Redux
+  // Enrich products với categoryName và supplierName từ Redux, đồng thời nếu Danh mục Inactive thì sản phẩm tự động Inactive
   const enrichedProducts = useMemo(
     () =>
-      products.map((p) => ({
-        ...p,
-        categoryName: p.categoryName || categories.find((c) => c.id === p.categoryId)?.name || '',
-        supplierName: p.supplierName || suppliers.find((s) => s.id === p.supplierId)?.name || '',
-      })),
+      products.map((p) => {
+        const cat = categories.find((c) => c.id === p.categoryId);
+        const isCatInactive = cat && cat.status === RECORD_STATUS.Inactive;
+        return {
+          ...p,
+          status: isCatInactive ? RECORD_STATUS.Inactive : p.status,
+          categoryName: p.categoryName || cat?.name || '',
+          supplierName: p.supplierName || suppliers.find((s) => s.id === p.supplierId)?.name || '',
+        };
+      }),
     [products, categories, suppliers],
   );
 
@@ -205,15 +220,39 @@ export const ProductsPage: FC = () => {
     dispatch(setProductModalOpen(true));
   };
 
-  const handleDelete = (id: string): void => {
-    dispatch(deleteProductThunk(id));
+  const handleDelete = async (id: string, permanent: boolean = false): Promise<void> => {
+    try {
+      const res = await dispatch(deleteProductThunk({ id, permanent })).unwrap();
+      message.success(res?.message || (permanent ? 'Đã xóa vĩnh viễn sản phẩm' : 'Đã ngừng kinh doanh sản phẩm'));
+      dispatch(fetchProducts());
+    } catch (err: any) {
+      message.error(err?.message || 'Có lỗi xảy ra khi xóa sản phẩm');
+    }
+  };
+
+  const handleRestore = async (id: string): Promise<void> => {
+    try {
+      const res = await dispatch(restoreProductThunk(id)).unwrap();
+      message.success(res?.message || 'Đã khôi phục kinh doanh sản phẩm');
+      dispatch(fetchProducts());
+    } catch (err: any) {
+      message.error(err?.message || 'Có lỗi xảy ra khi khôi phục sản phẩm');
+    }
   };
 
   const productColumns: ColumnsType<Product> = [
     {
+      title: 'Mã SKU',
+      dataIndex: 'sku',
+      width: 130,
+      fixed: 'left',
+      sorter: (a, b) => (a.sku ?? '').localeCompare(b.sku ?? ''),
+      render: (sku: string) => <span className="mono-code">{sku}</span>,
+    },
+    {
       title: 'Sản phẩm',
       dataIndex: 'name',
-      width: 300,
+      width: 250,
       fixed: 'left',
       render: (name: string, row) => (
         <Space size={10}>
@@ -228,7 +267,7 @@ export const ProductsPage: FC = () => {
               {name}
             </Text>
             <Text type="secondary" className="product-sub">
-              <span className="mono-code">{row.sku}</span> · {PRODUCT_UNIT_LABEL[row.unit]}
+              {PRODUCT_UNIT_LABEL[row.unit]}
             </Text>
           </span>
         </Space>
@@ -238,6 +277,7 @@ export const ProductsPage: FC = () => {
       title: 'Mã vạch',
       dataIndex: 'barcode',
       width: 150,
+      sorter: (a, b) => (a.barcode ?? '').localeCompare(b.barcode ?? ''),
       render: (value: string) => (
         <Text className="barcode-text">
           <BarcodeOutlined className="barcode-icon" />
@@ -359,6 +399,16 @@ export const ProductsPage: FC = () => {
       ),
     },
     {
+      title: 'Ngày cập nhật',
+      dataIndex: 'updatedAt',
+      width: 120,
+      align: 'center',
+      sorter: (a, b) => (a.updatedAt ?? a.createdAt ?? '').localeCompare(b.updatedAt ?? b.createdAt ?? ''),
+      render: (_: unknown, row: Product) => (
+        <Text type="secondary">{formatDateShort(row.updatedAt || row.createdAt)}</Text>
+      ),
+    },
+    {
       title: 'Trạng thái',
       dataIndex: 'status',
       align: 'center',
@@ -367,28 +417,110 @@ export const ProductsPage: FC = () => {
       render: (status: Product['status']) => <RecordStatusTag status={status} />,
     },
     {
-      title: '',
+      title: 'Thao tác',
       key: 'actions',
       align: 'center',
-      width: 90,
+      width: isAdmin ? 140 : 80,
       fixed: 'right',
       render: (_, row) => (
         <Space size={0}>
-          <Button
-            type="text"
-            icon={<EditOutlined className="action-edit-icon" />}
-            onClick={() => handleEdit(row)}
-          />
-          <Popconfirm
-            title="Xoá sản phẩm?"
-            description={`Xoá "${row.name}" khỏi danh sách?`}
-            okText="Xoá"
-            cancelText="Huỷ"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(row.id)}
-          >
-            <Button type="text" icon={<DeleteOutlined className="action-delete-icon" />} />
-          </Popconfirm>
+          {isAdmin && (
+            <Tooltip title="Chỉnh sửa sản phẩm">
+              <Button
+                type="text"
+                icon={<EditOutlined className="action-edit-icon" />}
+                onClick={() => handleEdit(row)}
+              />
+            </Tooltip>
+          )}
+
+          {isAdmin ? (
+            <>
+              {row.status === 'Active' ? (
+                <Popconfirm
+                  title="Ngừng kinh doanh toàn chuỗi?"
+                  description={`Tất cả chi nhánh sẽ ngừng bán "${row.name}". Dữ liệu tồn kho và lịch sử vẫn được giữ nguyên.`}
+                  okText="Ngừng bán"
+                  cancelText="Huỷ"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDelete(row.id, false)}
+                >
+                  <Tooltip title="Ngừng kinh doanh toàn chuỗi">
+                    <Button
+                      type="text"
+                      icon={<StopOutlined style={{ color: '#faad14' }} />}
+                    />
+                  </Tooltip>
+                </Popconfirm>
+              ) : (
+                <Popconfirm
+                  title="Kích hoạt kinh doanh lại?"
+                  description={`Mở lại kinh doanh "${row.name}" cho toàn chuỗi?`}
+                  okText="Kích hoạt"
+                  cancelText="Huỷ"
+                  onConfirm={() => handleRestore(row.id)}
+                >
+                  <Tooltip title="Kích hoạt kinh doanh lại">
+                    <Button
+                      type="text"
+                      icon={<UndoOutlined style={{ color: '#52c41a' }} />}
+                    />
+                  </Tooltip>
+                </Popconfirm>
+              )}
+
+              <Popconfirm
+                title="Xóa vĩnh viễn sản phẩm?"
+                description={`Xóa vĩnh viễn "${row.name}" khỏi cơ sở dữ liệu? (Nếu sản phẩm đã phát sinh giao dịch/tồn kho, hệ thống sẽ tự động chuyển sang ngừng kinh doanh toàn chuỗi).`}
+                okText="Xóa vĩnh viễn"
+                cancelText="Huỷ"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => handleDelete(row.id, true)}
+              >
+                <Tooltip title="Xóa vĩnh viễn (Chỉ Admin)">
+                  <Button
+                    type="text"
+                    icon={<DeleteOutlined className="action-delete-icon" />}
+                  />
+                </Tooltip>
+              </Popconfirm>
+            </>
+          ) : (
+            <>
+              {row.status === 'Active' ? (
+                <Popconfirm
+                  title="Ngừng kinh doanh tại chi nhánh?"
+                  description={`Ngừng kinh doanh "${row.name}" tại chi nhánh của bạn? Các chi nhánh khác vẫn bán bình thường.`}
+                  okText="Xác nhận"
+                  cancelText="Huỷ"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDelete(row.id, false)}
+                >
+                  <Tooltip title="Ngừng kinh doanh tại chi nhánh">
+                    <Button
+                      type="text"
+                      icon={<DeleteOutlined className="action-delete-icon" />}
+                    />
+                  </Tooltip>
+                </Popconfirm>
+              ) : (
+                <Popconfirm
+                  title="Kích hoạt kinh doanh lại?"
+                  description={`Mở lại kinh doanh "${row.name}" tại chi nhánh của bạn?`}
+                  okText="Kích hoạt"
+                  cancelText="Huỷ"
+                  onConfirm={() => handleRestore(row.id)}
+                >
+                  <Tooltip title="Kích hoạt kinh doanh lại tại chi nhánh">
+                    <Button
+                      type="text"
+                      icon={<UndoOutlined style={{ color: '#52c41a' }} />}
+                    />
+                  </Tooltip>
+                </Popconfirm>
+              )}
+            </>
+          )}
         </Space>
       ),
     },
@@ -426,9 +558,11 @@ export const ProductsPage: FC = () => {
         description="Danh sách SKU, mã vạch, giá bán và biên lợi nhuận. Quản lý danh mục hàng hoá ở trang riêng."
         extra={
           <Space wrap>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              Thêm sản phẩm
-            </Button>
+            {isAdmin && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+                Thêm sản phẩm
+              </Button>
+            )}
             <Tag color="red" className="tag-no-margin">
               {filtered.length} / {products.length} SKU
             </Tag>

@@ -25,4 +25,6 @@ public class SanPhamDTO {
     private Integer tonToiDa;
     private Boolean deHong;
     private Integer hanSuDungNgay;
+    private java.time.LocalDateTime ngayTao;
+    private java.time.LocalDateTime ngayCapNhat;
 }

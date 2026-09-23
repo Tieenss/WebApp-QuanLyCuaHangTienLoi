@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS so_quy (
     -- Với row OPENING: bằng chính số dư đầu kỳ.
     -- Với RECEIPT: runningBalance mới = runningBalance cũ + so_tien.
     -- Với PAYMENT: runningBalance mới = runningBalance cũ - so_tien.
-    running_balance DECIMAL(15,0) NOT NULL,
+    running_balance DECIMAL(15,0) NOT NULL DEFAULT 0,
 
     -- ===== TRẠNG THÁI =====
     -- MVP chỉ có COMPLETED. Sau này có thể có DRAFT (nháp), CANCELLED (huỷ).
@@ -108,8 +108,8 @@ CREATE TABLE IF NOT EXISTS so_quy (
                    CHECK (trang_thai IN ('COMPLETED', 'DRAFT', 'CANCELLED')),
 
     -- Audit timestamps
-    ngay_tao        TIMESTAMP    NOT NULL DEFAULT NOW(),
-    ngay_cap_nhat   TIMESTAMP    NOT NULL DEFAULT NOW()
+    ngay_tao        TIMESTAMP    NOT NULL DEFAULT clock_timestamp(),
+    ngay_cap_nhat   TIMESTAMP    NOT NULL DEFAULT clock_timestamp()
 );
 
 -- Vì ma_chung_tu dùng cho cả PK và FK → đổi FK thành `ma_chung_tu_lien_quan`
@@ -182,22 +182,6 @@ BEGIN
     END IF;
 
     IF TG_OP = 'UPDATE' AND NOW() > OLD.ngay_tao + INTERVAL '5 minutes' THEN
-        IF NEW.id = OLD.id AND
-           NEW.ma_chung_tu = OLD.ma_chung_tu AND
-           NEW.direction = OLD.direction AND
-           NEW.hang_muc = OLD.hang_muc AND
-           NEW.id_chi_nhanh IS NOT DISTINCT FROM OLD.id_chi_nhanh AND
-           NEW.id_nguoi_tao = OLD.id_nguoi_tao AND
-           NEW.entry_date = OLD.entry_date AND
-           NEW.ngay_tao = OLD.ngay_tao AND
-           NEW.so_tien = OLD.so_tien AND
-           NEW.hinh_thuc_tt = OLD.hinh_thuc_tt AND
-           NEW.doi_tuong = OLD.doi_tuong AND
-           NEW.dien_giai = OLD.dien_giai AND
-           NEW.ma_chung_tu_lien_quan IS NOT DISTINCT FROM OLD.ma_chung_tu_lien_quan THEN
-            RETURN NEW;
-        END IF;
-
         RAISE EXCEPTION 'Sổ quỹ bị khoá sau 5 phút. Row id=% không thể UPDATE. '
             'Hãy tạo phiếu đảo dấu để sửa.', OLD.id;
     END IF;
@@ -222,7 +206,7 @@ CREATE TRIGGER so_quy_immutable
 CREATE OR REPLACE FUNCTION trg_so_quy_reindex()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_balance_before DECIMAL(15,0);
+    v_balance_before DECIMAL(15,0) := 0;
     v_running DECIMAL(15,0) := 0;
     v_rec RECORD;
 BEGIN
@@ -232,33 +216,32 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- Tính số dư TRƯỚC entry_date (lấy runningBalance của row gần nhất trước đó)
+    -- Tính số dư TRƯỚC entry_date (kế thừa từ row gần nhất, bao gồm cả row OPENING)
     SELECT running_balance INTO v_balance_before
     FROM so_quy
     WHERE entry_date < NEW.entry_date
+       OR (entry_date = NEW.entry_date AND ngay_tao < COALESCE(NEW.ngay_tao, clock_timestamp()))
     ORDER BY entry_date DESC, ngay_tao DESC
     LIMIT 1;
+
     v_balance_before := COALESCE(v_balance_before, 0);
 
     -- Tính runningBalance cho row mới
-    v_running := v_balance_before;
     IF NEW.direction = 'RECEIPT' THEN
-        v_running := v_running + NEW.so_tien;
+        v_running := v_balance_before + NEW.so_tien;
     ELSE
-        v_running := v_running - NEW.so_tien;
+        v_running := v_balance_before - NEW.so_tien;
     END IF;
     NEW.running_balance := v_running;
 
-    -- Reindex tất cả row có entry_date >= NEW.entry_date (cộng dồn lại)
-    -- Đây là lý do nên có index trên entry_date.
+    -- Reindex tất cả row sau row mới (nếu có)
     FOR v_rec IN
         SELECT id FROM so_quy
         WHERE ma_chung_tu <> 'OPENING'
-          AND entry_date >= NEW.entry_date
-          AND id <> NEW.id
+          AND (entry_date > NEW.entry_date OR (entry_date = NEW.entry_date AND ngay_tao > COALESCE(NEW.ngay_tao, clock_timestamp())))
+          AND id <> COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::UUID)
         ORDER BY entry_date, ngay_tao
     LOOP
-        -- Reindex từng row (gọi logic tương tự)
         PERFORM fn_so_quy_tinh_running_balance(v_rec.id);
     END LOOP;
 
@@ -271,24 +254,25 @@ CREATE OR REPLACE FUNCTION fn_so_quy_tinh_running_balance(p_id UUID)
 RETURNS VOID AS $$
 DECLARE
     v_row RECORD;
-    v_balance_before DECIMAL(15,0);
+    v_balance_before DECIMAL(15,0) := 0;
     v_running DECIMAL(15,0);
 BEGIN
     SELECT * INTO v_row FROM so_quy WHERE id = p_id;
 
-    -- Lấy số dư trước entry_date
+    -- Lấy số dư của row trước đó (bao gồm OPENING)
     SELECT running_balance INTO v_balance_before
     FROM so_quy
-    WHERE (entry_date, ngay_tao) < (v_row.entry_date, v_row.ngay_tao)
+    WHERE entry_date < v_row.entry_date
+       OR (entry_date = v_row.entry_date AND ngay_tao < v_row.ngay_tao)
     ORDER BY entry_date DESC, ngay_tao DESC
     LIMIT 1;
+
     v_balance_before := COALESCE(v_balance_before, 0);
 
-    v_running := v_balance_before;
     IF v_row.direction = 'RECEIPT' THEN
-        v_running := v_running + v_row.so_tien;
+        v_running := v_balance_before + v_row.so_tien;
     ELSE
-        v_running := v_running - v_row.so_tien;
+        v_running := v_balance_before - v_row.so_tien;
     END IF;
 
     UPDATE so_quy SET running_balance = v_running WHERE id = p_id;
@@ -403,14 +387,14 @@ INSERT INTO so_quy (
     entry_date, so_tien, hinh_thuc_tt, doi_tuong, dien_giai,
     ma_chung_tu_lien_quan
 ) VALUES (
-    'PAYMENT', 'CAP_VON', 'a1b2c3d4-0001-0000-0000-000000000101',  -- Bùi Viện (chi nhánh nhận vốn)
+    'RECEIPT', 'CAP_VON', 'a1b2c3d4-0001-0000-0000-000000000101',  -- Bùi Viện (chi nhánh nhận vốn)
     'b2c3d4e5-0001-0000-0000-000000000001',  -- Admin
     CURRENT_DATE - INTERVAL '20 days', 200000000, 'BANK_TRANSFER',
     'Chi nhánh Bùi Viện', 'Cấp vốn quỹ tháng 1 cho chi nhánh Bùi Viện',
     NULL
 );
 
--- Row 3: Doanh thu bán hàng Bùi Viện ngày 1
+-- Row 3: Doanh thu bán hàng Bùi Viện (khớp Hoá đơn 1)
 INSERT INTO so_quy (
     direction, hang_muc, id_chi_nhanh, id_nguoi_tao,
     entry_date, so_tien, hinh_thuc_tt, doi_tuong, dien_giai,
@@ -418,12 +402,12 @@ INSERT INTO so_quy (
 ) VALUES (
     'RECEIPT', 'BAN_HANG', 'a1b2c3d4-0001-0000-0000-000000000101',
     'b2c3d4e5-0001-0000-0000-000000000006',  -- Thu ngân Mai
-    CURRENT_DATE - INTERVAL '15 days', 4580000, 'CASH',
-    'Khách lẻ (tiền mặt)', 'Doanh thu bán hàng cuối ngày',
-    NULL  -- (sẽ được fill từ hóa đơn cuối ngày)
+    CURRENT_DATE - INTERVAL '5 days', 56160, 'CASH',
+    'Khách lẻ (tiền mặt)', 'Doanh thu bán hàng POS: HD-' || TO_CHAR(CURRENT_DATE - INTERVAL '5 days', 'YYYYMMDD') || '-9001',
+    'HD-' || TO_CHAR(CURRENT_DATE - INTERVAL '5 days', 'YYYYMMDD') || '-9001'
 );
 
--- Row 4: Chi nhập hàng từ Pepsico
+-- Row 4: Chi nhập hàng từ Pepsico (khớp Phiếu nhập 1)
 INSERT INTO so_quy (
     direction, hang_muc, id_chi_nhanh, id_nguoi_tao,
     entry_date, so_tien, hinh_thuc_tt, doi_tuong, dien_giai,
@@ -431,13 +415,13 @@ INSERT INTO so_quy (
 ) VALUES (
     'PAYMENT', 'NHAP_HANG', 'a1b2c3d4-0001-0000-0000-000000000001',  -- Kho Tổng (nơi nhập hàng)
     'b2c3d4e5-0001-0000-0000-000000000003',  -- Thủ kho
-    CURRENT_DATE - INTERVAL '5 days', 1200000, 'BANK_TRANSFER',
+    CURRENT_DATE - INTERVAL '5 days', 1327000, 'BANK_TRANSFER',
     'Công Ty TNHH Pepsico Việt Nam',
-    'Thanh toán nhập hàng phiếu PN-...',
-    NULL  -- ma_chung_tu_lien_quan = mã phiếu nhập
+    'Thanh toán nhập hàng phiếu PN-' || TO_CHAR(CURRENT_DATE - INTERVAL '5 days', 'YYYYMMDD') || '-001',
+    'PN-' || TO_CHAR(CURRENT_DATE - INTERVAL '5 days', 'YYYYMMDD') || '-001'
 );
 
--- Row 5: Chi trả lương tháng trước
+-- Row 5: Chi trả lương tháng trước (khớp Bảng lương)
 INSERT INTO so_quy (
     direction, hang_muc, id_chi_nhanh, id_nguoi_tao,
     entry_date, so_tien, hinh_thuc_tt, doi_tuong, dien_giai,
@@ -447,11 +431,11 @@ INSERT INTO so_quy (
     'b2c3d4e5-0001-0000-0000-000000000002',  -- Kế toán duyệt
     CURRENT_DATE - INTERVAL '10 days', 125000000, 'BANK_TRANSFER',
     'Nhiều nhân viên',
-    'Chi trả lương kỳ tháng trước cho toàn công ty',
-    NULL  -- = mã bảng lương
+    'Chi trả lương kỳ tháng ' || TO_CHAR(CURRENT_DATE, 'MM-YYYY') || ' cho toàn công ty',
+    'PC-' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || '-001'
 );
 
--- Row 6: Chi hoàn tiền 1 đơn hàng (khách trả hàng)
+-- Row 6: Chi hoàn tiền 1 đơn hàng (khớp Hoá đơn 3)
 INSERT INTO so_quy (
     direction, hang_muc, id_chi_nhanh, id_nguoi_tao,
     entry_date, so_tien, hinh_thuc_tt, doi_tuong, dien_giai,
@@ -460,23 +444,23 @@ INSERT INTO so_quy (
     'PAYMENT', 'KHAC', 'a1b2c3d4-0001-0000-0000-000000000101',  -- Hoàn tại Bùi Viện
     'b2c3d4e5-0001-0000-0000-000000000004',  -- QL Trần Văn Anh
     CURRENT_DATE - INTERVAL '1 day', 32400, 'CASH',
-    'Khách hoàn đơn HD-...-9003',
+    'Khách hoàn đơn HD-' || TO_CHAR(CURRENT_DATE - INTERVAL '2 days', 'YYYYMMDD') || '-9003',
     'Hoàn tiền 2 lon Coca do lỗi bao bì',
-    'HD-...-9003'  -- mã hóa đơn
+    'HD-' || TO_CHAR(CURRENT_DATE - INTERVAL '2 days', 'YYYYMMDD') || '-9003'
 );
 
--- Row 7: Doanh thu MOMO (không phải tiền mặt) — ghi BANK_TRANSFER cho khớp "tiền về tài khoản"
+-- Row 7: Doanh thu MOMO (khớp Hoá đơn 2)
 INSERT INTO so_quy (
     direction, hang_muc, id_chi_nhanh, id_nguoi_tao,
     entry_date, so_tien, hinh_thuc_tt, doi_tuong, dien_giai,
     ma_chung_tu_lien_quan
 ) VALUES (
     'RECEIPT', 'BAN_HANG', 'a1b2c3d4-0001-0000-0000-000000000101',
-    'b2c3d4e5-0001-0000-0000-0000-000000000007',  -- Thu ngân Hùng
+    'b2c3d4e5-0001-0000-0000-000000000007',  -- Thu ngân Hùng
     CURRENT_DATE - INTERVAL '3 days', 41040, 'BANK_TRANSFER',
     'Khách lẻ (không dùng tiền mặt)',
     'Doanh thu bán hàng 1 hộp Vinamilk qua MoMo',
-    'HD-...-9002'
+    'HD-' || TO_CHAR(CURRENT_DATE - INTERVAL '3 days', 'YYYYMMDD') || '-9002'
 );
 
 COMMENT ON TABLE so_quy IS

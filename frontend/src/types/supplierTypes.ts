@@ -18,9 +18,10 @@ export interface Supplier {
     totalOrders: number;
     status: 'Active' | 'Inactive';
     createdAt: string;
+    updatedAt?: string;
 }
 
-export type SupplierFormValues = Omit<Supplier, 'id' | 'code' | 'totalDebt' | 'totalOrders' | 'createdAt'>;
+export type SupplierFormValues = Omit<Supplier, 'id' | 'code' | 'totalDebt' | 'totalOrders' | 'createdAt' | 'updatedAt'>;
 
 export interface SupplierStatSummary {
     totalSuppliers: number;
