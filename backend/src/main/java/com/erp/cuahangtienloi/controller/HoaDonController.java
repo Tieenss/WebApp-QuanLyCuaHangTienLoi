@@ -575,8 +575,100 @@ public class HoaDonController {
         }
     }
 
+    public record RefundRequest(String lyDoHoan) {}
+
+    @PostMapping("/{id}/refund")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
+    @Transactional
+    public ResponseEntity<?> refund(@PathVariable UUID id,
+                                   @RequestBody(required = false) RefundRequest body,
+                                   HttpServletRequest httpRequest) {
+        HoaDon hd = hoaDonRepository.findById(id).orElse(null);
+        if (hd == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!"COMPLETED".equals(hd.getTrangThai())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chỉ hoàn tiền được hoá đơn ở trạng thái COMPLETED"));
+        }
+
+        NhanVien actor = requireAuthenticatedEmployee(httpRequest);
+        if ("QUAN_LY".equals(actor.getVaiTro()) || "THU_NGAN".equals(actor.getVaiTro())) {
+            if (actor.getIdChiNhanh() != null && !actor.getIdChiNhanh().equals(hd.getIdChiNhanh())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.err("Không thể hoàn hoá đơn khác chi nhánh"));
+            }
+        }
+
+        String lyDo = (body != null && body.lyDoHoan() != null && !body.lyDoHoan().trim().isEmpty())
+                ? body.lyDoHoan().trim()
+                : "Khách trả hàng hoàn tiền";
+
+        String nguoiThucHien = (actor.getHoTen() != null && !actor.getHoTen().trim().isEmpty())
+                ? actor.getHoTen()
+                : "Hệ thống";
+
+        jdbcTemplate.query(
+                "SELECT fn_hoan_hoa_don(?::uuid, ?::uuid, ?::text, ?::varchar)",
+                rs -> { }, hd.getId(), actor.getId(), lyDo, nguoiThucHien
+        );
+
+        hd.setTrangThai("REFUNDED");
+        hd.setIdNguoiHoan(actor.getId());
+        hd.setNgayHoan(LocalDateTime.now());
+        hd.setLyDoHoan(lyDo);
+        hd.setNgayCapNhat(LocalDateTime.now());
+
+        return ResponseEntity.ok(toDTO(hd));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
+    @Transactional
+    public ResponseEntity<?> cancel(@PathVariable UUID id,
+                                   @RequestBody(required = false) RefundRequest body,
+                                   HttpServletRequest httpRequest) {
+        HoaDon hd = hoaDonRepository.findById(id).orElse(null);
+        if (hd == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!"COMPLETED".equals(hd.getTrangThai())) {
+            return ResponseEntity.badRequest().body(ApiResponse.err("Chỉ huỷ được hoá đơn ở trạng thái COMPLETED"));
+        }
+
+        NhanVien actor = requireAuthenticatedEmployee(httpRequest);
+        if ("QUAN_LY".equals(actor.getVaiTro()) || "THU_NGAN".equals(actor.getVaiTro())) {
+            if (actor.getIdChiNhanh() != null && !actor.getIdChiNhanh().equals(hd.getIdChiNhanh())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.err("Không thể huỷ hoá đơn khác chi nhánh"));
+            }
+        }
+
+        String lyDo = (body != null && body.lyDoHoan() != null && !body.lyDoHoan().trim().isEmpty())
+                ? body.lyDoHoan().trim()
+                : "Huỷ đơn hàng";
+
+        String nguoiThucHien = (actor.getHoTen() != null && !actor.getHoTen().trim().isEmpty())
+                ? actor.getHoTen()
+                : "Hệ thống";
+
+        hd.setTrangThai("CANCELLED");
+        hd.setIdNguoiHoan(actor.getId());
+        hd.setNgayHoan(LocalDateTime.now());
+        hd.setLyDoHoan(lyDo);
+        hd.setNgayCapNhat(LocalDateTime.now());
+        hoaDonRepository.saveAndFlush(hd);
+
+        List<ChiTietHoaDon> lines = chiTietHoaDonRepository.findByIdHoaDon(id);
+        for (ChiTietHoaDon line : lines) {
+            jdbcTemplate.query(
+                    "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, 'SALE_RETURN'::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, NULL::date, ?::text, NOW()::timestamp)",
+                    rs -> { }, line.getIdSanPham(), hd.getIdChiNhanh(), line.getSoLuong(), line.getDonGiaVon(),
+                    hd.getMaHoaDon(), nguoiThucHien, "Huỷ đơn hàng: " + hd.getMaHoaDon());
+        }
+
+        return ResponseEntity.ok(toDTO(hd));
+    }
+
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody HoaDon request) {
         return hoaDonRepository.findById(id)
                 .map(hd -> {
