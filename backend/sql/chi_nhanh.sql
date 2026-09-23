@@ -68,6 +68,13 @@ CREATE TABLE IF NOT EXISTS chi_nhanh (
     -- TRUE = đang hoạt động, FALSE = tạm đóng.
     dang_hoat_dong  BOOLEAN      NOT NULL DEFAULT TRUE,
 
+    dia_chi         VARCHAR(500),
+    loai_chi_nhanh  VARCHAR(50),
+    nguoi_cap_nhat  VARCHAR(100),
+    nguoi_tao       VARCHAR(100),
+    trang_thai      VARCHAR(50) DEFAULT 'ACTIVE',
+    ten_quan_ly     VARCHAR(255),
+
     -- Audit timestamps
     ngay_tao        TIMESTAMP    NOT NULL DEFAULT NOW(),
     ngay_cap_nhat   TIMESTAMP    NOT NULL DEFAULT NOW()

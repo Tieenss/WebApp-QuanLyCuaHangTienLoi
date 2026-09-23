@@ -63,11 +63,22 @@ export const sanPhamApi = {
     return response.json();
   },
 
-  delete: async (id: string): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/api/san-pham/${id}`, {
+  delete: async (id: string, permanent: boolean = false): Promise<any> => {
+    const url = `${API_BASE_URL}/api/san-pham/${id}${permanent ? '?permanent=true' : ''}`;
+    const response = await fetch(url, {
       method: 'DELETE',
       headers: getHeaders(),
     });
     if (!response.ok) throw await parseApiError(response, 'Không thể xóa sản phẩm');
+    return response.json();
+  },
+
+  restore: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/api/san-pham/${id}/restore`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+    });
+    if (!response.ok) throw await parseApiError(response, 'Không thể khôi phục sản phẩm');
+    return response.json();
   },
 };
