@@ -53,17 +53,34 @@ export const EmployeeFormModal: FC = () => {
     (state) => state.employee,
   );
   const branches = useAppSelector((state) => state.branch.branches);
+  const user = useAppSelector((state) => state.auth.user);
   const isEditing = selectedEmployee !== null;
   const salaryType = Form.useWatch('employmentType', form);
+  const isManager = user?.role === 'QUAN_LY';
+  // const isAdmin = user?.role === 'ADMIN';
 
   // Lọc chi nhánh theo vai trò: THU_KHO chỉ được chọn Kho tổng
   const filterBranchesByRole = (role: string) => {
-    if (role === 'THU_KHO') {
-      return branches.filter((b) => b.status === RECORD_STATUS.Active
-        && b.kind === BRANCH_KIND.DistributionCenter);
+    let filtered = branches.filter(
+        (b) => b.status === RECORD_STATUS.Active,
+    );
+
+    // QUẢN LÝ chỉ được thao tác tại chi nhánh của mình.
+    if (isManager) {
+      filtered = filtered.filter(
+          (b) => b.id === user?.branchId,
+      );
     }
-    return branches.filter((b) => b.status === RECORD_STATUS.Active
-      && b.kind === BRANCH_KIND.Store);
+
+    if (role === USER_ROLE.WarehouseKeeper) {
+      return filtered.filter(
+          (b) => b.kind === BRANCH_KIND.DistributionCenter,
+      );
+    }
+
+    return filtered.filter(
+        (b) => b.kind === BRANCH_KIND.Store,
+    );
   };
 
   useEffect(() => {
@@ -96,6 +113,9 @@ export const EmployeeFormModal: FC = () => {
         position,
         role: selectedEmployee.role,
         employmentType,
+        branchId: isManager
+            ? user?.branchId ?? selectedEmployee.branchId
+            : selectedEmployee.branchId,
       });
 
       return;
@@ -112,8 +132,9 @@ export const EmployeeFormModal: FC = () => {
       status: RECORD_STATUS.Active,
       hourlyWage: 0,
       baseSalary: 0,
+      branchId: isManager ? user?.branchId ?? null : null,
     });
-  }, [isModalOpen, selectedEmployee, form]);
+  }, [isModalOpen, selectedEmployee, form, isManager, user?.branchId]);
 
   const handleSubmit = async (): Promise<void> => {
     try {
@@ -129,6 +150,18 @@ export const EmployeeFormModal: FC = () => {
       } else {
         values.baseSalary = 0;
       }
+
+      /**
+       * QUẢN LÝ chỉ được quản lý THU_NGAN
+       * tại chi nhánh của chính mình.
+       *
+       * Backend vẫn kiểm tra lại rule này.
+       */
+      if (isManager) {
+        values.role = USER_ROLE.Cashier;
+        values.branchId = user?.branchId ?? null;
+      }
+
       // Nếu vai trò là ADMIN/KE_TOAN → KHÔNG gửi branchId (DB constraint)
       if (values.role === USER_ROLE.Admin || values.role === USER_ROLE.Accountant) {
         values.branchId = null;
@@ -207,16 +240,24 @@ export const EmployeeFormModal: FC = () => {
             >
               <Select
                   placeholder="Chọn chức vụ"
-                  options={EMPLOYEE_POSITIONS.map((position) => ({
-                    value: position,
-                    label: position,
-                  }))}
+                  options={EMPLOYEE_POSITIONS
+                      .filter((position) => !isManager || POSITION_ROLE_MAP[position] === USER_ROLE.Cashier)
+                      .map((position) => ({
+                        value: position,
+                        label: position,
+                      }))}
+                  disabled={isManager && isEditing}
                   onChange={(value) => {
-                    // Chức vụ → tự động xác định vai trò hệ thống
-                    form.setFieldValue('role', POSITION_ROLE_MAP[value]);
+                    const role = POSITION_ROLE_MAP[value];
 
-                    // Role thay đổi → reset chi nhánh
-                    form.setFieldValue('branchId', null);
+                    form.setFieldValue('role', role);
+
+                    // Khi QUẢN LÝ tạo THU_NGAN thì giữ chi nhánh của mình.
+                    if (isManager && role === USER_ROLE.Cashier) {
+                      form.setFieldValue('branchId', user?.branchId ?? null);
+                    } else {
+                      form.setFieldValue('branchId', null);
+                    }
                   }}
               />
             </Form.Item>
@@ -233,7 +274,11 @@ export const EmployeeFormModal: FC = () => {
                 ]}
             >
               <Select
-                  options={ROLE_OPTIONS}
+                  options={
+                    isManager
+                        ? ROLE_OPTIONS.filter((option) => option.value === USER_ROLE.Cashier)
+                        : ROLE_OPTIONS
+                  }
                   disabled
               />
             </Form.Item>
@@ -275,12 +320,14 @@ export const EmployeeFormModal: FC = () => {
                             label: `${b.code} - ${b.name}`,
                           }))}
                           allowClear
-                          disabled={!requiresBranch}
+                          disabled={!requiresBranch || isManager}
                           placeholder={
                             requiresBranch
                                 ? role === 'THU_KHO'
                                     ? 'Chọn Kho tổng'
-                                    : 'Chọn chi nhánh'
+                                    : isManager
+                                        ? 'Chi nhánh của bạn'
+                                        : 'Chọn chi nhánh'
                                 : 'Không cần chọn'
                           }
                       />

@@ -59,6 +59,15 @@ export const EmployeesPage: FC = () => {
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
   const { employees, loading } = useAppSelector((state) => state.employee);
   const branchesState = useAppSelector((state) => state.branch.branches);
+  const canManageAll = user?.role === 'ADMIN';
+
+  const canManageRow = (row: Employee): boolean =>
+      canManageAll ||
+      (
+          user?.role === 'QUAN_LY' &&
+          row.role === 'THU_NGAN' &&
+          row.branchId === user?.branchId
+      );
 
   useEffect(() => {
     dispatch(fetchEmployees());
@@ -324,25 +333,35 @@ export const EmployeesPage: FC = () => {
       align: 'center',
       width: 90,
       fixed: 'right',
-      render: (_, row) => (
-        <Space size={0}>
-          <Button
-            type="text"
-            icon={<EditOutlined className="action-edit-icon" />}
-            onClick={() => handleEdit(row)}
-          />
-          <Popconfirm
-            title="Xoá nhân viên?"
-            description={`Xoá "${row.fullName}" khỏi danh sách?`}
-            okText="Xoá"
-            cancelText="Huỷ"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(row.id)}
-          >
-            <Button type="text" icon={<DeleteOutlined className="action-delete-icon" />} />
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, row) => {
+        if (!canManageRow(row)) {
+          return null;
+        }
+
+        return (
+            <Space size={0}>
+              <Button
+                  type="text"
+                  icon={<EditOutlined className="action-edit-icon" />}
+                  onClick={() => handleEdit(row)}
+              />
+
+              <Popconfirm
+                  title="Xoá nhân viên?"
+                  description={`Xoá "${row.fullName}" khỏi danh sách?`}
+                  okText="Xoá"
+                  cancelText="Huỷ"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDelete(row.id)}
+              >
+                <Button
+                    type="text"
+                    icon={<DeleteOutlined className="action-delete-icon" />}
+                />
+              </Popconfirm>
+            </Space>
+        );
+      },
     },
   ];
 
@@ -378,9 +397,16 @@ export const EmployeesPage: FC = () => {
         description="Danh sách nhân sự, ca làm việc được phân công, chi nhánh và vai trò hệ thống."
         extra={
           <Space wrap>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              Thêm nhân viên
-            </Button>
+            {(canManageAll || user?.role === 'QUAN_LY') && (
+                <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={handleAdd}
+                >
+                  Thêm nhân viên
+                </Button>
+            )}
+
             <Tag color="red" className="tag-no-margin">
               {filtered.length} / {scoped.length} nhân sự
             </Tag>
