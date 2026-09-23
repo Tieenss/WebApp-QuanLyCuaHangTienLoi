@@ -19,7 +19,6 @@ import { ArrowRightOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/ic
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchStock, resolveStockLevel, stockOf } from '@/store/slices/stockSlice';
 import {
-  buildTransfer,
   fetchTransfers,
   type TransferDraftLine,
 } from '@/store/slices/transferSlice';
@@ -28,7 +27,7 @@ import { chiNhanhApi, type ChiNhanhDTO } from '@/api/chiNhanh';
 import { API_BASE_URL } from '@/config/api';
 import { apiFetch } from '@/api/http';
 import { tonKhoApi, type TonKhoDTO } from '@/api/tonKho';
-import { chiTietPhieuXuatApi, phieuXuatKhoApi } from '@/api/phieuXuatKho';
+import { chiTietPhieuXuatApi, phieuXuatKhoApi, type PhieuXuatKhoDTO } from '@/api/phieuXuatKho';
 import { DOCUMENT_STATUS, STOCK_LEVEL, USER_ROLE, type DocumentStatus, type StockLevel } from '@/types';
 import { dayjs, today } from '@/utils/dateUtils';
 import { formatVND } from '@/utils/formatters';
@@ -90,12 +89,10 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   const balances = useAppSelector((state) => state.stock.balances);
   const branches = useAppSelector((state) => state.branch.branches);
   const products = useAppSelector((state) => state.product.products);
-  const transferCount = useAppSelector((state) => state.transfer.transfers.length);
 
   // const activeStores = branches.filter((b) => b.status === 'Active');
   const sellableProducts = products.filter((p) => p.status === 'Active');
   const branchNameById = (id: string) => branches.find((b) => b.id === id)?.name ?? '';
-  const productById = (id: string) => products.find((p) => p.id === id);
 
   const isRequest = initialStatus === DOCUMENT_STATUS.Pending;
 
@@ -244,21 +241,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         return;
       }
 
-  const performedBy =
-    user === null ? 'Không xác định' : `${user.fullName} (${user.employeeCode})`;
-
-      const transfer = buildTransfer({
-        toBranchId: values.toBranchId,
-        toBranchName: branchNameById(values.toBranchId),
-        lines: validRows.map(({ productId, quantity }) => ({ productId, quantity })),
-        requestDate: values.requestDate.format('YYYY-MM-DD'),
-        note: values.note?.trim() ?? '',
-        createdBy: performedBy,
-        existingCount: transferCount,
-        initialStatus,
-        getProductById: productById,
-      });
-      if (transfer === null) return;
+      let created: PhieuXuatKhoDTO;
 
       // 1) Tạo header PENDING + dòng chi tiết xuống DB. Việc trừ/cộng tồn do
       //    backend làm qua /ship và /receive (fun the_kho + ton_kho).
@@ -282,7 +265,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
           const err = await response.json();
           throw new Error(err.message || 'Lỗi lưu phiếu xuất');
         }
-        const created = await response.json();
+        created = await response.json();
 
         await chiTietPhieuXuatApi.createBatch(
           validRows.map((row, index) => ({
@@ -314,13 +297,16 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       dispatch(fetchTransfers());
       dispatch(fetchStock());
 
+      const ticketCode = created.maPhieu;
+      const targetBranchName = created.tenChiNhanhNhan || branchNameById(values.toBranchId);
+
       if (isRequest) {
         message.success(
-          `Đã gửi yêu cầu xuất ${transfer.code} sang ${transfer.toBranchName}. Vui lòng chờ Thủ kho duyệt.`,
+          `Đã gửi yêu cầu xuất ${ticketCode} sang ${targetBranchName}. Vui lòng chờ Thủ kho duyệt.`,
         );
       } else {
         message.success(
-          `Đã xuất phiếu ${transfer.code} sang ${transfer.toBranchName}: trừ tồn Kho Tổng và cộng tồn cửa hàng.`,
+          `Đã xuất phiếu ${ticketCode} sang ${targetBranchName}: trừ tồn Kho Tổng và cộng tồn cửa hàng.`,
         );
       }
       onClose();
