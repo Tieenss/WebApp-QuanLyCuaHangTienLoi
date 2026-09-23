@@ -44,11 +44,6 @@ const STATUS_OPTIONS = [
   { value: 'Inactive', label: 'Ngừng hoạt động' },
 ];
 
-// Chỉ nhận: "24/7" hoặc "HH:MM - HH:MM".
-// HH: 00–23 (giờ đóng cho phép 24:00 để tương thích dữ liệu cũ), MM: 00–59.
-const OPENING_HOURS_PATTERN =
-    /^(24\/7|([01]\d|2[0-3]):[0-5]\d\s*-\s*(([01]\d|2[0-3]):[0-5]\d|24:00))$/;
-
 type BranchEditorValues = BranchFormValues & { managerId?: string };
 
 export const BranchFormModal: FC = () => {
@@ -123,40 +118,20 @@ export const BranchFormModal: FC = () => {
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-                name="code"
-                label="Mã chi nhánh"
-                rules={[
-                  {
-                    required: true,
-                    whitespace: true,
-                    message: 'Vui lòng nhập mã chi nhánh.',
-                  },
-                  {
-                    max: 20,
-                    message: 'Mã chi nhánh tối đa 20 ký tự.',
-                  },
-                ]}
+              name="code"
+              label="Mã chi nhánh"
+              rules={[{ required: true, message: 'Vui lòng nhập mã chi nhánh.' }]}
             >
-              <Input placeholder="VD: CK-0101" maxLength={20} />
+              <Input placeholder="VD: CK-0101" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
               name="name"
               label="Tên điểm bán"
-              rules={[
-                {
-                  required: true,
-                  whitespace: true,
-                  message: 'Vui lòng nhập tên.',
-                },
-                {
-                  max: 255,
-                  message: 'Tên chi nhánh tối đa 255 ký tự.',
-                },
-              ]}
+              rules={[{ required: true, message: 'Vui lòng nhập tên.' }]}
             >
-              <Input placeholder="Tên chi nhánh" maxLength={255} />
+              <Input placeholder="Tên chi nhánh" />
             </Form.Item>
           </Col>
         </Row>
@@ -185,63 +160,30 @@ export const BranchFormModal: FC = () => {
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-                name="province"
-                label="Tỉnh/Thành"
-                rules={[
-                  {
-                    required: true,
-                    whitespace: true,
-                    message: 'Vui lòng nhập tỉnh/thành.',
-                  },
-                  {
-                    max: 100,
-                    message: 'Tỉnh/Thành tối đa 100 ký tự.',
-                  },
-                ]}
+              name="province"
+              label="Tỉnh/Thành"
+              rules={[{ required: true, message: 'Vui lòng nhập tỉnh/thành.' }]}
             >
-              <Input placeholder="Tỉnh/Thành" maxLength={100} />
+              <Input placeholder="Tỉnh/Thành" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
             <Form.Item
-                name="district"
-                label="Quận/Huyện"
-                rules={[
-                  {
-                    required: true,
-                    whitespace: true,
-                    message: 'Vui lòng nhập quận/huyện.',
-                  },
-                  {
-                    max: 100,
-                    message: 'Quận/Huyện tối đa 100 ký tự.',
-                  },
-                ]}
+              name="district"
+              label="Quận/Huyện"
+              rules={[{ required: true, message: 'Vui lòng nhập quận/huyện.' }]}
             >
-              <Input placeholder="Quận/Huyện" maxLength={100} />
+              <Input placeholder="Quận/Huyện" />
             </Form.Item>
           </Col>
         </Row>
 
         <Form.Item
-            name="addressLine"
-            label="Địa chỉ"
-            rules={[
-              {
-                required: true,
-                whitespace: true,
-                message: 'Vui lòng nhập địa chỉ.',
-              },
-              {
-                max: 500,
-                message: 'Địa chỉ tối đa 500 ký tự.',
-              },
-            ]}
+          name="addressLine"
+          label="Địa chỉ"
+          rules={[{ required: true, message: 'Vui lòng nhập địa chỉ.' }]}
         >
-          <Input
-              placeholder="Số nhà, đường, phường/xã"
-              maxLength={500}
-          />
+          <Input placeholder="Số nhà, đường, phường/xã" />
         </Form.Item>
 
         <Row gutter={16}>
@@ -295,30 +237,11 @@ export const BranchFormModal: FC = () => {
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
-                name="openingHours"
-                label="Giờ mở cửa"
-                normalize={(value: string | undefined) => value?.trim().toUpperCase()}
-                rules={[
-                  {
-                    required: true,
-                    whitespace: true,
-                    message: 'Vui lòng nhập giờ mở cửa.',
-                  },
-                  {
-                    max: 50,
-                    message: 'Giờ mở cửa tối đa 50 ký tự.',
-                  },
-                  {
-                    pattern: OPENING_HOURS_PATTERN,
-                    message:
-                        'Giờ mở cửa phải là "24/7" hoặc dạng "HH:MM - HH:MM" (VD: 06:00 - 22:00).',
-                  },
-                ]}
+              name="openingHours"
+              label="Giờ mở cửa"
+              rules={[{ required: true, message: 'Vui lòng nhập giờ mở cửa.' }]}
             >
-              <Input
-                  placeholder='VD: "24/7" hoặc "06:00 - 22:00"'
-                  maxLength={50}
-              />
+              <Input placeholder='VD: "24/7" hoặc "06:00 - 22:00"' />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
@@ -328,8 +251,8 @@ export const BranchFormModal: FC = () => {
               rules={[
                 {
                   type: 'number',
-                  min: 50,
-                  message: 'Diện tích phải >= 50.',
+                  min: 0,
+                  message: 'Diện tích phải >= 0.',
                 },
               ]}
             >
