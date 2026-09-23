@@ -100,9 +100,17 @@ export const updateProductThunk = createAsyncThunk(
 
 export const deleteProductThunk = createAsyncThunk(
   'product/delete',
+  async ({ id, permanent = false }: { id: string; permanent?: boolean }) => {
+    const res = await sanPhamApi.delete(id, permanent);
+    return { id, permanent, message: res?.message };
+  },
+);
+
+export const restoreProductThunk = createAsyncThunk(
+  'product/restore',
   async (id: string) => {
-    await sanPhamApi.delete(id);
-    return id;
+    const res = await sanPhamApi.restore(id);
+    return { id, message: res?.message };
   },
 );
 
@@ -142,10 +150,24 @@ export const productSlice = createSlice({
         if (index !== -1) state.products[index] = action.payload;
       })
       .addCase(deleteProductThunk.fulfilled, (state, action) => {
-        state.products = state.products.filter((p) => p.id !== action.payload);
+        if (action.payload.permanent) {
+          state.products = state.products.filter((p) => p.id !== action.payload.id);
+        } else {
+          const index = state.products.findIndex((p) => p.id === action.payload.id);
+          if (index !== -1) {
+            state.products[index].status = 'Inactive';
+          }
+        }
+      })
+      .addCase(restoreProductThunk.fulfilled, (state, action) => {
+        const index = state.products.findIndex((p) => p.id === action.payload.id);
+        if (index !== -1) {
+          state.products[index].status = 'Active';
+        }
       });
   },
 });
 
 export const { setSelectedProduct, setProductModalOpen } = productSlice.actions;
 export default productSlice.reducer;
+

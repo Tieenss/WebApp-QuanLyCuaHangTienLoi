@@ -4,7 +4,6 @@ import {
   ColorPicker,
   Form,
   Input,
-  InputNumber,
   Modal,
   Select,
 } from 'antd';
@@ -66,7 +65,6 @@ export const CategoryFormModal: FC<CategoryFormModalProps> = ({
       parentId: null,
       icon: '📦',
       color: CHART_COLORS[0] ?? '#E31837',
-      displayOrder: 1,
       status: RECORD_STATUS.Active,
       description: '',
     });
@@ -143,14 +141,6 @@ export const CategoryFormModal: FC<CategoryFormModalProps> = ({
               },
             ]}
           />
-        </Form.Item>
-
-        <Form.Item
-          name="displayOrder"
-          label="Thứ tự hiển thị"
-          rules={[{ required: true, message: 'Nhập thứ tự.' }]}
-        >
-          <InputNumber min={1} step={1} className="category-order-input" />
         </Form.Item>
 
         <Form.Item

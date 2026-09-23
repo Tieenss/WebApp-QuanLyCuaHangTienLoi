@@ -78,7 +78,7 @@ export const EmployeesPage: FC = () => {
       branchName: emp.branchName || branchesState.find((b) => b.id === emp.branchId)?.name || '',
     }));
     if (allowed.length === 0) return enriched;
-    return enriched.filter((employee) => allowed.includes(employee.branchId));
+    return enriched.filter((employee) => employee.branchId !== null && allowed.includes(employee.branchId));
   }, [user?.allowedBranchIds, employees, branchesState]);
 
   const filtered = useMemo(

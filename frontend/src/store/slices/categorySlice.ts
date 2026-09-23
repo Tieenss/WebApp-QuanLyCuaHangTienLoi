@@ -78,10 +78,41 @@ export const updateCategoryThunk = createAsyncThunk(
   },
 );
 
+/**
+ * Soft delete: gọi DELETE backend (backend sẽ set dangHoatDong=false).
+ * Store cập nhật status thành Inactive thay vì xoá record khỏi danh sách
+ * để trang vẫn hiển thị danh mục với trạng thái "Ngừng hoạt động".
+ */
 export const deleteCategoryThunk = createAsyncThunk(
   'category/delete',
   async (id: string) => {
-    await danhMucApi.delete(id);
+    const res = await danhMucApi.delete(id);
+    return { id, message: res?.message };
+  },
+);
+
+export const restoreCategoryThunk = createAsyncThunk(
+  'category/restore',
+  async (id: string) => {
+    const res = await danhMucApi.restore(id);
+    return { id, message: res?.message };
+  },
+);
+
+/** Di chuyển danh mục lên trên (swap với phần tử liền kề nhỏ hơn). */
+export const moveCategoryUp = createAsyncThunk(
+  'category/moveUp',
+  async (id: string) => {
+    await danhMucApi.moveUp(id);
+    return id;
+  },
+);
+
+/** Di chuyển danh mục xuống dưới (swap với phần tử liền kề lớn hơn). */
+export const moveCategoryDown = createAsyncThunk(
+  'category/moveDown',
+  async (id: string) => {
+    await danhMucApi.moveDown(id);
     return id;
   },
 );
@@ -115,11 +146,25 @@ export const categorySlice = createSlice({
         const index = state.categories.findIndex((c) => c.id === action.payload.id);
         if (index !== -1) state.categories[index] = action.payload;
       })
+      // Soft delete: chuyển status → Inactive thay vì xoá khỏi store
       .addCase(deleteCategoryThunk.fulfilled, (state, action) => {
-        state.categories = state.categories.filter((c) => c.id !== action.payload);
+        const index = state.categories.findIndex((c) => c.id === action.payload.id);
+        if (index !== -1) state.categories[index].status = 'Inactive';
+      })
+      // Restore: chuyển status → Active
+      .addCase(restoreCategoryThunk.fulfilled, (state, action) => {
+        const index = state.categories.findIndex((c) => c.id === action.payload.id);
+        if (index !== -1) state.categories[index].status = 'Active';
+      })
+      // Sau khi move, fetch lại từ backend để có thứ tự chính xác
+      .addCase(moveCategoryUp.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(moveCategoryDown.fulfilled, (state) => {
+        state.loading = false;
       });
   },
 });
 
 export const { addCategoryLocal } = categorySlice.actions;
-export default categorySlice.reducer;
+export default categorySlice.reducer;
