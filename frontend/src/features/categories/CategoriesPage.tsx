@@ -307,7 +307,7 @@ export const CategoriesPage: FC = () => {
       width: 140,
       render: (status: Category['status']) => <RecordStatusTag status={status} />,
     },
-    ...(canEdit
+    ...(isAdmin
       ? [
           {
             title: 'Sắp xếp',
@@ -333,21 +333,27 @@ export const CategoriesPage: FC = () => {
               </Space>
             ),
           },
+        ]
+      : []),
+    ...(canEdit
+      ? [
           {
             title: 'Thao tác',
             key: 'actions',
             align: 'center' as const,
-            width: 110,
+            width: isAdmin ? 110 : 80,
             fixed: 'right' as const,
             render: (_: unknown, row: Category) => (
               <Space size={0}>
-                <Tooltip title="Chỉnh sửa danh mục">
-                  <Button
-                    type="text"
-                    icon={<EditOutlined className="action-edit-icon" />}
-                    onClick={() => handleEdit(row)}
-                  />
-                </Tooltip>
+                {isAdmin && (
+                  <Tooltip title="Chỉnh sửa danh mục">
+                    <Button
+                      type="text"
+                      icon={<EditOutlined className="action-edit-icon" />}
+                      onClick={() => handleEdit(row)}
+                    />
+                  </Tooltip>
+                )}
                 {row.status === 'Active' ? (
                   <Popconfirm
                     title={isAdmin ? "Ngừng kinh doanh toàn chuỗi?" : "Ngừng kinh doanh tại chi nhánh?"}
@@ -420,7 +426,7 @@ export const CategoriesPage: FC = () => {
             <Tag color="red" className="tag-no-margin">
               {filtered.length} / {categories.length} nhóm
             </Tag>
-            {canEdit && (
+            {isAdmin && (
               <Button
                 type="primary"
                 icon={<PlusOutlined />}

@@ -136,7 +136,7 @@ public class DanhMucController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody DanhMuc request) {
         request.setTenDanhMuc(requireText(request.getTenDanhMuc(), "Tên danh mục", 2, 100));
         if (request.getMaDanhMuc() != null && request.getMaDanhMuc().length() > 20) {
@@ -176,7 +176,7 @@ public class DanhMucController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody DanhMuc request) {
         return danhMucRepository.findById(id)
                 .map(dm -> {
@@ -316,7 +316,7 @@ public class DanhMucController {
      * có thuTuHienThi nhỏ hơn liền kề nhất.
      */
     @PatchMapping("/{id}/move-up")
-    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> moveUp(@PathVariable UUID id) {
         return danhMucRepository.findById(id)
                 .map(current -> {
@@ -347,7 +347,7 @@ public class DanhMucController {
      * có thuTuHienThi lớn hơn liền kề nhất.
      */
     @PatchMapping("/{id}/move-down")
-    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> moveDown(@PathVariable UUID id) {
         return danhMucRepository.findById(id)
                 .map(current -> {

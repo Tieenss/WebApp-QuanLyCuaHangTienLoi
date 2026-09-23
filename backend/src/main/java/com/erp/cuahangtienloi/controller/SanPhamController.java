@@ -131,7 +131,7 @@ public class SanPhamController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@Valid @RequestBody CreateSanPhamRequest request) {
         if (sanPhamRepository.existsBySku(request.getSku())) {
             return ResponseEntity.badRequest().body( ApiResponse.err("SKU đã tồn tại"));
@@ -178,7 +178,7 @@ public class SanPhamController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> update(@PathVariable UUID id, @Valid @RequestBody UpdateSanPhamRequest request) {
         return sanPhamRepository.findById(id)
                 .map(sp -> {
