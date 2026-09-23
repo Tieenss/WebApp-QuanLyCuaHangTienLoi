@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FC } from 'react';
+import { isInitialLoading } from '@/utils/tableLoading';
 import {
   App as AntdApp,
   Button,
@@ -567,7 +568,7 @@ export const ProductsPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          loading={loading}
+          loading={isInitialLoading(loading, products)}
           scroll={{ x: 1900 }}
           pagination={{
             pageSize: 12,

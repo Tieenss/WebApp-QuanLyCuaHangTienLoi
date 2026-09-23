@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
+import { isInitialLoading } from '@/utils/tableLoading';
 import {
   Button,
   Card,
@@ -390,7 +391,7 @@ export const BranchesPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          loading={loading}
+          loading={isInitialLoading(loading, branches)}
           scroll={{ x: 1560 }}
           pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `${total} điểm bán` }}
         />

@@ -27,6 +27,7 @@ import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { AttendanceStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { isInitialLoading } from '@/utils/tableLoading';
 import {
   canApprovePayment,
   canConfirmHours,
@@ -995,7 +996,7 @@ export const AttendancePage: FC = () => {
                     columns={myShiftColumns}
                     dataSource={myAttendance}
                     rowKey="id"
-                    loading={attendanceLoading}
+                    loading={isInitialLoading(attendanceLoading, attendanceRecords)}
                     size="small"
                     scroll={{ x: 1000 }}
                     pagination={{
@@ -1042,7 +1043,7 @@ export const AttendancePage: FC = () => {
                     columns={attendanceColumns}
                     dataSource={attendanceRegister}
                     rowKey="id"
-                    loading={attendanceLoading}
+                    loading={isInitialLoading(attendanceLoading, attendanceRecords)}
                     size="small"
                     scroll={{ x: 1420 }}
                     pagination={{
@@ -1117,7 +1118,7 @@ export const AttendancePage: FC = () => {
                     columns={payrollColumns}
                     dataSource={payroll}
                     rowKey="id"
-                    loading={payrollLoading}
+                    loading={isInitialLoading(payrollLoading, payrollRows)}
                     size="small"
                     scroll={{ x: 2100 }}
                     className="dense-table"
