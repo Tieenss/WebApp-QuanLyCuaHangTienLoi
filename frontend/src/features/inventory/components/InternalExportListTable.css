@@ -1,0 +1,44 @@
+/* InternalExportListTable */
+
+.export-code {
+  font-weight: 700;
+  color: #e31837;
+}
+
+.export-date {
+  font-size: 12px;
+}
+
+.export-type-tag {
+  font-size: 11px;
+}
+
+.export-warehouse {
+  font-weight: 600;
+  color: #111827;
+}
+
+.export-destination {
+  font-size: 12px;
+}
+
+.export-value {
+  font-weight: 700;
+  color: #111827;
+}
+
+.export-edit-icon {
+  color: #1890ff;
+}
+
+.export-delete-icon {
+  color: #ff4d4f;
+}
+
+.export-item-price {
+  font-weight: 500;
+}
+
+.export-item-total {
+  font-weight: 700;
+}

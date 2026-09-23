@@ -1,0 +1,32 @@
+/* RecentOrders */
+
+.recent-orders-icon {
+  color: #e31837;
+  font-size: 18px;
+}
+
+.order-id {
+  font-weight: 600;
+  color: #e31837;
+}
+
+.cashier-name {
+  font-size: 13px;
+}
+
+.payment-tag {
+  font-weight: 600;
+}
+
+.order-total {
+  font-weight: 700;
+}
+
+.view-all-btn {
+  color: #e31837;
+  padding: 0;
+}
+
+.view-all-arrow {
+  font-size: 11px;
+}

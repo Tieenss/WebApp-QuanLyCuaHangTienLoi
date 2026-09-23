@@ -1,0 +1,91 @@
+
+.stat-card {
+    transition: all 0.25s ease-in-out;
+    border: 1px solid #e5e7eb;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(227, 24, 55, 0.08);
+    border-color: rgba(227, 24, 55, 0.3);
+}
+
+.stat-card-accent-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #e31837 0%, #ffc72c 100%);
+}
+
+.stat-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+}
+
+.stat-icon-revenue {
+    background-color: #fff0f2;
+    color: #e31837;
+}
+
+.stat-icon-orders {
+    background-color: #fef3c7;
+    color: #d97706;
+}
+
+.stat-icon-avgOrder {
+    background-color: #ecfdf5;
+    color: #059669;
+}
+
+.stat-icon-lowStock {
+    background-color: #fef2f2;
+    color: #dc2626;
+}
+
+/* --------------------------------------------
+   Utilities
+   -------------------------------------------- */
+
+.card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.full-height-card {
+    height: 100%;
+}
+
+.page-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Page Banner Header */
+.page-banner-card {
+    border-left: 5px solid #e31837;
+}
+
+.page-banner-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.page-title {
+    margin: 4px 0 0;
+    font-weight: 800;
+    color: #111827;
+}

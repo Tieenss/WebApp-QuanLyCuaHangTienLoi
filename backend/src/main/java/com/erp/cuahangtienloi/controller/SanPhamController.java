@@ -20,11 +20,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -64,13 +66,20 @@ public class SanPhamController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<SanPhamDTO>> getAll(HttpServletRequest request) {
         UUID branchId = resolveBranchId(request);
         boolean isAdmin = isAdmin();
 
+        // Pre-load lookup maps – 1 query each instead of N
+        Map<UUID, String> danhMucMap = danhMucRepository.findAll().stream()
+                .collect(Collectors.toMap(DanhMuc::getId, DanhMuc::getTenDanhMuc));
+        Map<UUID, String> nccMap = nhaCungCapRepository.findAll().stream()
+                .collect(Collectors.toMap(NhaCungCap::getId, NhaCungCap::getTenNcc));
+
         List<SanPhamDTO> list = sanPhamRepository.findAll().stream()
                 .map(sp -> {
-                    SanPhamDTO dto = toDTO(sp);
+                    SanPhamDTO dto = toDTO(sp, danhMucMap, nccMap);
                     // Nếu Admin đã tắt dangHoatDong ở san_pham -> false cho toàn bộ chi nhánh
                     if (Boolean.FALSE.equals(sp.getDangHoatDong())) {
                         dto.setDangHoatDong(false);
@@ -325,6 +334,10 @@ public class SanPhamController {
     }
 
     private SanPhamDTO toDTO(SanPham sp) {
+        return toDTO(sp, null, null);
+    }
+
+    private SanPhamDTO toDTO(SanPham sp, Map<UUID, String> danhMucMap, Map<UUID, String> nccMap) {
         SanPhamDTO dto = new SanPhamDTO();
         dto.setId(sp.getId());
         dto.setIdDanhMuc(sp.getIdDanhMuc());
@@ -347,12 +360,14 @@ public class SanPhamController {
         dto.setNgayCapNhat(sp.getNgayCapNhat());
 
         if (sp.getIdDanhMuc() != null) {
-            danhMucRepository.findById(sp.getIdDanhMuc())
-                    .ifPresent(dm -> dto.setTenDanhMuc(dm.getTenDanhMuc()));
+            String ten = danhMucMap != null ? danhMucMap.get(sp.getIdDanhMuc())
+                    : danhMucRepository.findById(sp.getIdDanhMuc()).map(DanhMuc::getTenDanhMuc).orElse(null);
+            dto.setTenDanhMuc(ten);
         }
         if (sp.getIdNhaCungCap() != null) {
-            nhaCungCapRepository.findById(sp.getIdNhaCungCap())
-                    .ifPresent(ncc -> dto.setTenNhaCungCap(ncc.getTenNcc()));
+            String ten = nccMap != null ? nccMap.get(sp.getIdNhaCungCap())
+                    : nhaCungCapRepository.findById(sp.getIdNhaCungCap()).map(NhaCungCap::getTenNcc).orElse(null);
+            dto.setTenNhaCungCap(ten);
         }
 
         return dto;

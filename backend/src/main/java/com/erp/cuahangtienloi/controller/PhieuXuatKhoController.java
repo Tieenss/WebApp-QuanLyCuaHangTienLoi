@@ -2,6 +2,7 @@ package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.PhieuXuatKhoDTO;
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
+import com.erp.cuahangtienloi.entity.ChiNhanh;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuXuat;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuXuatKho;
@@ -25,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/phieu-xuat-kho")
@@ -48,13 +50,13 @@ public class PhieuXuatKhoController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<PhieuXuatKhoDTO>> getAll(HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
-        List<PhieuXuatKhoDTO> list = phieuXuatKhoRepository.findAll().stream()
+        List<PhieuXuatKho> filtered = phieuXuatKhoRepository.findAll().stream()
                 .filter(pxk -> canReadTransfer(actor, pxk))
-                .map(this::toDTO)
                 .toList();
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(filtered));
     }
 
     @GetMapping("/{id}")
@@ -69,35 +71,35 @@ public class PhieuXuatKhoController {
 
     @GetMapping("/by-branch-xuat/{idChiNhanhXuat}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<PhieuXuatKhoDTO>> getByBranchXuat(@PathVariable UUID idChiNhanhXuat, HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
-        List<PhieuXuatKhoDTO> list = phieuXuatKhoRepository.findByIdChiNhanhXuat(idChiNhanhXuat).stream()
+        List<PhieuXuatKho> filtered = phieuXuatKhoRepository.findByIdChiNhanhXuat(idChiNhanhXuat).stream()
                 .filter(pxk -> canReadTransfer(actor, pxk))
-                .map(this::toDTO)
                 .toList();
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(filtered));
     }
 
     @GetMapping("/by-branch-nhan/{idChiNhanhNhan}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<PhieuXuatKhoDTO>> getByBranchNhan(@PathVariable UUID idChiNhanhNhan, HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
-        List<PhieuXuatKhoDTO> list = phieuXuatKhoRepository.findByIdChiNhanhNhan(idChiNhanhNhan).stream()
+        List<PhieuXuatKho> filtered = phieuXuatKhoRepository.findByIdChiNhanhNhan(idChiNhanhNhan).stream()
                 .filter(pxk -> canReadTransfer(actor, pxk))
-                .map(this::toDTO)
                 .toList();
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(filtered));
     }
 
     @GetMapping("/by-status/{trangThai}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO', 'QUAN_LY')")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<PhieuXuatKhoDTO>> getByStatus(@PathVariable String trangThai, HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
-        List<PhieuXuatKhoDTO> list = phieuXuatKhoRepository.findByTrangThai(trangThai).stream()
+        List<PhieuXuatKho> filtered = phieuXuatKhoRepository.findByTrangThai(trangThai).stream()
                 .filter(pxk -> canReadTransfer(actor, pxk))
-                .map(this::toDTO)
                 .toList();
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(filtered));
     }
 
     @PostMapping
@@ -134,6 +136,13 @@ public class PhieuXuatKhoController {
         pxk.setNgayXuatThucTe(null);
         pxk.setNgayNhanThucTe(null);
         pxk.setNgayYeuCau(request.getNgayYeuCau() != null ? request.getNgayYeuCau() : LocalDate.now());
+        
+        if ("COMPLETED".equals(trangThai)) {
+            if (pxk.getIdNguoiDuyet() == null) pxk.setIdNguoiDuyet(idNguoiTao);
+            if (pxk.getNgayXuatThucTe() == null) pxk.setNgayXuatThucTe(pxk.getNgayYeuCau());
+            if (pxk.getNgayNhanThucTe() == null) pxk.setNgayNhanThucTe(pxk.getNgayYeuCau());
+        }
+
         pxk.setGhiChu(request.getGhiChu());
         pxk.setNgayTao(LocalDateTime.now());
         pxk.setNgayCapNhat(LocalDateTime.now());
@@ -171,6 +180,13 @@ public class PhieuXuatKhoController {
                     if (request.getIdChiNhanhXuat() != null) pxk.setIdChiNhanhXuat(request.getIdChiNhanhXuat());
                     if (request.getIdChiNhanhNhan() != null) pxk.setIdChiNhanhNhan(request.getIdChiNhanhNhan());
                     if (request.getTrangThai() != null) pxk.setTrangThai(request.getTrangThai());
+                    
+                    if ("COMPLETED".equals(pxk.getTrangThai())) {
+                        if (pxk.getIdNguoiDuyet() == null) pxk.setIdNguoiDuyet(pxk.getIdNguoiTao());
+                        if (pxk.getNgayXuatThucTe() == null) pxk.setNgayXuatThucTe(pxk.getNgayYeuCau());
+                        if (pxk.getNgayNhanThucTe() == null) pxk.setNgayNhanThucTe(pxk.getNgayYeuCau());
+                    }
+
                     if (request.getGhiChu() != null) pxk.setGhiChu(request.getGhiChu());
                     pxk.setNgayCapNhat(LocalDateTime.now());
                     phieuXuatKhoRepository.save(pxk);
@@ -479,7 +495,21 @@ public class PhieuXuatKhoController {
         return null;
     }
 
+    /** Bulk convert – chỉ gọi 2 query phụ (ChiNhanh + NhanVien) dù list dài bao nhiêu. */
+    private List<PhieuXuatKhoDTO> toDTOList(List<PhieuXuatKho> source) {
+        if (source.isEmpty()) return List.of();
+        Map<UUID, String> chiNhanhMap = chiNhanhRepository.findAll().stream()
+                .collect(Collectors.toMap(cn -> cn.getId(), cn -> cn.getTenChiNhanh()));
+        Map<UUID, String> nhanVienMap = nhanVienRepository.findAll().stream()
+                .collect(Collectors.toMap(nv -> nv.getId(), nv -> nv.getHoTen()));
+        return source.stream().map(pxk -> toDTO(pxk, chiNhanhMap, nhanVienMap)).collect(Collectors.toList());
+    }
+
     private PhieuXuatKhoDTO toDTO(PhieuXuatKho pxk) {
+        return toDTO(pxk, null, null);
+    }
+
+    private PhieuXuatKhoDTO toDTO(PhieuXuatKho pxk, Map<UUID, String> chiNhanhMap, Map<UUID, String> nhanVienMap) {
         PhieuXuatKhoDTO dto = new PhieuXuatKhoDTO();
         dto.setId(pxk.getId());
         dto.setMaPhieu(pxk.getMaPhieu());
@@ -495,24 +525,29 @@ public class PhieuXuatKhoController {
         dto.setGhiChu(pxk.getGhiChu());
 
         if (pxk.getIdChiNhanhXuat() != null) {
-            chiNhanhRepository.findById(pxk.getIdChiNhanhXuat())
-                    .ifPresent(cn -> dto.setTenChiNhanhXuat(cn.getTenChiNhanh()));
+            String ten = chiNhanhMap != null ? chiNhanhMap.get(pxk.getIdChiNhanhXuat())
+                    : chiNhanhRepository.findById(pxk.getIdChiNhanhXuat()).map(cn -> cn.getTenChiNhanh()).orElse(null);
+            dto.setTenChiNhanhXuat(ten);
         }
         if (pxk.getIdChiNhanhNhan() != null) {
-            chiNhanhRepository.findById(pxk.getIdChiNhanhNhan())
-                    .ifPresent(cn -> dto.setTenChiNhanhNhan(cn.getTenChiNhanh()));
+            String ten = chiNhanhMap != null ? chiNhanhMap.get(pxk.getIdChiNhanhNhan())
+                    : chiNhanhRepository.findById(pxk.getIdChiNhanhNhan()).map(cn -> cn.getTenChiNhanh()).orElse(null);
+            dto.setTenChiNhanhNhan(ten);
         }
         if (pxk.getIdNguoiTao() != null) {
-            nhanVienRepository.findById(pxk.getIdNguoiTao())
-                    .ifPresent(nv -> dto.setTenNguoiTao(nv.getHoTen()));
+            String ten = nhanVienMap != null ? nhanVienMap.get(pxk.getIdNguoiTao())
+                    : nhanVienRepository.findById(pxk.getIdNguoiTao()).map(nv -> nv.getHoTen()).orElse(null);
+            dto.setTenNguoiTao(ten);
         }
         if (pxk.getIdNguoiDuyet() != null) {
-            nhanVienRepository.findById(pxk.getIdNguoiDuyet())
-                    .ifPresent(nv -> dto.setTenNguoiDuyet(nv.getHoTen()));
+            String ten = nhanVienMap != null ? nhanVienMap.get(pxk.getIdNguoiDuyet())
+                    : nhanVienRepository.findById(pxk.getIdNguoiDuyet()).map(nv -> nv.getHoTen()).orElse(null);
+            dto.setTenNguoiDuyet(ten);
         }
         if (pxk.getIdNguoiNhan() != null) {
-            nhanVienRepository.findById(pxk.getIdNguoiNhan())
-                    .ifPresent(nv -> dto.setTenNguoiNhan(nv.getHoTen()));
+            String ten = nhanVienMap != null ? nhanVienMap.get(pxk.getIdNguoiNhan())
+                    : nhanVienRepository.findById(pxk.getIdNguoiNhan()).map(nv -> nv.getHoTen()).orElse(null);
+            dto.setTenNguoiNhan(ten);
         }
 
         return dto;

@@ -56,8 +56,8 @@ export const TransfersPage: FC = () => {
   const balances = useAppSelector((state) => state.stock.balances);
 
   const [isFormOpen, setFormOpen] = useState(false);
-  const [detailsCache, setDetailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
-  const [usersCache, setUsersCache] = useState<Record<string, string>>({});
+  const [detailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
+
 
   const [rejectTarget, setRejectTarget] = useState<StockTransfer | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -92,21 +92,7 @@ export const TransfersPage: FC = () => {
       [transfers, branches],
   );
 
-  useEffect(() => {
-    transfers.forEach((t) => {
-      if (detailsCache[t.id] === undefined) {
-        chiTietPhieuXuatApi.getByPhieuXuat(t.id)
-            .then((data) => setDetailsCache((prev) => ({ ...prev, [t.id]: data })))
-            .catch(() => setDetailsCache((prev) => ({ ...prev, [t.id]: [] })));
-      }
-      const createdById = t.createdById;
-      if (createdById && !usersCache[createdById]) {
-        nhanVienApi.getById(createdById)
-            .then((nv) => setUsersCache((prev) => ({ ...prev, [createdById]: nv.hoTen })))
-            .catch(() => setUsersCache((prev) => ({ ...prev, [createdById]: '' })));
-      }
-    });
-  }, [transfers.length]);
+  // Lazy loading will be handled when expanding a row
 
   const scoped = useMemo(() => {
     const list = enrichedTransfers.filter((t) => {

@@ -84,11 +84,10 @@ export const AccountManagementPage = () => {
             account.email ?? '',
             account.vaiTro ?? '',
             account.trangThai,
-            branchNameById.get(account.idChiNhanh ?? '') ?? '',
           ]),
         )
         .sort((a, b) => compareDateDescWithId(a, b, (row) => row.ngayTao)),
-    [data, search, branchNameById],
+    [data, search],
   );
   // const [selectedVaiTro, setSelectedVaiTro] = useState<string>('THU_NGAN');
 
@@ -132,10 +131,15 @@ export const AccountManagementPage = () => {
 
   useEffect(() => {
     fetchData();
-    fetchNhanVienOptions();
-    fetchBranches();
-    fetchAllNhanVien();
   }, []);
+
+  useEffect(() => {
+    if (modalOpen) {
+      if (nhanVienOptions.length === 0) fetchNhanVienOptions();
+      if (branches.length === 0) fetchBranches();
+      if (allNhanVien.length === 0) fetchAllNhanVien();
+    }
+  }, [modalOpen]);
 
   // NV chưa có tài khoản + lọc theo idChiNhanh được chọn
   // const filteredNhanVienOptions = useMemo(() => {
@@ -290,7 +294,7 @@ export const AccountManagementPage = () => {
           allowClear
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Tìm theo tên đăng nhập, họ tên, email, vai trò, chi nhánh..."
+          placeholder="Tìm theo tên đăng nhập, họ tên, email, vai trò, trạng thái..."
           style={{ maxWidth: 440 }}
         />
         <Button

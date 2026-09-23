@@ -1,0 +1,15 @@
+/* DashboardPage */
+
+.live-tag {
+  font-weight: 700;
+  background-color: #e31837;
+  color: #ffffff;
+}
+
+.branch-label {
+  font-size: 13px;
+}
+
+.clock-icon {
+  color: #6b7280;
+}

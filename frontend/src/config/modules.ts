@@ -379,7 +379,7 @@ export const getLandingPath = (role: UserRole): string => {
 };
 
 /** Các route dùng chung cho mọi role sau khi đã đăng nhập. */
-const AUTHENTICATED_SHARED_PATHS = new Set(['/account']);
+const AUTHENTICATED_SHARED_PATHS = new Set(['/', '/account']);
 
 /** Kiểm tra một vai trò có được vào path hay không. */
 export const canAccessPath = (role: UserRole, path: string): boolean => {

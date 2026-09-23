@@ -1,0 +1,28 @@
+/* SuppliersPage */
+
+.breadcrumb-label {
+  font-size: 13px;
+}
+
+.add-supplier-btn {
+  background-color: #e31837;
+  border-color: #e31837;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.filters-row {
+  margin-bottom: 20px;
+}
+
+.search-prefix-icon {
+  color: #9ca3af;
+}
+
+.filter-prefix-icon {
+  color: #e31837;
+}
+
+.category-filter-select {
+  width: 100%;
+}

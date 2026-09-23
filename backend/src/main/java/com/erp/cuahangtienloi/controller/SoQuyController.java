@@ -2,6 +2,8 @@ package com.erp.cuahangtienloi.controller;
 
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.dto.SoQuyDTO;
+import com.erp.cuahangtienloi.entity.ChiNhanh;
+import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.SoQuy;
 import com.erp.cuahangtienloi.repository.*;
 import com.erp.cuahangtienloi.service.BranchAccessService;
@@ -17,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -35,11 +38,10 @@ public class SoQuyController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<SoQuyDTO>> getAll(HttpServletRequest request) {
-        List<SoQuyDTO> list = findEntriesVisibleTo(request).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+        List<SoQuy> entries = findEntriesVisibleTo(request);
+        return ResponseEntity.ok(toDTOList(entries));
     }
 
     @GetMapping("/{id}")
@@ -53,13 +55,11 @@ public class SoQuyController {
 
     @GetMapping("/by-branch/{idChiNhanh}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<SoQuyDTO>> getByChiNhanh(@PathVariable UUID idChiNhanh,
                                                          HttpServletRequest request) {
         branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
-        List<SoQuyDTO> list = soQuyRepository.findByIdChiNhanh(idChiNhanh).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(soQuyRepository.findByIdChiNhanh(idChiNhanh)));
     }
 
     @GetMapping("/by-direction/{direction}")
@@ -214,7 +214,21 @@ public class SoQuyController {
         return ResponseEntity.notFound().build();
     }
 
+    /** Bulk convert – chỉ gọi 2 query phụ (ChiNhanh + NhanVien) dù list dài bao nhiêu. */
+    private List<SoQuyDTO> toDTOList(List<SoQuy> source) {
+        if (source.isEmpty()) return List.of();
+        Map<UUID, String> chiNhanhMap = chiNhanhRepository.findAll().stream()
+                .collect(Collectors.toMap(cn -> cn.getId(), cn -> cn.getTenChiNhanh()));
+        Map<UUID, String> nhanVienMap = nhanVienRepository.findAll().stream()
+                .collect(Collectors.toMap(nv -> nv.getId(), nv -> nv.getHoTen()));
+        return source.stream().map(sq -> toDTO(sq, chiNhanhMap, nhanVienMap)).collect(Collectors.toList());
+    }
+
     private SoQuyDTO toDTO(SoQuy sq) {
+        return toDTO(sq, null, null);
+    }
+
+    private SoQuyDTO toDTO(SoQuy sq, Map<UUID, String> chiNhanhMap, Map<UUID, String> nhanVienMap) {
         SoQuyDTO dto = new SoQuyDTO();
         dto.setId(sq.getId());
         dto.setMaChungTu(sq.getMaChungTu());
@@ -232,12 +246,14 @@ public class SoQuyController {
         dto.setTrangThai(sq.getTrangThai());
 
         if (sq.getIdChiNhanh() != null) {
-            chiNhanhRepository.findById(sq.getIdChiNhanh())
-                    .ifPresent(cn -> dto.setTenChiNhanh(cn.getTenChiNhanh()));
+            String ten = chiNhanhMap != null ? chiNhanhMap.get(sq.getIdChiNhanh())
+                    : chiNhanhRepository.findById(sq.getIdChiNhanh()).map(cn -> cn.getTenChiNhanh()).orElse(null);
+            dto.setTenChiNhanh(ten);
         }
         if (sq.getIdNguoiTao() != null) {
-            nhanVienRepository.findById(sq.getIdNguoiTao())
-                    .ifPresent(nv -> dto.setTenNguoiTao(nv.getHoTen()));
+            String ten = nhanVienMap != null ? nhanVienMap.get(sq.getIdNguoiTao())
+                    : nhanVienRepository.findById(sq.getIdNguoiTao()).map(nv -> nv.getHoTen()).orElse(null);
+            dto.setTenNguoiTao(ten);
         }
 
         return dto;

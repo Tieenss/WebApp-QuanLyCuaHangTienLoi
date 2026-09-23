@@ -1,0 +1,35 @@
+/* StatCard */
+
+.stat-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.stat-card-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.stat-card-value {
+  margin: 8px 0 4px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.stat-card-footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stat-change-tag {
+  font-weight: 600;
+  border: none;
+  padding: 2px 8px;
+}
+
+.stat-timeframe {
+  font-size: 12px;
+}

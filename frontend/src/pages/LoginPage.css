@@ -1,0 +1,154 @@
+
+.login-page {
+  display: flex;
+  min-height: 100vh;
+  width: 100vw;
+}
+
+.login-brand-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1d20 0%, #2a080c 50%, #e31837 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-brand-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px;
+  max-width: 520px;
+}
+
+.login-brand-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 20px;
+  object-fit: contain;
+  margin-bottom: 24px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.login-brand-title {
+  color: #ffffff;
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.login-brand-subtitle {
+  color: #ffc72c;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  margin-top: 8px;
+}
+
+.login-brand-features {
+  list-style: none;
+  padding: 0;
+  margin: 48px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  text-align: left;
+}
+
+.login-brand-features li {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.login-brand-features li .anticon {
+  color: #ffc72c;
+  font-size: 18px;
+}
+
+.login-brand-footer {
+  margin-top: 56px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+}
+
+.login-form-panel {
+  width: 520px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  padding: 40px;
+}
+
+.login-form-box {
+  width: 100%;
+  max-width: 380px;
+}
+
+.login-welcome-label {
+  font-weight: 700;
+  letter-spacing: 2px;
+  font-size: 12px;
+}
+
+.login-heading {
+  margin: 6px 0 8px !important;
+  font-weight: 800;
+  color: #111827;
+}
+
+.login-description {
+  display: block;
+  margin-bottom: 28px;
+}
+
+.login-input-icon {
+  color: #9ca3af;
+}
+
+.login-options-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.login-remember-item {
+  margin-bottom: 0;
+}
+
+.login-forgot-btn {
+  padding: 0;
+  color: #e31837;
+}
+
+.login-submit-btn {
+  font-weight: 600;
+}
+
+.login-demo-hint {
+  margin-top: 16px;
+  text-align: center;
+  padding-top: 16px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+@media (max-width: 900px) {
+  .login-brand-panel {
+    display: none;
+  }
+
+  .login-form-panel {
+    width: 100%;
+  }
+}
