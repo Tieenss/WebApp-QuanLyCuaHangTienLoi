@@ -17,14 +17,14 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      idle-timeout: 300000
-      connection-timeout: 20000
-      max-lifetime: 600000
-      keepalive-time: 60000
-      initialization-fail-timeout: 0         # Cho phép app khởi động tiếp mà không crash nếu Neon đang sleep
-#      validation-timeout: 5000
+      maximum-pool-size: 5          # Neon free tier giới hạn concurrent connections
+      minimum-idle: 1               # Giữ ít nhất 1 kết nối sống để tránh cold start
+      idle-timeout: 60000           # 1 phút - đủ để Neon không sleep giữa các request
+      connection-timeout: 30000     # Timeout chờ lấy connection từ pool
+      max-lifetime: 300000          # 5 phút - thấp hơn server timeout của Neon
+      keepalive-time: 30000         # Ping giữ kết nối sống mỗi 30 giây
+      connection-test-query: SELECT 1   # Query ping kiểm tra kết nối còn sống
+      initialization-fail-timeout: 0   # Cho phép app khởi động mà không crash nếu Neon đang sleep
   jpa:
     open-in-view: false
     hibernate:

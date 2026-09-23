@@ -55,6 +55,7 @@ export const AppRouter: FC = () => (
       </Route>
 
       <Route
+        path="/"
         element={
           <ProtectedRoute>
             <AdminLayout />
