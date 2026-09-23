@@ -113,8 +113,8 @@ public class ChiNhanhController {
         cn.setNgayCapNhat(LocalDateTime.now());
         cn.setNguoiCapNhat(request.getNguoiCapNhat());
 
-        chiNhanhRepository.save(cn);
-        return ResponseEntity.ok(cn);
+        ChiNhanh saved = chiNhanhRepository.save(cn);
+        return ResponseEntity.ok(saved);
     }
 
     @PutMapping("/{id}")

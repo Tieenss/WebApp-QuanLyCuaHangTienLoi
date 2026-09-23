@@ -37,7 +37,17 @@ public class TaiKhoanController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<TaiKhoanDTO>> getAllTaiKhoan() {
-        List<TaiKhoanDTO> list = taiKhoanRepository.findAll().stream()
+        List<TaiKhoan> taiKhoans = taiKhoanRepository.findAll();
+        
+        List<UUID> nvIds = taiKhoans.stream()
+                .map(TaiKhoan::getIdNhanVien)
+                .filter(id -> id != null)
+                .collect(Collectors.toList());
+                
+        java.util.Map<UUID, NhanVien> nhanVienMap = nhanVienRepository.findAllById(nvIds).stream()
+                .collect(Collectors.toMap(NhanVien::getId, nv -> nv));
+
+        List<TaiKhoanDTO> list = taiKhoans.stream()
                 .map(tk -> {
                     TaiKhoanDTO dto = new TaiKhoanDTO();
                     dto.setId(tk.getId());
@@ -46,12 +56,13 @@ public class TaiKhoanController {
                     dto.setNgayTao(tk.getNgayTao());
                     dto.setIdNhanVien(tk.getIdNhanVien());
                     if (tk.getIdNhanVien() != null) {
-                        nhanVienRepository.findById(tk.getIdNhanVien()).ifPresent(nv -> {
+                        NhanVien nv = nhanVienMap.get(tk.getIdNhanVien());
+                        if (nv != null) {
                             dto.setEmail(nv.getEmail());
                             dto.setHoTen(nv.getHoTen());
                             dto.setVaiTro(nv.getVaiTro());
                             dto.setIdChiNhanh(nv.getIdChiNhanh());
-                        });
+                        }
                     }
                     return dto;
                 })
@@ -149,8 +160,8 @@ public class TaiKhoanController {
             }
             newNv.setNgayTao(LocalDateTime.now());
             newNv.setNgayCapNhat(LocalDateTime.now());
-            nhanVienRepository.save(newNv);
-            nhanVienId = newNv.getId();
+            NhanVien savedNv = nhanVienRepository.save(newNv);
+            nhanVienId = savedNv.getId();
         }
 
         TaiKhoan taiKhoan = new TaiKhoan();
@@ -161,7 +172,7 @@ public class TaiKhoanController {
         taiKhoan.setTrangThai("ACTIVE");
         taiKhoan.setNgayTao(LocalDateTime.now());
 
-        taiKhoanRepository.save(taiKhoan);
+        TaiKhoan savedTaiKhoan = taiKhoanRepository.save(taiKhoan);
 
         if (request.getVaiTro() != null) {
             final UUID finalNhanVienId = nhanVienId;

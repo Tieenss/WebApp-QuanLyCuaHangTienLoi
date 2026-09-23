@@ -1,52 +1,37 @@
 import React from 'react';
-import { Form, Input, Button, Checkbox, Select, Typography, message } from 'antd';
+import { Form, Input, Button, Checkbox, Typography, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { FireOutlined, SafetyOutlined, ShopOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../store';
-import { loginSuccess } from '../store/slices/authSlice';
-import { ROLES, ROLE_LABEL } from '../config/rbacConfig';
-import type { RoleKey } from '../config/rbacConfig';
+import { loginAsync } from '../store/slices/authSlice';
+import type { LoginFormValues } from '../types';
 import logo from '../assets/logo.png';
 import './LoginPage.css';
 
 const { Title, Text } = Typography;
 
-const DEMO_ROLE_OPTIONS = Object.values(ROLES).map((role) => ({
-    value: role.key,
-    label: role.label,
-}));
 
-interface LoginFormValues {
-    username: string;
-    password: string;
-    role: RoleKey;
-    remember?: boolean;
-}
 
 export const LoginPage: React.FC = () => {
     const navigate = useNavigate();
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<any>();
     const isAuthenticated = useSelector((state: RootState) => !!state.auth.user);
+    const isSubmitting = useSelector((state: RootState) => state.auth.isSubmitting);
 
     if (isAuthenticated) {
         return <Navigate to="/" replace />;
     }
 
-    const handleLogin = (values: LoginFormValues) => {
-        dispatch(
-            loginSuccess({
-                token: `demo-token-${Date.now()}`,
-                user: {
-                    username: values.username,
-                    fullName: values.username,
-                    role: values.role,
-                },
-            })
-        );
-        message.success(`Đăng nhập thành công với vai trò ${ROLE_LABEL[values.role]}!`);
-        navigate('/');
+    const handleLogin = async (values: LoginFormValues) => {
+        try {
+            await dispatch(loginAsync(values)).unwrap();
+            message.success(`Đăng nhập thành công!`);
+            navigate('/');
+        } catch (error: any) {
+            message.error(error || 'Đăng nhập thất bại!');
+        }
     };
 
     return (
@@ -116,13 +101,6 @@ export const LoginPage: React.FC = () => {
                             />
                         </Form.Item>
 
-                        <Form.Item
-                            name="role"
-                            label="Vai Trò (Demo RBAC)"
-                            rules={[{ required: true, message: 'Vui lòng chọn vai trò!' }]}
-                        >
-                            <Select options={DEMO_ROLE_OPTIONS} />
-                        </Form.Item>
 
                         <div className="login-options-row">
                             <Form.Item name="remember" valuePropName="checked" className="login-remember-item">
@@ -140,18 +118,14 @@ export const LoginPage: React.FC = () => {
                                 size="large"
                                 block
                                 className="login-submit-btn"
+                                loading={isSubmitting}
                             >
                                 Đăng Nhập
                             </Button>
                         </Form.Item>
                     </Form>
 
-                    <div className="login-demo-hint">
-                        <Text type="secondary">
-                            Demo: mật khẩu bất kỳ (≥ 6 ký tự). Chọn vai trò khác nhau để thấy
-                            phân quyền menu thay đổi.
-                        </Text>
-                    </div>
+
                 </div>
             </div>
         </div>

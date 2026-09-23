@@ -7,27 +7,31 @@ import type { RootState } from '../../../store';
 import type { Branch } from '../../../types/branchTypes';
 import {
     setSelectedBranch,
-    setModalOpen,
-    deleteBranch,
+    setBranchModalOpen,
+    deleteBranchThunk,
 } from '../../../store/slices/branchSlice';
 import { hasPermission, PERMISSIONS } from '../../../config/rbacConfig';
 import './BranchListTable.css';
 
 const { Text } = Typography;
 
-export const BranchListTable: React.FC = () => {
-    const dispatch = useDispatch();
-    const { branches, searchQuery } = useSelector((state: RootState) => state.branch);
+interface BranchListTableProps {
+    searchQuery: string;
+}
+
+export const BranchListTable: React.FC<BranchListTableProps> = ({ searchQuery }) => {
+    const dispatch = useDispatch<any>();
+    const { branches } = useSelector((state: RootState) => state.branch);
     const user = useSelector((state: RootState) => state.auth.user);
     const canManage = hasPermission(user, PERMISSIONS.BRANCHES_MANAGE);
 
     const handleEdit = (branch: Branch) => {
         dispatch(setSelectedBranch(branch));
-        dispatch(setModalOpen(true));
+        dispatch(setBranchModalOpen(true));
     };
 
     const handleDelete = (id: string, name: string) => {
-        dispatch(deleteBranch(id));
+        dispatch(deleteBranchThunk(id));
         message.success(`Đã xóa chi nhánh "${name}"!`);
     };
 
@@ -36,7 +40,7 @@ export const BranchListTable: React.FC = () => {
         return (
             b.name.toLowerCase().includes(q) ||
             b.id.toLowerCase().includes(q) ||
-            b.managerName.toLowerCase().includes(q)
+            (b.managerName && b.managerName.toLowerCase().includes(q))
         );
     });
 
@@ -57,7 +61,7 @@ export const BranchListTable: React.FC = () => {
                     <Text className="branch-name">{name}</Text>
                     <div>
                         <Text type="secondary" className="branch-address">
-                            {record.address}, {record.district}
+                            {record.addressLine}, {record.district}
                         </Text>
                     </div>
                 </div>

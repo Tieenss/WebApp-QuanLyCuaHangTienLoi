@@ -54,10 +54,8 @@ public class NhanVienController {
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<List<NhanVien>> getByChiNhanh(@PathVariable UUID idChiNhanh, HttpServletRequest request) {
         branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
-        List<NhanVien> list = nhanVienRepository.findAll().stream()
-                .filter(nv -> idChiNhanh.equals(nv.getIdChiNhanh()))
-                .toList();
-        return ResponseEntity.ok(list);
+        // Dùng query có điều kiện thay vì findAll()+filter trong RAM
+        return ResponseEntity.ok(nhanVienRepository.findByIdChiNhanh(idChiNhanh));
     }
 
     @GetMapping("/active")
@@ -126,8 +124,8 @@ public class NhanVienController {
             nv.setNgayVaoLam(java.time.LocalDate.now());
         }
 
-        nhanVienRepository.save(nv);
-        return ResponseEntity.ok(nv);
+        NhanVien saved = nhanVienRepository.save(nv);
+        return ResponseEntity.ok(saved);
     }
 
     @PutMapping("/{id}")

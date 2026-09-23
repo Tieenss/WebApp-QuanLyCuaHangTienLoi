@@ -19,6 +19,9 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -35,10 +38,7 @@ public class SanPhamController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<SanPhamDTO>> getAll() {
-        List<SanPhamDTO> list = sanPhamRepository.findAll().stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(sanPhamRepository.findAll()));
     }
 
     @GetMapping("/{id}")
@@ -52,10 +52,7 @@ public class SanPhamController {
     @GetMapping("/by-danh-muc/{idDanhMuc}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<SanPhamDTO>> getByDanhMuc(@PathVariable UUID idDanhMuc) {
-        List<SanPhamDTO> list = sanPhamRepository.findByIdDanhMuc(idDanhMuc).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(sanPhamRepository.findByIdDanhMuc(idDanhMuc)));
     }
 
     @GetMapping("/by-ma-vach/{maVach}")
@@ -69,10 +66,7 @@ public class SanPhamController {
     @GetMapping("/active")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<SanPhamDTO>> getActive() {
-        List<SanPhamDTO> list = sanPhamRepository.findByDangHoatDong(true).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(sanPhamRepository.findByDangHoatDong(true)));
     }
 
     @PostMapping
@@ -191,7 +185,22 @@ public class SanPhamController {
         return ResponseEntity.notFound().build();
     }
 
-    private SanPhamDTO toDTO(SanPham sp) {
+    /** Batch load: map 1 danh sách sản phẩm → DTO với chỉ 3 SELECT tổng (thay vì 2N+1). */
+    private List<SanPhamDTO> toDTOList(List<SanPham> products) {
+        if (products.isEmpty()) return List.of();
+        Set<UUID> dmIds = products.stream().map(SanPham::getIdDanhMuc)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<UUID> nccIds = products.stream().map(SanPham::getIdNhaCungCap)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, String> dmNames = danhMucRepository.findAllById(dmIds).stream()
+                .collect(Collectors.toMap(DanhMuc::getId, DanhMuc::getTenDanhMuc));
+        Map<UUID, String> nccNames = nhaCungCapRepository.findAllById(nccIds).stream()
+                .collect(Collectors.toMap(NhaCungCap::getId, NhaCungCap::getTenNcc));
+        return products.stream().map(sp -> toDTO(sp, dmNames, nccNames)).collect(Collectors.toList());
+    }
+
+    /** Map một sản phẩm sang DTO dùng pre-loaded lookup maps – không gọi DB. */
+    private SanPhamDTO toDTO(SanPham sp, Map<UUID, String> dmNames, Map<UUID, String> nccNames) {
         SanPhamDTO dto = new SanPhamDTO();
         dto.setId(sp.getId());
         dto.setIdDanhMuc(sp.getIdDanhMuc());
@@ -210,17 +219,22 @@ public class SanPhamController {
         dto.setTonToiDa(sp.getTonToiDa());
         dto.setDeHong(sp.getDeHong());
         dto.setHanSuDungNgay(sp.getHanSuDungNgay());
-
-        if (sp.getIdDanhMuc() != null) {
-            danhMucRepository.findById(sp.getIdDanhMuc())
-                    .ifPresent(dm -> dto.setTenDanhMuc(dm.getTenDanhMuc()));
-        }
-        if (sp.getIdNhaCungCap() != null) {
-            nhaCungCapRepository.findById(sp.getIdNhaCungCap())
-                    .ifPresent(ncc -> dto.setTenNhaCungCap(ncc.getTenNcc()));
-        }
-
+        dto.setTenDanhMuc(sp.getIdDanhMuc() != null ? dmNames.get(sp.getIdDanhMuc()) : null);
+        dto.setTenNhaCungCap(sp.getIdNhaCungCap() != null ? nccNames.get(sp.getIdNhaCungCap()) : null);
         return dto;
+    }
+
+    /** Dùng cho getById / getByMaVach – 1 sản phẩm, gọi DB theo từng ID vẫn OK. */
+    private SanPhamDTO toDTO(SanPham sp) {
+        String tenDanhMuc = sp.getIdDanhMuc() != null
+                ? danhMucRepository.findById(sp.getIdDanhMuc()).map(DanhMuc::getTenDanhMuc).orElse(null)
+                : null;
+        String tenNhaCungCap = sp.getIdNhaCungCap() != null
+                ? nhaCungCapRepository.findById(sp.getIdNhaCungCap()).map(NhaCungCap::getTenNcc).orElse(null)
+                : null;
+        return toDTO(sp,
+                tenDanhMuc != null ? Map.of(sp.getIdDanhMuc(), tenDanhMuc) : Map.of(),
+                tenNhaCungCap != null ? Map.of(sp.getIdNhaCungCap(), tenNhaCungCap) : Map.of());
     }
 
 //    record ErrorResponse(String message) {}

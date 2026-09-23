@@ -4,6 +4,7 @@ import com.erp.cuahangtienloi.dto.BangLuongDTO;
 import com.erp.cuahangtienloi.dto.Response.ApiResponse;
 import com.erp.cuahangtienloi.entity.BangLuong;
 import com.erp.cuahangtienloi.entity.ChamCong;
+import com.erp.cuahangtienloi.entity.ChiNhanh;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.SoQuy;
 import com.erp.cuahangtienloi.repository.*;
@@ -22,8 +23,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -145,11 +149,10 @@ public class BangLuongController {
         List<BangLuong> source = period == null || period.isBlank()
                 ? bangLuongRepository.findAll()
                 : bangLuongRepository.findByThangNam(requirePeriod(period));
-        List<BangLuongDTO> list = source.stream()
+        List<BangLuong> filtered = source.stream()
                 .filter(bl -> branchAccessService.canReadBranch(actor, bl.getIdChiNhanh()))
-                .map(this::toDTO)
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(filtered));
     }
 
     /** Nhân viên chỉ xem bảng lương của chính mình, không cần quyền xem nhân sự. */
@@ -159,10 +162,10 @@ public class BangLuongController {
             @RequestParam(required = false) String period, HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
         String requestedPeriod = period == null || period.isBlank() ? null : requirePeriod(period);
-        return ResponseEntity.ok(bangLuongRepository.findByIdNhanVien(actor.getId()).stream()
+        List<BangLuong> list = bangLuongRepository.findByIdNhanVien(actor.getId()).stream()
                 .filter(bl -> requestedPeriod == null || bl.getThangNam().equals(requestedPeriod))
-                .map(this::toDTO)
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(toDTOList(list));
     }
 
     @GetMapping("/{id}")
@@ -179,22 +182,20 @@ public class BangLuongController {
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<BangLuongDTO>> getByNhanVien(@PathVariable UUID idNhanVien, HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
-        List<BangLuongDTO> list = bangLuongRepository.findByIdNhanVien(idNhanVien).stream()
+        List<BangLuong> list = bangLuongRepository.findByIdNhanVien(idNhanVien).stream()
                 .filter(bl -> branchAccessService.canReadBranch(actor, bl.getIdChiNhanh()))
-                .map(this::toDTO)
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(list));
     }
 
     @GetMapping("/by-month/{thangNam}")
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'QUAN_LY')")
     public ResponseEntity<List<BangLuongDTO>> getByThangNam(@PathVariable String thangNam, HttpServletRequest request) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(request);
-        List<BangLuongDTO> list = bangLuongRepository.findByThangNam(thangNam).stream()
+        List<BangLuong> list = bangLuongRepository.findByThangNam(thangNam).stream()
                 .filter(bl -> branchAccessService.canReadBranch(actor, bl.getIdChiNhanh()))
-                .map(this::toDTO)
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(list));
     }
 
     @GetMapping("/by-branch/{idChiNhanh}/month/{thangNam}")
@@ -202,11 +203,8 @@ public class BangLuongController {
     public ResponseEntity<List<BangLuongDTO>> getByChiNhanhAndThangNam(
             @PathVariable UUID idChiNhanh, @PathVariable String thangNam, HttpServletRequest request) {
         branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
-        List<BangLuongDTO> list = bangLuongRepository
-                .findByIdChiNhanhAndThangNam(idChiNhanh, thangNam).stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(list);
+        return ResponseEntity.ok(toDTOList(bangLuongRepository
+                .findByIdChiNhanhAndThangNam(idChiNhanh, thangNam)));
     }
 
     @GetMapping("/by-status/{trangThai}")
@@ -560,6 +558,75 @@ public class BangLuongController {
         return ResponseEntity.notFound().build();
     }
 
+    /** Batch load: 2 SELECT thay vì (1+4)N+1 khi map danh sách bảng lương. */
+    private List<BangLuongDTO> toDTOList(List<BangLuong> list) {
+        if (list.isEmpty()) return List.of();
+        // Thu thập tất cả UUID nhân viên liên quan (4 trường khác nhau)
+        Set<UUID> nvIds = new HashSet<>();
+        list.forEach(bl -> {
+            if (bl.getIdNhanVien() != null) nvIds.add(bl.getIdNhanVien());
+            if (bl.getIdNguoiXacNhan() != null) nvIds.add(bl.getIdNguoiXacNhan());
+            if (bl.getIdNguoiDuyetChi() != null) nvIds.add(bl.getIdNguoiDuyetChi());
+            if (bl.getIdNguoiThanhToan() != null) nvIds.add(bl.getIdNguoiThanhToan());
+        });
+        Set<UUID> cnIds = list.stream().map(BangLuong::getIdChiNhanh)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, NhanVien> nvMap = nhanVienRepository.findAllById(nvIds).stream()
+                .collect(Collectors.toMap(NhanVien::getId, nv -> nv));
+        Map<UUID, String> cnNames = chiNhanhRepository.findAllById(cnIds).stream()
+                .collect(Collectors.toMap(ChiNhanh::getId, ChiNhanh::getTenChiNhanh));
+        return list.stream().map(bl -> toDTO(bl, nvMap, cnNames)).collect(Collectors.toList());
+    }
+
+    private BangLuongDTO toDTO(BangLuong bl, Map<UUID, NhanVien> nvMap, Map<UUID, String> cnNames) {
+        BangLuongDTO dto = new BangLuongDTO();
+        dto.setId(bl.getId());
+        dto.setIdNhanVien(bl.getIdNhanVien());
+        dto.setIdChiNhanh(bl.getIdChiNhanh());
+        dto.setLoaiHopDong(bl.getLoaiHopDong());
+        dto.setThangNam(bl.getThangNam());
+        dto.setTongGioLam(bl.getTongGioLam());
+        dto.setOvertimeHours(bl.getOvertimeHours());
+        dto.setTongSoCa(bl.getTongSoCa());
+        dto.setGioDieuChinh(bl.getGioDieuChinh());
+        dto.setLyDoDieuChinh(bl.getLyDoDieuChinh());
+        dto.setLuongTheoGio(bl.getLuongTheoGio());
+        dto.setLuongCung(bl.getLuongCung());
+        dto.setLuongCungThucTe(bl.getLuongCungThucTe());
+        dto.setTienCongTheoGio(bl.getTienCongTheoGio());
+        dto.setTienOt(bl.getTienOt());
+        dto.setThuong(bl.getThuong());
+        dto.setKhauTru(bl.getKhauTru());
+        dto.setTongTienLuong(bl.getTongTienLuong());
+        dto.setTrangThai(bl.getTrangThai());
+        dto.setIdNguoiXacNhan(bl.getIdNguoiXacNhan());
+        dto.setNgayXacNhan(bl.getNgayXacNhan());
+        dto.setIdNguoiDuyetChi(bl.getIdNguoiDuyetChi());
+        dto.setNgayDuyetChi(bl.getNgayDuyetChi());
+        dto.setIdNguoiThanhToan(bl.getIdNguoiThanhToan());
+        dto.setNgayThanhToan(bl.getNgayThanhToan());
+        dto.setMaPhieuChi(bl.getMaPhieuChi());
+        dto.setTenChiNhanh(bl.getIdChiNhanh() != null ? cnNames.get(bl.getIdChiNhanh()) : null);
+        if (bl.getIdNhanVien() != null) {
+            NhanVien nv = nvMap.get(bl.getIdNhanVien());
+            if (nv != null) { dto.setTenNhanVien(nv.getHoTen()); dto.setMaNhanVien(nv.getMaNhanVien()); dto.setVaiTro(nv.getVaiTro()); }
+        }
+        if (bl.getIdNguoiXacNhan() != null) {
+            NhanVien nv = nvMap.get(bl.getIdNguoiXacNhan());
+            if (nv != null) dto.setTenNguoiXacNhan(nv.getHoTen());
+        }
+        if (bl.getIdNguoiDuyetChi() != null) {
+            NhanVien nv = nvMap.get(bl.getIdNguoiDuyetChi());
+            if (nv != null) dto.setTenNguoiDuyetChi(nv.getHoTen());
+        }
+        if (bl.getIdNguoiThanhToan() != null) {
+            NhanVien nv = nvMap.get(bl.getIdNguoiThanhToan());
+            if (nv != null) dto.setTenNguoiThanhToan(nv.getHoTen());
+        }
+        return dto;
+    }
+
+    /** Dùng cho getById / create / update – 1 bản ghi, gọi DB riêng lạ vẫn OK. */
     private BangLuongDTO toDTO(BangLuong bl) {
         BangLuongDTO dto = new BangLuongDTO();
         dto.setId(bl.getId());

@@ -29,7 +29,7 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: none
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
@@ -51,4 +51,4 @@ logging:
   level:
     root: INFO
     com.erp.cuahangtienloi: DEBUG
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: INFO
