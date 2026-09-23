@@ -435,7 +435,7 @@ $$ LANGUAGE plpgsql;
 
 -- Phiếu 1: COMPLETED — Xuất 50 lon Coca + 30 gói Oishi từ Kho Tổng → Bùi Viện
 INSERT INTO phieu_xuat_kho
-    (id_chi_nhanh_xuat, id_chi_nhanh_nhan, id_nguoi_tao,
+    (id, id_chi_nhanh_xuat, id_chi_nhanh_nhan, id_nguoi_tao,
      ngay_yeu_cau, ngay_xuat_thuc_te, ngay_nhan_thuc_te,
      id_nguoi_duyet, id_nguoi_nhan,
      trang_thai, ghi_chu)
@@ -456,21 +456,23 @@ SET ma_phieu = 'PX-' || TO_CHAR(ngay_yeu_cau, 'YYYYMMDD') || '-001'
 WHERE id = '00000000-0000-0000-0000-000000000010';
 
 INSERT INTO chi_tiet_phieu_xuat
-    (id_phieu_xuat, id_san_pham, so_luong_yeu_cau, so_luong_xuat, so_luong_nhan,
+    (id, id_phieu_xuat, id_san_pham, so_luong_yeu_cau, so_luong_xuat, so_luong_nhan,
      don_gia_von, han_su_dung, thu_tu)
 VALUES
     -- 50 lon Coca (xuất = nhận = 50)
-    ('00000000-0000-0000-0000-000000000010',
+    ('00000000-0000-0000-0000-000000000110',
+     '00000000-0000-0000-0000-000000000010',
      'f6a7b8c9-0001-0000-0000-000000000010', 50, 50, 50,
      9500, CURRENT_DATE + 180, 1),
     -- 30 gói Oishi
-    ('00000000-0000-0000-0000-000000000010',
+    ('00000000-0000-0000-0000-000000000111',
+     '00000000-0000-0000-0000-000000000010',
      'f6a7b8c9-0001-0000-0000-000000000030', 30, 30, 30,
      6500, NULL, 2);
 
 -- Phiếu 2: PENDING — Quản lý Bùi Viện yêu cầu 20 lon Coca, chờ thủ kho duyệt
 INSERT INTO phieu_xuat_kho
-    (id_chi_nhanh_xuat, id_chi_nhanh_nhan, id_nguoi_tao,
+    (id, id_chi_nhanh_xuat, id_chi_nhanh_nhan, id_nguoi_tao,
      ngay_yeu_cau, trang_thai, ghi_chu)
 VALUES
     ('00000000-0000-0000-0000-000000000011',
@@ -485,10 +487,11 @@ SET ma_phieu = 'PX-' || TO_CHAR(ngay_yeu_cau, 'YYYYMMDD') || '-002'
 WHERE id = '00000000-0000-0000-0000-000000000011';
 
 INSERT INTO chi_tiet_phieu_xuat
-    (id_phieu_xuat, id_san_pham, so_luong_yeu_cau, so_luong_xuat, so_luong_nhan,
+    (id, id_phieu_xuat, id_san_pham, so_luong_yeu_cau, so_luong_xuat, so_luong_nhan,
      don_gia_von, han_su_dung, thu_tu)
 VALUES
-    ('00000000-0000-0000-0000-000000000011',
+    ('00000000-0000-0000-0000-000000000112',
+     '00000000-0000-0000-0000-000000000011',
      'f6a7b8c9-0001-0000-0000-000000000010', 20, 0, 0,
      9500, CURRENT_DATE + 180, 1);
 

@@ -393,8 +393,8 @@ CREATE OR REPLACE FUNCTION fn_tao_hoa_don(
     p_id_chi_nhanh    UUID,
     p_id_thu_ngan     UUID,
     p_ca_lam_viec     VARCHAR(20),
-    p_ngay_ban        TIMESTAMP DEFAULT NOW(),
     p_hinh_thuc_tt    VARCHAR(20),
+    p_ngay_ban        TIMESTAMP DEFAULT NOW(),
     p_tien_khach_dua  DECIMAL(15,0) DEFAULT NULL,
     p_sdt_thanh_vien  VARCHAR(20) DEFAULT NULL,
     p_giam_gia        DECIMAL(15,0) DEFAULT 0,
@@ -562,7 +562,7 @@ $$ LANGUAGE plpgsql;
 
 -- Hoá đơn 1: COMPLETED, CASH, 3 món
 INSERT INTO hoa_don
-    (id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
+    (id, id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
      hinh_thuc_tt, tien_khach_dua, sdt_thanh_vien,
      giam_gia, ghi_chu)
 VALUES
@@ -570,7 +570,7 @@ VALUES
      'a1b2c3d4-0001-0000-0000-000000000101',  -- Bùi Viện
      'b2c3d4e5-0001-0000-0000-000000000006',  -- Thu ngân Mai (NV-0006)
      'MORNING', CURRENT_DATE - INTERVAL '5 days',
-     'CASH', 50000, NULL,
+     'CASH', 60000, NULL,
      0, 'Khách mua nước + snack');
 
 UPDATE hoa_don
@@ -578,29 +578,27 @@ SET ma_hoa_don = 'HD-' || TO_CHAR(ngay_ban, 'YYYYMMDD') || '-9001'
 WHERE id = '00000000-0000-0000-0000-000000000030';
 
 INSERT INTO chi_tiet_hoa_don
-    (id_hoa_don, id_san_pham, so_luong, don_gia, giam_gia_dong,
+    (id, id_hoa_don, id_san_pham, so_luong, don_gia, giam_gia_dong,
      vat_phantram, don_gia_von, thu_tu)
 VALUES
     -- 2 lon Coca × 15.000đ, VAT 8% → 30.000 × 1.08 = 32.400đ
-    ('00000000-0000-0000-0000-000000000030',
+    ('00000000-0000-0000-0000-000000000301',
+     '00000000-0000-0000-0000-000000000030',
      'f6a7b8c9-0001-0000-0000-000000000010', 2, 15000, 0, 8, 9500, 1),
     -- 1 chai Aquafina × 10.000đ, VAT 8% → 10.800đ
-    ('00000000-0000-0000-0000-000000000030',
+    ('00000000-0000-0000-0000-000000000302',
+     '00000000-0000-0000-0000-000000000030',
      'f6a7b8c9-0001-0000-0000-000000000012', 1, 10000, 0, 8, 5000, 2),
     -- 1 gói Oishi × 12.000đ, VAT 8% → 12.960đ
-    ('00000000-0000-0000-0000-000000000030',
+    ('00000000-0000-0000-0000-000000000303',
+     '00000000-0000-0000-0000-000000000030',
      'f6a7b8c9-0001-0000-0000-000000000030', 1, 12000, 0, 8, 6500, 3);
 
--- Cập nhật tien_thoi (50.000 - 56.160 = -6.160 — khách đưa thiếu, thực tế phải cập nhật lại ở backend)
--- Trong thực tế khách phải đưa đủ, tien_thoi >= 0. Sửa lại:
-UPDATE hoa_don
-SET tien_khach_dua = 60000
-WHERE id = '00000000-0000-0000-0000-000000000030';
 -- grand_total = 56160, tien_khach_dua = 60000, tien_thoi = 3840 (60.000 - 56.160)
 
 -- Hoá đơn 2: COMPLETED, MOMO, 1 món (không có tien_khach_dua)
 INSERT INTO hoa_don
-    (id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
+    (id, id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
      hinh_thuc_tt, sdt_thanh_vien, giam_gia)
 VALUES
     ('00000000-0000-0000-0000-000000000031',
@@ -614,16 +612,17 @@ SET ma_hoa_don = 'HD-' || TO_CHAR(ngay_ban, 'YYYYMMDD') || '-9002'
 WHERE id = '00000000-0000-0000-0000-000000000031';
 
 INSERT INTO chi_tiet_hoa_don
-    (id_hoa_don, id_san_pham, so_luong, don_gia, giam_gia_dong,
+    (id, id_hoa_don, id_san_pham, so_luong, don_gia, giam_gia_dong,
      vat_phantram, don_gia_von, thu_tu)
 VALUES
     -- 1 hộp Vinamilk × 38.000đ, VAT 8% → 41.040đ (KHÁCH THÀNH VIÊN)
-    ('00000000-0000-0000-0000-000000000031',
+    ('00000000-0000-0000-0000-000000000304',
+     '00000000-0000-0000-0000-000000000031',
      'f6a7b8c9-0001-0000-0000-000000000040', 1, 38000, 0, 8, 26000, 1);
 
 -- Hoá đơn 3: REFUNDED, đã hoàn tiền
 INSERT INTO hoa_don
-    (id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
+    (id, id_chi_nhanh, id_thu_ngan, ca_lam_viec, ngay_ban,
      hinh_thuc_tt, tien_khach_dua, sdt_thanh_vien, giam_gia,
      trang_thai, id_nguoi_hoan, ngay_hoan, ly_do_hoan, ghi_chu)
 VALUES
@@ -631,7 +630,7 @@ VALUES
      'a1b2c3d4-0001-0000-0000-000000000101',
      'b2c3d4e5-0001-0000-0000-000000000006',
      'MORNING', CURRENT_DATE - INTERVAL '2 days',
-     'CASH', 30000, NULL, 0,
+     'CASH', 50000, NULL, 0,
      'REFUNDED',
      'b2c3d4e5-0001-0000-0000-000000000004',  -- QL Trần Văn Anh duyệt
      CURRENT_DATE - INTERVAL '1 day',
@@ -643,10 +642,11 @@ SET ma_hoa_don = 'HD-' || TO_CHAR(ngay_ban, 'YYYYMMDD') || '-9003'
 WHERE id = '00000000-0000-0000-0000-000000000032';
 
 INSERT INTO chi_tiet_hoa_don
-    (id_hoa_don, id_san_pham, so_luong, don_gia, giam_gia_dong,
+    (id, id_hoa_don, id_san_pham, so_luong, don_gia, giam_gia_dong,
      vat_phantram, don_gia_von, thu_tu)
 VALUES
-    ('00000000-0000-0000-0000-000000000032',
+    ('00000000-0000-0000-0000-000000000305',
+     '00000000-0000-0000-0000-000000000032',
      'f6a7b8c9-0001-0000-0000-000000000010', 2, 15000, 0, 8, 9500, 1);
 
 COMMENT ON TABLE hoa_don IS

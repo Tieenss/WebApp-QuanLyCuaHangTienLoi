@@ -438,9 +438,10 @@ $$ LANGUAGE plpgsql;
 
 -- Phiếu 1: Pepsico - Nhập 100 lon Coca + 50 gói Oishi, thanh toán ngay
 INSERT INTO phieu_nhap
-    (id_chi_nhanh, id_ncc, id_nguoi_nhap,
+    (id, id_chi_nhanh, id_ncc, id_nguoi_nhap,
      ngay_dat_hang, ngay_du_kien_giao, ngay_nhan_thuc_te,
-     giam_gia, trang_thai, ghi_chu)
+     sub_total, vat_total, giam_gia, grand_total,
+     trang_thai, ghi_chu)
 VALUES
     ('00000000-0000-0000-0000-000000000001',
      'a1b2c3d4-0001-0000-0000-000000000001',  -- Kho Tổng
@@ -449,7 +450,8 @@ VALUES
      CURRENT_DATE - INTERVAL '5 days',
      CURRENT_DATE - INTERVAL '3 days',
      CURRENT_DATE - INTERVAL '2 days',
-     50000, 'COMPLETED', 'Đơn đặt hàng tuần 1 tháng 8');
+     1275000, 102000, 50000, 1327000,
+     'COMPLETED', 'Đơn đặt hàng tuần 1 tháng 8');
 
 -- Cập nhật ma_phieu sau khi INSERT (để dùng cho lines)
 UPDATE phieu_nhap
@@ -457,23 +459,26 @@ SET ma_phieu = 'PN-' || TO_CHAR(ngay_dat_hang, 'YYYYMMDD') || '-001'
 WHERE id = '00000000-0000-0000-0000-000000000001';
 
 INSERT INTO chi_tiet_phieu_nhap
-    (id_phieu_nhap, id_san_pham, so_luong_dat, so_luong_nhan,
+    (id, id_phieu_nhap, id_san_pham, so_luong_dat, so_luong_nhan,
      don_gia_nhap, vat_phantram, han_su_dung, thu_tu)
 VALUES
     -- 100 lon Coca Cola, đơn giá 9.500đ, VAT 8%
-    ('00000000-0000-0000-0000-000000000001',
+    ('00000000-0000-0000-0000-000000000101',
+     '00000000-0000-0000-0000-000000000001',
      'f6a7b8c9-0001-0000-0000-000000000010', 100, 100, 9500, 8,
      CURRENT_DATE + 180, 1),
     -- 50 gói Oishi, đơn giá 6.500đ, VAT 8%
-    ('00000000-0000-0000-0000-000000000001',
+    ('00000000-0000-0000-0000-000000000102',
+     '00000000-0000-0000-0000-000000000001',
      'f6a7b8c9-0001-0000-0000-000000000030', 50, 50, 6500, 8,
      NULL, 2);
 
 -- Phiếu 2: Vinamilk - Nhập sữa, NCC giao THIẾU (đặt 100 nhận 80), công nợ
 INSERT INTO phieu_nhap
-    (id_chi_nhanh, id_ncc, id_nguoi_nhap,
+    (id, id_chi_nhanh, id_ncc, id_nguoi_nhap,
      ngay_dat_hang, ngay_du_kien_giao, ngay_nhan_thuc_te,
-     giam_gia, trang_thai, ghi_chu)
+     sub_total, vat_total, giam_gia, grand_total,
+     trang_thai, ghi_chu)
 VALUES
     ('00000000-0000-0000-0000-000000000002',
      'a1b2c3d4-0001-0000-0000-000000000001',  -- Kho Tổng
@@ -482,31 +487,34 @@ VALUES
      CURRENT_DATE - INTERVAL '15 days',
      CURRENT_DATE - INTERVAL '10 days',
      CURRENT_DATE - INTERVAL '8 days',
-     0, 'COMPLETED', 'Vinamilk giao thiếu 20 hộp do thiếu hàng');
+     2080000, 166400, 0, 2246400,
+     'COMPLETED', 'Vinamilk giao thiếu 20 hộp do thiếu hàng');
 
 UPDATE phieu_nhap
 SET ma_phieu = 'PN-' || TO_CHAR(ngay_dat_hang, 'YYYYMMDD') || '-002'
 WHERE id = '00000000-0000-0000-0000-000000000002';
 
 INSERT INTO chi_tiet_phieu_nhap
-    (id_phieu_nhap, id_san_pham, so_luong_dat, so_luong_nhan,
+    (id, id_phieu_nhap, id_san_pham, so_luong_dat, so_luong_nhan,
      don_gia_nhap, vat_phantram, han_su_dung, thu_tu)
 VALUES
     -- 100 hộp Vinamilk đặt, NHẬN 80, đơn giá 26.000đ
-    ('00000000-0000-0000-0000-000000000002',
+    ('00000000-0000-0000-0000-000000000103',
+     '00000000-0000-0000-0000-000000000002',
      'f6a7b8c9-0001-0000-0000-000000000040', 100, 80, 26000, 8,
      CURRENT_DATE + 180, 1);
 
 -- Sau khi INSERT xong, trigger AFTER INSERT line đã tự tính:
 --   - sub_total, vat_total, grand_total
---   - cong_no từ grand_total - da_thanh_toan (mặc định 0)
--- Cập nhật thủ công paid_amount cho 2 phiếu
+-- Cập nhật thủ công paid_amount và cong_no cho 2 phiếu
 UPDATE phieu_nhap
-SET da_thanh_toan = grand_total
+SET da_thanh_toan = grand_total,
+    cong_no = 0
 WHERE id = '00000000-0000-0000-0000-000000000001';  -- Pepsico: thanh toán ngay
 
 UPDATE phieu_nhap
-SET da_thanh_toan = 0
+SET da_thanh_toan = 0,
+    cong_no = grand_total
 WHERE id = '00000000-0000-0000-0000-000000000002';  -- Vinamilk: công nợ 15 ngày
 
 -- Cập nhật thống kê NCC
@@ -544,7 +552,7 @@ COMMENT ON COLUMN phieu_nhap.ma_phieu IS
     'Mã phiếu dạng PN-YYYYMMDD-NNN. Trigger `trg_phieu_nhap_sinh_ma` sinh '
     'tự động nếu NULL. UNIQUE — không thể trùng.';
 
-COMMENT ON COLUMN phieu_nhap.so_luong_dat IS
+COMMENT ON COLUMN chi_tiet_phieu_nhap.so_luong_dat IS
     'SL đặt — gửi yêu cầu cho NCC. Có thể khác SL nhận (so_luong_nhan) khi '
     'NCC giao thiếu. UNIQUE cùng id_san_pham trong bảng chi_tiet_phieu_nhap '
     'đảm bảo 1 SP không xuất hiện 2 dòng trong cùng phiếu.';

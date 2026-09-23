@@ -74,6 +74,10 @@ CREATE TABLE IF NOT EXISTS nhan_vien (
     -- Map: ACTIVE → TRUE, INACTIVE → FALSE (giống bảng chi_nhanh).
     dang_hoat_dong  BOOLEAN      NOT NULL DEFAULT TRUE,
 
+    nguoi_cap_nhat  VARCHAR(100),
+    nguoi_tao       VARCHAR(100),
+    trang_thai      VARCHAR(50)  DEFAULT 'ACTIVE',
+
     ngay_tao        TIMESTAMP    NOT NULL DEFAULT NOW(),
     ngay_cap_nhat   TIMESTAMP    NOT NULL DEFAULT NOW(),
 
@@ -122,13 +126,13 @@ INSERT INTO nhan_vien
 VALUES
     -- Quản trị + Kế toán (trụ sở, NULL chi nhánh)
     ('b2c3d4e5-0001-0000-0000-000000000001', NULL, 'NV-0001',
-     'admin', '$2a$10$DEMO_BCRYPT_HASH_admin_change_in_prod',
+     'admin', '$2a$10$GM6QhP5ns4BI9dSkY7Gc5e9QnOWJkLxp/7n/5T64ZkZ954kyTmDNO',
      'Nguyễn Minh Tuấn', '0901000001', 'admin@circlek.vn',
      'ADMIN', 'Giám đốc vận hành', 'FULL_TIME', 'MORNING',
      0, 45000000, '0123456789', 'Vietcombank', '2018-01-15', TRUE),
 
     ('b2c3d4e5-0001-0000-0000-000000000002', NULL, 'NV-0002',
-     'ketoan', '$2a$10$DEMO_BCRYPT_HASH_ketoan_change_in_prod',
+     'ketoan', '$2a$10$GM6QhP5ns4BI9dSkY7Gc5e9QnOWJkLxp/7n/5T64ZkZ954kyTmDNO',
      'Phạm Thị Hồng', '0901000002', 'ketoan@circlek.vn',
      'KE_TOAN', 'Kế toán trưởng', 'FULL_TIME', 'MORNING',
      0, 32000000, '0123456790', 'ACB', '2019-03-20', TRUE),
@@ -136,7 +140,7 @@ VALUES
     -- Thủ kho (Kho Tổng)
     ('b2c3d4e5-0001-0000-0000-000000000003',
      'a1b2c3d4-0001-0000-0000-000000000001', 'NV-0003',
-     'thukho', '$2a$10$DEMO_BCRYPT_HASH_thukho_change_in_prod',
+     'thukho', '$2a$10$GM6QhP5ns4BI9dSkY7Gc5e9QnOWJkLxp/7n/5T64ZkZ954kyTmDNO',
      'Phạm Quốc Hưng', '0901000003', 'thukho@circlek.vn',
      'THU_KHO', 'Trưởng phòng kho', 'FULL_TIME', 'MORNING',
      0, 28000000, '0123456791', 'Techcombank', '2019-03-15', TRUE),
@@ -144,14 +148,14 @@ VALUES
     -- Quản lý chi nhánh
     ('b2c3d4e5-0001-0000-0000-000000000004',
      'a1b2c3d4-0001-0000-0000-000000000101', 'NV-0004',
-     'quanly_bv', '$2a$10$DEMO_BCRYPT_HASH_quanly_bv_change_in_prod',
+     'quanly_bv', '$2a$10$GM6QhP5ns4BI9dSkY7Gc5e9QnOWJkLxp/7n/5T64ZkZ954kyTmDNO',
      'Trần Văn Anh', '0901000004', 'quanly.bvien@circlek.vn',
      'QUAN_LY', 'Quản lý cửa hàng', 'FULL_TIME', 'MORNING',
      0, 22000000, '0123456792', 'MB Bank', '2020-06-01', TRUE),
 
     ('b2c3d4e5-0001-0000-0000-000000000005',
      'a1b2c3d4-0001-0000-0000-000000000102', 'NV-0005',
-     'quanly_tqt', '$2a$10$DEMO_BCRYPT_HASH_quanly_tqt_change_in_prod',
+     'quanly_tqt', '$2a$10$GM6QhP5ns4BI9dSkY7Gc5e9QnOWJkLxp/7n/5T64ZkZ954kyTmDNO',
      'Nguyễn Thị Kim Ngân', '0901000005', 'quanly.tqt@circlek.vn',
      'QUAN_LY', 'Quản lý cửa hàng', 'FULL_TIME', 'AFTERNOON',
      0, 21000000, '0123456793', 'MB Bank', '2020-11-20', TRUE),
@@ -159,21 +163,21 @@ VALUES
     -- Thu ngân (3 ca khác nhau)
     ('b2c3d4e5-0001-0000-0000-000000000006',
      'a1b2c3d4-0001-0000-0000-000000000101', 'NV-0006',
-     'thungan_bv_1', '$2a$10$DEMO_BCRYPT_HASH_thungan1_change_in_prod',
+     'thungan_bv_1', '$2a$10$GM6QhP5ns4BI9dSkY7Gc5e9QnOWJkLxp/7n/5T64ZkZ954kyTmDNO',
      'Lê Thị Mai', '0901000006', 'thungan1@circlek.vn',
      'THU_NGAN', 'Nhân viên bán hàng', 'FULL_TIME', 'MORNING',
      0, 14000000, '0123456794', 'VPBank', '2021-02-15', TRUE),
 
     ('b2c3d4e5-0001-0000-0000-000000000007',
      'a1b2c3d4-0001-0000-0000-000000000101', 'NV-0007',
-     'thungan_bv_2', '$2a$10$DEMO_BCRYPT_HASH_thungan2_change_in_prod',
+     'thungan_bv_2', '$2a$10$GM6QhP5ns4BI9dSkY7Gc5e9QnOWJkLxp/7n/5T64ZkZ954kyTmDNO',
      'Nguyễn Văn Hùng', '0901000007', 'thungan2@circlek.vn',
      'THU_NGAN', 'Nhân viên bán hàng', 'FULL_TIME', 'AFTERNOON',
      0, 14000000, '0123456795', 'VPBank', '2021-05-10', TRUE),
 
     ('b2c3d4e5-0001-0000-0000-000000000008',
      'a1b2c3d4-0001-0000-0000-000000000101', 'NV-0008',
-     'thungan_bv_3', '$2a$10$DEMO_BCRYPT_HASH_thungan3_change_in_prod',
+     'thungan_bv_3', '$2a$10$GM6QhP5ns4BI9dSkY7Gc5e9QnOWJkLxp/7n/5T64ZkZ954kyTmDNO',
      'Phạm Văn Toàn', '0901000008', 'thungan3@circlek.vn',
      'THU_NGAN', 'Nhân viên bán hàng ca đêm', 'PART_TIME', 'NIGHT',
      28000, 0, '0123456796', 'Techcombank', '2022-08-01', TRUE),
@@ -181,7 +185,7 @@ VALUES
     -- Thu ngân của chi nhánh khác
     ('b2c3d4e5-0001-0000-0000-000000000009',
      'a1b2c3d4-0001-0000-0000-000000000201', 'NV-0009',
-     'thungan_hk_1', '$2a$10$DEMO_BCRYPT_HASH_thungan4_change_in_prod',
+     'thungan_hk_1', '$2a$10$GM6QhP5ns4BI9dSkY7Gc5e9QnOWJkLxp/7n/5T64ZkZ954kyTmDNO',
      'Đặng Thị Linh', '0901000009', 'thungan.hk@circlek.vn',
      'THU_NGAN', 'Nhân viên bán hàng', 'FULL_TIME', 'MORNING',
      0, 13500000, '0123456797', 'MB Bank', '2021-10-05', TRUE)
@@ -200,14 +204,20 @@ ALTER TABLE chi_nhanh
     ON DELETE SET NULL
     ON UPDATE CASCADE;
 
--- Cập nhật `id_quan_ly` cho các chi nhánh có quản lý
-UPDATE chi_nhanh SET id_quan_ly = 'b2c3d4e5-0001-0000-0000-000000000003'
+-- Cập nhật `id_quan_ly` và `ten_quan_ly` cho các chi nhánh có quản lý
+UPDATE chi_nhanh
+SET id_quan_ly = 'b2c3d4e5-0001-0000-0000-000000000003',
+    ten_quan_ly = 'Phạm Quốc Hưng'
 WHERE ma_chi_nhanh = 'CK-DC01';
 
-UPDATE chi_nhanh SET id_quan_ly = 'b2c3d4e5-0001-0000-0000-000000000004'
+UPDATE chi_nhanh
+SET id_quan_ly = 'b2c3d4e5-0001-0000-0000-000000000004',
+    ten_quan_ly = 'Trần Văn Anh'
 WHERE ma_chi_nhanh = 'CK-0101';
 
-UPDATE chi_nhanh SET id_quan_ly = 'b2c3d4e5-0001-0000-0000-000000000005'
+UPDATE chi_nhanh
+SET id_quan_ly = 'b2c3d4e5-0001-0000-0000-000000000005',
+    ten_quan_ly = 'Nguyễn Thị Kim Ngân'
 WHERE ma_chi_nhanh = 'CK-0102';
 
 COMMENT ON TABLE nhan_vien IS

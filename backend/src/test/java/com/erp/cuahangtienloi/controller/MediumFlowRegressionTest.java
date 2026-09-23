@@ -10,6 +10,8 @@ import com.erp.cuahangtienloi.repository.NhaCungCapRepository;
 import com.erp.cuahangtienloi.repository.NhanVienRepository;
 import com.erp.cuahangtienloi.repository.SanPhamRepository;
 import com.erp.cuahangtienloi.repository.TaiKhoanRepository;
+import com.erp.cuahangtienloi.service.BranchAccessService;
+import com.erp.cuahangtienloi.service.BranchProductStatusService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,7 +37,9 @@ class MediumFlowRegressionTest {
         SanPhamController controller = new SanPhamController(
                 sanPhamRepository,
                 mock(DanhMucRepository.class),
-                mock(NhaCungCapRepository.class)
+                mock(NhaCungCapRepository.class),
+                mock(BranchAccessService.class),
+                mock(BranchProductStatusService.class)
         );
         UUID productId = UUID.randomUUID();
         SanPham product = new SanPham();
@@ -61,7 +65,8 @@ class MediumFlowRegressionTest {
         NhanVienController controller = new NhanVienController(
                 nhanVienRepository,
                 mock(ChiNhanhRepository.class),
-                mock(TaiKhoanRepository.class)
+                mock(TaiKhoanRepository.class),
+                mock(BranchAccessService.class)
         );
         UUID employeeId = UUID.randomUUID();
         NhanVien employee = new NhanVien();
@@ -88,7 +93,8 @@ class MediumFlowRegressionTest {
         NhanVienController controller = new NhanVienController(
                 nhanVienRepository,
                 mock(ChiNhanhRepository.class),
-                mock(TaiKhoanRepository.class)
+                mock(TaiKhoanRepository.class),
+                mock(BranchAccessService.class)
         );
         UUID employeeId = UUID.randomUUID();
         NhanVien employee = new NhanVien();

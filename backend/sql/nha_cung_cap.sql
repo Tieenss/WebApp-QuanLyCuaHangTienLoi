@@ -290,7 +290,7 @@ ON CONFLICT DO NOTHING;
 -- (Trước đó NULL vì chưa có bảng NCC)
 -- =============================================================================
 UPDATE san_pham SET id_nha_cung_cap = '0a1b2c3d-0001-0000-0000-000000000001'  -- Pepsico
-WHERE ma_vach IN ('8934567000100', '8934567000117');  -- Coca, Pepsi
+WHERE ma_vach IN ('8934567000100', '8934567000117', '8934567000124');  -- Coca, Pepsi, Aquafina
 
 UPDATE san_pham SET id_nha_cung_cap = '0a1b2c3d-0001-0000-0000-000000000002'  -- Vinamilk
 WHERE ma_vach = '8934567000407';  -- Vinamilk 1L

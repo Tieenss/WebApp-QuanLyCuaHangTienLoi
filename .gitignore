@@ -1,0 +1,8 @@
+node_modules/
+audit-context.xml
+
+# Agent & Prompting metadata
+docs/agent/
+skills/
+.agents/
+.aider*

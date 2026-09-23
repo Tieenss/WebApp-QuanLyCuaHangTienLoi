@@ -296,7 +296,7 @@ $$ LANGUAGE plpgsql;
 
 -- Phiếu 1: DANG_KIEM_KE — Thủ kho đang đếm tại Kho Tổng
 INSERT INTO phieu_kiem_ke
-    (id_chi_nhanh, id_nguoi_tao, ngay_kiem_ke, trang_thai, ghi_chu)
+    (id, id_chi_nhanh, id_nguoi_tao, ngay_kiem_ke, trang_thai, ghi_chu)
 VALUES
     ('00000000-0000-0000-0000-000000000020',
      'a1b2c3d4-0001-0000-0000-000000000001',  -- Kho Tổng
@@ -309,24 +309,27 @@ SET ma_phieu = 'KK-' || TO_CHAR(ngay_kiem_ke, 'YYYYMMDD') || '-001'
 WHERE id = '00000000-0000-0000-0000-000000000020';
 
 INSERT INTO chi_tiet_kiem_ke
-    (id_phieu_kiem_ke, id_san_pham, ton_he_thong, ton_thuc_te,
+    (id, id_phieu_kiem_ke, id_san_pham, ton_he_thong, ton_thuc_te,
      don_gia_von, ly_do_lech)
 VALUES
     -- 1200 lon Coca: đếm thực tế 1198 (hao hụt 2 lon)
-    ('00000000-0000-0000-0000-000000000020',
+    ('00000000-0000-0000-0000-000000010021',
+     '00000000-0000-0000-0000-000000000020',
      'f6a7b8c9-0001-0000-0000-000000000010', 1200, 1198, 9500,
      'Hao hụt 2 lon do vỡ trong kho'),
     -- 600 gói Oishi: đếm thực tế 600 (khớp)
-    ('00000000-0000-0000-0000-000000000020',
+    ('00000000-0000-0000-0000-000000010022',
+     '00000000-0000-0000-0000-000000000020',
      'f6a7b8c9-0001-0000-0000-000000000030', 600, 600, 6500, NULL),
     -- 800 gói mì Hảo Hảo: đếm thực tế 803 (thừa 3 gói do nhập trước đó sai)
-    ('00000000-0000-0000-0000-000000000020',
+    ('00000000-0000-0000-0000-000000010023',
+     '00000000-0000-0000-0000-000000000020',
      'f6a7b8c9-0001-0000-0000-000000000050', 800, 803, 4500,
      'Thừa 3 gói do lệch khi nhập từ phiếu PN-20260801-001');
 
 -- Phiếu 2: DA_CAN_BANG — Quản lý Bùi Viện kiểm kê cửa hàng, đã cân bằng
 INSERT INTO phieu_kiem_ke
-    (id_chi_nhanh, id_nguoi_tao, id_nguoi_duyet,
+    (id, id_chi_nhanh, id_nguoi_tao, id_nguoi_duyet,
      ngay_kiem_ke, ngay_can_bang, trang_thai, ghi_chu)
 VALUES
     ('00000000-0000-0000-0000-000000000021',
@@ -341,18 +344,21 @@ SET ma_phieu = 'KK-' || TO_CHAR(ngay_kiem_ke, 'YYYYMMDD') || '-001'
 WHERE id = '00000000-0000-0000-0000-000000000021';
 
 INSERT INTO chi_tiet_kiem_ke
-    (id_phieu_kiem_ke, id_san_pham, ton_he_thong, ton_thuc_te,
+    (id, id_phieu_kiem_ke, id_san_pham, ton_he_thong, ton_thuc_te,
      don_gia_von, ly_do_lech)
 VALUES
     -- 85 lon Coca: đếm 83 (hao hụt 2)
-    ('00000000-0000-0000-0000-000000000021',
+    ('00000000-0000-0000-0000-000000010024',
+     '00000000-0000-0000-0000-000000000021',
      'f6a7b8c9-0001-0000-0000-000000000010', 85, 83, 9500,
      'Hao hụt 2 lon do khách làm đổ'),
     -- 120 chai Aquafina: đếm 120 (khớp)
-    ('00000000-0000-0000-0000-000000000021',
+    ('00000000-0000-0000-0000-000000010025',
+     '00000000-0000-0000-0000-000000000021',
      'f6a7b8c9-0001-0000-0000-000000000012', 120, 120, 5000, NULL),
     -- 8 hộp Vinamilk: đếm 7 (hao hụt 1)
-    ('00000000-0000-0000-0000-000000000021',
+    ('00000000-0000-0000-0000-000000010026',
+     '00000000-0000-0000-0000-000000000021',
      'f6a7b8c9-0001-0000-0000-000000000040', 8, 7, 26000,
      'Hao hụt 1 hộp do HSD trôi');
 

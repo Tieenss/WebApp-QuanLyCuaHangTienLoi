@@ -262,7 +262,8 @@ VALUES
      22000000, 0, 0, 1000000, 0,
      23000000,
      'DA_XAC_NHAN',
-     NULL, NULL,  -- quản lý KHÔNG qua tầng 1 (bỏ qua xác nhận giờ)
+     'b2c3d4e5-0001-0000-0000-000000000001',
+     DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '2 days',  -- Admin xác nhận giờ cho Quản lý
      'b2c3d4e5-0001-0000-0000-000000000002',
      DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '3 days',
      NULL, NULL, NULL),
