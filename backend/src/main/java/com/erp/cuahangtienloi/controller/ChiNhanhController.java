@@ -79,7 +79,11 @@ public class ChiNhanhController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> create(@RequestBody ChiNhanh request) {
-        request.setMaChiNhanh(requireText(request.getMaChiNhanh(), "Mã chi nhánh", 1, 50));
+        if (request.getMaChiNhanh() == null || request.getMaChiNhanh().trim().isEmpty()) {
+            request.setMaChiNhanh(generateNextMaChiNhanh());
+        } else {
+            request.setMaChiNhanh(requireText(request.getMaChiNhanh(), "Mã chi nhánh", 1, 50));
+        }
         request.setTenChiNhanh(requireText(request.getTenChiNhanh(), "Tên chi nhánh", 1, 255));
         oneOf(request.getLoai(), "Loại chi nhánh", Set.of("KHO_TONG", "CUA_HANG_BAN_LE"));
         request.setSoDienThoai(requirePhone(request.getSoDienThoai(), "SĐT liên hệ chi nhánh"));
@@ -232,6 +236,31 @@ public class ChiNhanhController {
             return "Kho tổng chỉ nhận THU_KHO; cửa hàng chỉ nhận QUAN_LY làm người phụ trách";
         }
         return null;
+    }
+
+    private String generateNextMaChiNhanh() {
+        List<ChiNhanh> all = chiNhanhRepository.findAll();
+        int max = 100;
+        for (ChiNhanh cn : all) {
+            String code = cn.getMaChiNhanh();
+            if (code != null) {
+                String trimmed = code.trim().toUpperCase();
+                if (trimmed.startsWith("CK-")) {
+                    String sub = trimmed.substring(3);
+                    try {
+                        int val = Integer.parseInt(sub);
+                        if (val > max) max = val;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+        int nextVal = max + 1;
+        String nextCode = String.format("CK-%04d", nextVal);
+        while (chiNhanhRepository.findByMaChiNhanh(nextCode).isPresent()) {
+            nextVal++;
+            nextCode = String.format("CK-%04d", nextVal);
+        }
+        return nextCode;
     }
 
 //    record ErrorResponse(String message) {}

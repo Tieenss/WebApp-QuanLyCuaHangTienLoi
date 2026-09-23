@@ -90,7 +90,10 @@ public class NhanVienController {
         if (request.getEmail() != null && nhanVienRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Email đã tồn tại"));
         }
-        if (request.getMaNhanVien() != null && nhanVienRepository.existsByMaNhanVien(request.getMaNhanVien())) {
+        if (request.getMaNhanVien() == null || request.getMaNhanVien().trim().isEmpty()) {
+            request.setMaNhanVien(generateNextMaNhanVien());
+        }
+        if (nhanVienRepository.existsByMaNhanVien(request.getMaNhanVien())) {
             return ResponseEntity.badRequest().body( ApiResponse.err("Mã nhân viên đã tồn tại"));
         }
 
@@ -338,5 +341,29 @@ public class NhanVienController {
         return null;
     }
 
+    private String generateNextMaNhanVien() {
+        List<NhanVien> all = nhanVienRepository.findAll();
+        int max = 0;
+        for (NhanVien nv : all) {
+            String code = nv.getMaNhanVien();
+            if (code != null) {
+                String trimmed = code.trim().toUpperCase();
+                if (trimmed.startsWith("NV-")) {
+                    String sub = trimmed.substring(3);
+                    try {
+                        int val = Integer.parseInt(sub);
+                        if (val > max) max = val;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+        int nextVal = max + 1;
+        String nextCode = String.format("NV-%04d", nextVal);
+        while (nhanVienRepository.existsByMaNhanVien(nextCode)) {
+            nextVal++;
+            nextCode = String.format("NV-%04d", nextVal);
+        }
+        return nextCode;
+    }
 
 }

@@ -51,12 +51,33 @@ const OPENING_HOURS_PATTERN =
 
 type BranchEditorValues = BranchFormValues & { managerId?: string };
 
+const generateNextBranchCode = (branches: Array<{ code: string }>): string => {
+  let maxNum = 100;
+  for (const b of branches) {
+    if (!b.code) continue;
+    const match = b.code.trim().match(/^CK-(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+  }
+  let nextNum = maxNum + 1;
+  let candidate = `CK-${String(nextNum).padStart(4, '0')}`;
+  while (branches.some((b) => b.code?.toUpperCase() === candidate)) {
+    nextNum += 1;
+    candidate = `CK-${String(nextNum).padStart(4, '0')}`;
+  }
+  return candidate;
+};
+
 export const BranchFormModal: FC = () => {
   const [form] = Form.useForm<BranchEditorValues>();
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
 
-  const { isModalOpen, selectedBranch } = useAppSelector(
+  const { isModalOpen, selectedBranch, branches } = useAppSelector(
     (state) => state.branch,
   );
   const isEditing = selectedBranch !== null;
@@ -72,12 +93,14 @@ export const BranchFormModal: FC = () => {
       return;
     }
     form.resetFields();
+    const autoCode = generateNextBranchCode(branches);
     form.setFieldsValue({
+      code: autoCode,
       kind: BRANCH_KIND.Store,
       status: RECORD_STATUS.Active,
       region: REGION.South,
     });
-  }, [isModalOpen, selectedBranch, form]);
+  }, [isModalOpen, selectedBranch, branches, form]);
 
   const handleSubmit = async (): Promise<void> => {
     try {
@@ -137,7 +160,7 @@ export const BranchFormModal: FC = () => {
                   },
                 ]}
             >
-              <Input placeholder="VD: CK-0101" maxLength={20} />
+              <Input placeholder="VD: CK-0101" maxLength={20} disabled />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
