@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
+import { isInitialLoading } from '@/utils/tableLoading';
 import {
   Avatar,
   Button,
@@ -406,7 +407,7 @@ export const EmployeesPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          loading={loading}
+          loading={isInitialLoading(loading, employees)}
           scroll={{ x: 1700 }}
           pagination={{
             pageSize: 12,

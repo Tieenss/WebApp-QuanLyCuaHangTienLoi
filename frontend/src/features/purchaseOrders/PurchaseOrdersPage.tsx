@@ -1,4 +1,5 @@
 import { useMemo, useState, type FC, type ReactElement } from 'react';
+import { isInitialLoading } from '@/utils/tableLoading';
 import {
   App as AntdApp,
   Button,
@@ -604,7 +605,7 @@ export const PurchaseOrdersPage: FC = () => {
           dataSource={filtered}
           rowKey="id"
           size="middle"
-          loading={loading}
+          loading={isInitialLoading(loading, orders)}
           scroll={{ x: 1800 }}
           expandable={{
             expandedRowRender: (record) => {
