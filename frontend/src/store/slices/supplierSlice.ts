@@ -44,7 +44,8 @@ const mapDtoToSupplier = (dto: NhaCungCapDTO): Supplier => ({
   totalOrders: dto.tongDonHang || 0,
   status: dto.dangHoatDong === false ? ('Inactive' as const) : ('Active' as const),
   categories: (dto as any).categories?.map((c: any) => c.tenDanhMuc) ?? [],
-  createdAt: today(),
+  createdAt: dto.ngayTao || today(),
+  updatedAt: dto.ngayCapNhat || dto.ngayTao || undefined,
   note: dto.ghiChu || '',
 });
 

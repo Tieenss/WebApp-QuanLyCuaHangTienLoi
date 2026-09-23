@@ -40,6 +40,8 @@ const mapDtoToBranch = (dto: ChiNhanhDTO): Branch => ({
   monthlyRevenue: dto.doanhThuThang || 0,
   openedAt: dto.ngayKhaiTruong || today(),
   status: dto.dangHoatDong === false ? ('Inactive' as const) : ('Active' as const),
+  createdAt: dto.ngayTao,
+  updatedAt: dto.ngayCapNhat || dto.ngayTao || undefined,
 });
 
 export const fetchBranches = createAsyncThunk('branch/fetchAll', async () => {

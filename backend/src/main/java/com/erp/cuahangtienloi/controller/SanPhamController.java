@@ -343,6 +343,8 @@ public class SanPhamController {
         dto.setTonToiDa(sp.getTonToiDa());
         dto.setDeHong(sp.getDeHong());
         dto.setHanSuDungNgay(sp.getHanSuDungNgay());
+        dto.setNgayTao(sp.getNgayTao());
+        dto.setNgayCapNhat(sp.getNgayCapNhat());
 
         if (sp.getIdDanhMuc() != null) {
             danhMucRepository.findById(sp.getIdDanhMuc())

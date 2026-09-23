@@ -43,6 +43,8 @@ export interface Category {
   productCount: number;
   displayOrder: number;
   status: RecordStatus;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type CategoryFormValues = Omit<Category, 'id' | 'productCount'> & {
@@ -84,12 +86,13 @@ export interface Product {
   shelfLifeDays: number;
   imageUrl: string;
   status: RecordStatus;
-  createdAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type ProductFormValues = Omit<
   Product,
-  'id' | 'categoryName' | 'supplierName' | 'createdAt'
+  'id' | 'categoryName' | 'supplierName' | 'createdAt' | 'updatedAt'
 >;
 
 /** Lợi nhuận gộp trên một đơn vị sản phẩm. */

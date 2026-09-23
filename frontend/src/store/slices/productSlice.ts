@@ -39,7 +39,8 @@ const mapDtoToProduct = (dto: SanPhamDTO): Product => ({
   shelfLifeDays: dto.hanSuDungNgay || 0,
   imageUrl: dto.imageUrl || '',
   status: dto.dangHoatDong === false ? ('Inactive' as const) : ('Active' as const),
-  createdAt: today(),
+  createdAt: dto.ngayTao || today(),
+  updatedAt: dto.ngayCapNhat || dto.ngayTao || undefined,
 });
 
 export const fetchProducts = createAsyncThunk('product/fetchAll', async () => {

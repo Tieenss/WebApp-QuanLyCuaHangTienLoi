@@ -52,6 +52,7 @@ import {
   matchKeyword,
 } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
+import { formatDateShort } from '@/utils/dateUtils';
 import { ProductFormModal } from './components/ProductFormModal';
 import './ProductsPage.css';
 
@@ -241,9 +242,17 @@ export const ProductsPage: FC = () => {
 
   const productColumns: ColumnsType<Product> = [
     {
+      title: 'Mã SKU',
+      dataIndex: 'sku',
+      width: 130,
+      fixed: 'left',
+      sorter: (a, b) => (a.sku ?? '').localeCompare(b.sku ?? ''),
+      render: (sku: string) => <span className="mono-code">{sku}</span>,
+    },
+    {
       title: 'Sản phẩm',
       dataIndex: 'name',
-      width: 300,
+      width: 250,
       fixed: 'left',
       render: (name: string, row) => (
         <Space size={10}>
@@ -258,7 +267,7 @@ export const ProductsPage: FC = () => {
               {name}
             </Text>
             <Text type="secondary" className="product-sub">
-              <span className="mono-code">{row.sku}</span> · {PRODUCT_UNIT_LABEL[row.unit]}
+              {PRODUCT_UNIT_LABEL[row.unit]}
             </Text>
           </span>
         </Space>
@@ -268,6 +277,7 @@ export const ProductsPage: FC = () => {
       title: 'Mã vạch',
       dataIndex: 'barcode',
       width: 150,
+      sorter: (a, b) => (a.barcode ?? '').localeCompare(b.barcode ?? ''),
       render: (value: string) => (
         <Text className="barcode-text">
           <BarcodeOutlined className="barcode-icon" />
@@ -386,6 +396,16 @@ export const ProductsPage: FC = () => {
         <Text className="supplier-ellipsis" ellipsis>
           {value}
         </Text>
+      ),
+    },
+    {
+      title: 'Ngày cập nhật',
+      dataIndex: 'updatedAt',
+      width: 120,
+      align: 'center',
+      sorter: (a, b) => (a.updatedAt ?? a.createdAt ?? '').localeCompare(b.updatedAt ?? b.createdAt ?? ''),
+      render: (_: unknown, row: Product) => (
+        <Text type="secondary">{formatDateShort(row.updatedAt || row.createdAt)}</Text>
       ),
     },
     {

@@ -19,6 +19,8 @@ export interface NhanVienDTO {
   soTaiKhoan?: string;
   tenNganHang?: string;
   ngayVaoLam?: string;
+  ngayTao?: string;
+  ngayCapNhat?: string;
 }
 
 const getHeaders = (): HeadersInit => {

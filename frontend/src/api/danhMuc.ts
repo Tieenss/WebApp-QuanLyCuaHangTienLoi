@@ -14,6 +14,8 @@ export interface DanhMucDTO {
   thuTuHienThi?: number;
   productCount?: number;
   dangHoatDong?: boolean;
+  ngayTao?: string;
+  ngayCapNhat?: string;
 }
 
 const getHeaders = (): HeadersInit => {

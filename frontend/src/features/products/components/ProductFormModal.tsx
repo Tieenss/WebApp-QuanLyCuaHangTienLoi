@@ -178,7 +178,7 @@ export const ProductFormModal: FC = () => {
       onCancel={() => dispatch(setProductModalOpen(false))}
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" className="product-form">
+      <Form form={form} layout="vertical" className="product-form" validateTrigger={['onSubmit']}>
         <Row gutter={16}>
           <Col xs={24} md={12}>
             <Form.Item
@@ -296,7 +296,7 @@ export const ProductFormModal: FC = () => {
                 },
               ]}
             >
-              <InputNumber className="product-amount-input" min={1001} step={100} addonAfter="₫" />
+              <InputNumber className="product-amount-input" step={100} addonAfter="₫" />
             </Form.Item>
           </Col>
           <Col xs={24} md={12}>
@@ -315,7 +315,7 @@ export const ProductFormModal: FC = () => {
                 },
               ]}
             >
-              <InputNumber className="product-amount-input" min={1001} step={100} addonAfter="₫" />
+              <InputNumber className="product-amount-input" step={100} addonAfter="₫" />
             </Form.Item>
           </Col>
         </Row>

@@ -20,6 +20,8 @@ export interface SanPhamDTO {
   tonToiDa?: number;
   deHong?: boolean;
   hanSuDungNgay?: number;
+  ngayTao?: string;
+  ngayCapNhat?: string;
 }
 
 const getHeaders = (): HeadersInit => {

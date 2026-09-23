@@ -9,8 +9,15 @@ dayjs.locale('vi');
 export const DATE_FORMAT_ISO = 'YYYY-MM-DD';
 /** Định dạng hiển thị cho người dùng Việt Nam. */
 export const DATE_FORMAT_VN = 'DD/MM/YYYY';
+export const DATE_FORMAT_SHORT_VN = 'DD/MM';
 export const DATETIME_FORMAT_VN = 'DD/MM/YYYY HH:mm';
 export const TIME_FORMAT = 'HH:mm';
+
+/**
+ * Hiển thị ngày ngắn gọn dạng dd/mm (VD: 23/09).
+ */
+export const formatDateShort = (value: string | Date | null | undefined): string =>
+  value ? dayjs(value).format(DATE_FORMAT_SHORT_VN) : '—';
 
 /**
  * Hiển thị ngày theo chuẩn Việt Nam.

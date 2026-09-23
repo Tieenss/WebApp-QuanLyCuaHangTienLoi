@@ -303,6 +303,8 @@ public class NhaCungCapController {
 
         dto.setDangHoatDong(ncc.getDangHoatDong());
         dto.setGhiChu(ncc.getGhiChu());
+        dto.setNgayTao(ncc.getNgayTao());
+        dto.setNgayCapNhat(ncc.getNgayCapNhat());
 
         List<NhaCungCapDanhMuc> links =
                 nccDanhMucRepository.findByIdNhaCungCap(ncc.getId());

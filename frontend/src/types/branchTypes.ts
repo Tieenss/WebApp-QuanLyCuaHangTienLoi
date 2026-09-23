@@ -56,10 +56,12 @@ export interface Branch {
   monthlyRevenue: VND;
   openedAt: string;
   status: RecordStatus;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /** Giá trị form thêm/sửa chi nhánh (bỏ các field hệ thống tự sinh). */
 export type BranchFormValues = Omit<
   Branch,
-  'id' | 'managerName' | 'managerId' | 'employeeCount' | 'monthlyRevenue'
+  'id' | 'managerName' | 'managerId' | 'employeeCount' | 'monthlyRevenue' | 'createdAt' | 'updatedAt'
 >;

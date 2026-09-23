@@ -33,7 +33,7 @@ import {
   setStatusFilter,
 } from '@/store/slices/supplierSlice';
 import type { Supplier } from '@/types';
-import { formatDate } from '@/utils/dateUtils';
+import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { SupplierFormModal } from './components/SupplierFormModal';
@@ -179,6 +179,7 @@ export const SuppliersPage: FC = () => {
       dataIndex: 'code',
       width: 100,
       fixed: 'left',
+      sorter: (a, b) => (a.code ?? '').localeCompare(b.code ?? ''),
       render: (code: string) => <span className="mono-code">{code}</span>,
     },
     {
@@ -275,8 +276,17 @@ export const SuppliersPage: FC = () => {
       dataIndex: 'createdAt',
       width: 110,
       sorter: (a, b) => a.createdAt.localeCompare(b.createdAt),
-      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
+    },
+    {
+      title: 'Ngày cập nhật',
+      dataIndex: 'updatedAt',
+      width: 120,
+      align: 'center',
+      sorter: (a, b) => (a.updatedAt ?? a.createdAt ?? '').localeCompare(b.updatedAt ?? b.createdAt ?? ''),
+      render: (_: unknown, row: Supplier) => (
+        <Text type="secondary">{formatDateShort(row.updatedAt || row.createdAt)}</Text>
+      ),
     },
     {
       title: 'Trạng thái',

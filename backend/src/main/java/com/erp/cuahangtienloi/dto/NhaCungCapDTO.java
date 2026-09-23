@@ -51,6 +51,10 @@ public class NhaCungCapDTO {
 
     private String ghiChu;
 
+    private java.time.LocalDateTime ngayTao;
+
+    private java.time.LocalDateTime ngayCapNhat;
+
     /**
      * Dùng khi CREATE / UPDATE.
      * Frontend gửi danh sách UUID của danh mục.

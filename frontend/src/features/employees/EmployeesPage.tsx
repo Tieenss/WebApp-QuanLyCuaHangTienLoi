@@ -40,7 +40,7 @@ import {
   type Employee,
   type ShiftCode,
 } from '@/types';
-import { formatDate } from '@/utils/dateUtils';
+import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { EmployeeFormModal } from './components/EmployeeFormModal';
@@ -213,9 +213,17 @@ export const EmployeesPage: FC = () => {
 
   const columns: ColumnsType<Employee> = [
     {
+      title: 'Mã',
+      dataIndex: 'code',
+      width: 110,
+      fixed: 'left',
+      sorter: (a, b) => (a.code ?? '').localeCompare(b.code ?? ''),
+      render: (code: string) => <span className="mono-code">{code}</span>,
+    },
+    {
       title: 'Nhân viên',
       dataIndex: 'fullName',
-      width: 250,
+      width: 230,
       fixed: 'left',
       render: (name: string, row) => (
         <Space size={10}>
@@ -227,7 +235,7 @@ export const EmployeesPage: FC = () => {
               {name}
             </Text>
             <Text type="secondary" className="employee-sub">
-              {row.code} · {row.position}
+              {row.position}
             </Text>
           </span>
         </Space>
@@ -313,8 +321,17 @@ export const EmployeesPage: FC = () => {
       dataIndex: 'joinedAt',
       width: 110,
       sorter: (a, b) => a.joinedAt.localeCompare(b.joinedAt),
-      defaultSortOrder: 'descend',
       render: (value: string) => formatDate(value),
+    },
+    {
+      title: 'Ngày cập nhật',
+      dataIndex: 'updatedAt',
+      width: 120,
+      align: 'center',
+      sorter: (a, b) => (a.updatedAt ?? a.joinedAt ?? '').localeCompare(b.updatedAt ?? b.joinedAt ?? ''),
+      render: (_: unknown, row: Employee) => (
+        <Text type="secondary">{formatDateShort(row.updatedAt || row.joinedAt)}</Text>
+      ),
     },
     {
       title: 'Trạng thái',
