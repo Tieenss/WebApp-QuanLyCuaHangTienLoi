@@ -40,6 +40,21 @@ public class HoaDonService {
     private final JdbcTemplate jdbcTemplate;
     private final LoHangService loHangService;
 
+    private final Map<String, HoaDonDTO> recentCheckoutCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Long> recentCheckoutTimestamp = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<String, Object> checkoutLocks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void evictExpiredCheckoutKeys() {
+        long now = System.currentTimeMillis();
+        recentCheckoutTimestamp.entrySet().removeIf(entry -> {
+            if (now - entry.getValue() > 60_000) {
+                recentCheckoutCache.remove(entry.getKey());
+                return true;
+            }
+            return false;
+        });
+    }
+
     @Getter
     @Setter
     public static class CreateSaleRequest {
@@ -81,6 +96,7 @@ public class HoaDonService {
     @Getter
     @Setter
     public static class CheckoutRequest {
+        private String clientRequestId;
         @NotNull(message = "Chi nhánh bắt buộc chọn")
         private UUID idChiNhanh;
         private String caLamViec;
@@ -247,143 +263,168 @@ public class HoaDonService {
 
     @Transactional
     public HoaDonDTO checkout(CheckoutRequest request, UUID cashierId, NhanVien cashier) {
-        if (!"ADMIN".equals(cashier.getVaiTro())
-                && cashier.getIdChiNhanh() != null
-                && !cashier.getIdChiNhanh().equals(request.getIdChiNhanh())) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.FORBIDDEN, "Không được bán hàng tại chi nhánh khác");
-        }
-        if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
-            throw new IllegalArgumentException("Chi nhánh bán hàng không tồn tại");
+        String dedupKey = (request.getClientRequestId() != null && !request.getClientRequestId().isBlank())
+                ? "req:" + request.getClientRequestId().trim()
+                : "fallback:" + cashierId + ":" + request.getIdChiNhanh() + ":" + (System.currentTimeMillis() / 2000);
+
+        evictExpiredCheckoutKeys();
+
+        HoaDonDTO cached = recentCheckoutCache.get(dedupKey);
+        if (cached != null) {
+            return cached;
         }
 
-        Map<UUID, CheckoutLine> requested = new LinkedHashMap<>();
-        for (CheckoutLine line : request.getLines()) {
-            if (requested.putIfAbsent(line.getIdSanPham(), line) != null) {
-                throw new IllegalArgumentException("Một sản phẩm chỉ được xuất hiện một lần trong hóa đơn");
+        Object lock = checkoutLocks.computeIfAbsent(dedupKey, k -> new Object());
+        synchronized (lock) {
+            cached = recentCheckoutCache.get(dedupKey);
+            if (cached != null) {
+                return cached;
+            }
+            try {
+                if (!"ADMIN".equals(cashier.getVaiTro())
+                        && cashier.getIdChiNhanh() != null
+                        && !cashier.getIdChiNhanh().equals(request.getIdChiNhanh())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN, "Không được bán hàng tại chi nhánh khác");
+                }
+                if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+                    throw new IllegalArgumentException("Chi nhánh bán hàng không tồn tại");
+                }
+
+                Map<UUID, CheckoutLine> requested = new LinkedHashMap<>();
+                for (CheckoutLine line : request.getLines()) {
+                    if (requested.putIfAbsent(line.getIdSanPham(), line) != null) {
+                        throw new IllegalArgumentException("Một sản phẩm chỉ được xuất hiện một lần trong hóa đơn");
+                    }
+                }
+
+                List<CheckoutLineCalculated> calculated = new ArrayList<>();
+                BigDecimal subTotal = BigDecimal.ZERO;
+                BigDecimal lineDiscountTotal = BigDecimal.ZERO;
+                BigDecimal vatTotal = BigDecimal.ZERO;
+
+                List<UUID> productIds = requested.keySet().stream().sorted(Comparator.naturalOrder()).toList();
+                for (UUID productId : productIds) {
+                    CheckoutLine line = requested.get(productId);
+                    TonKho stock = tonKhoRepository.findByIdSanPhamAndIdChiNhanhForUpdate(productId, request.getIdChiNhanh())
+                            .orElseThrow(() -> new IllegalArgumentException("Sản phẩm chưa có tồn kho tại chi nhánh"));
+                    if (stock.getSoLuongTon() == null || stock.getSoLuongTon() < line.getSoLuong()) {
+                        throw new IllegalArgumentException("Số lượng bán vượt tồn kho hiện tại");
+                    }
+                    var product = sanPhamRepository.findById(productId)
+                            .filter(p -> Boolean.TRUE.equals(p.getDangHoatDong()))
+                            .orElseThrow(() -> new IllegalArgumentException("Sản phẩm không tồn tại hoặc đã ngừng bán"));
+                    BigDecimal unitPrice = product.getGiaBan();
+                    if (unitPrice == null || unitPrice.signum() < 0) {
+                        throw new IllegalArgumentException("Sản phẩm chưa có giá bán hợp lệ");
+                    }
+                    BigDecimal gross = unitPrice.multiply(BigDecimal.valueOf(line.getSoLuong()));
+                    BigDecimal lineDiscount = line.getGiamGiaDong() == null ? BigDecimal.ZERO : line.getGiamGiaDong();
+                    if (lineDiscount.signum() < 0 || lineDiscount.compareTo(gross) > 0) {
+                        throw new IllegalArgumentException("Giảm giá dòng không hợp lệ");
+                    }
+                    int vat = product.getVatPhantram() == null ? 0 : product.getVatPhantram();
+                    BigDecimal net = gross.subtract(lineDiscount);
+                    BigDecimal lineVat = net.multiply(BigDecimal.valueOf(vat))
+                            .divide(BigDecimal.valueOf(100))
+                            .setScale(0, RoundingMode.HALF_UP);
+                    calculated.add(new CheckoutLineCalculated(productId, line.getSoLuong(), unitPrice,
+                            lineDiscount, vat, net, stock.getGiaVonTrungBinh() == null ? BigDecimal.ZERO : stock.getGiaVonTrungBinh()));
+                    subTotal = subTotal.add(gross);
+                    lineDiscountTotal = lineDiscountTotal.add(lineDiscount);
+                    vatTotal = vatTotal.add(lineVat);
+                }
+
+                BigDecimal orderDiscount = request.getGiamGia() == null ? BigDecimal.ZERO : request.getGiamGia();
+                if (orderDiscount.signum() < 0 || orderDiscount.compareTo(subTotal.subtract(lineDiscountTotal)) > 0) {
+                    throw new IllegalArgumentException("Giảm giá hóa đơn không hợp lệ");
+                }
+                BigDecimal totalDiscount = lineDiscountTotal.add(orderDiscount);
+                BigDecimal grandTotal = subTotal.subtract(totalDiscount).add(vatTotal);
+                String paymentMethod = request.getHinhThucTt() == null ? "CASH" : request.getHinhThucTt();
+                validatePayment(paymentMethod, grandTotal, request.getTienKhachDua());
+                BigDecimal tendered = "CASH".equals(paymentMethod) ? request.getTienKhachDua() : grandTotal;
+                BigDecimal change = tendered.subtract(grandTotal);
+
+                HoaDon invoice = new HoaDon();
+                invoice.setId(UUID.randomUUID());
+                invoice.setMaHoaDon(sinhMaHoaDon());
+                invoice.setIdChiNhanh(request.getIdChiNhanh());
+                invoice.setIdThuNgan(cashierId);
+                invoice.setCaLamViec(request.getCaLamViec() == null ? "MORNING" : request.getCaLamViec());
+                invoice.setNgayBan(LocalDateTime.now());
+                invoice.setHinhThucTt(paymentMethod);
+                invoice.setSdtThanhVien(request.getSdtThanhVien());
+                invoice.setSubTotal(subTotal);
+                invoice.setGiamGia(totalDiscount);
+                invoice.setVatTotal(vatTotal);
+                invoice.setGrandTotal(grandTotal);
+                invoice.setTienKhachDua(tendered);
+                invoice.setTienThoi(change);
+                invoice.setTrangThai("COMPLETED");
+                invoice.setNgayTao(LocalDateTime.now());
+                invoice.setNgayCapNhat(LocalDateTime.now());
+                HoaDon saved = hoaDonRepository.saveAndFlush(invoice);
+
+                List<ChiTietHoaDon> invoiceLines = new ArrayList<>();
+                int order = 1;
+                for (CheckoutLineCalculated line : calculated) {
+                    ChiTietHoaDon detail = new ChiTietHoaDon();
+                    detail.setId(UUID.randomUUID());
+                    detail.setIdHoaDon(saved.getId());
+                    detail.setIdSanPham(line.productId());
+                    detail.setSoLuong(line.quantity());
+                    detail.setDonGia(line.unitPrice());
+                    detail.setGiamGiaDong(line.lineDiscount());
+                    detail.setVatPhantram(line.vatPercent());
+                    detail.setThanhTien(line.netAmount());
+                    detail.setDonGiaVon(line.unitCost());
+                    detail.setThuTu(order++);
+                    detail.setNgayTao(LocalDateTime.now());
+                    invoiceLines.add(detail);
+                }
+                chiTietHoaDonRepository.saveAll(invoiceLines);
+                chiTietHoaDonRepository.flush();
+
+                for (CheckoutLineCalculated line : calculated) {
+                    jdbcTemplate.query(
+                            "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, 'SALE_OUT'::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, NULL::date, ?::text, NOW()::timestamp)",
+                            rs -> { }, line.productId(), request.getIdChiNhanh(), -line.quantity(), line.unitCost(),
+                            saved.getMaHoaDon(), cashier.getHoTen(), "Bán hàng POS: " + saved.getMaHoaDon());
+                    loHangService.xuatKhoFEFO(line.productId(), request.getIdChiNhanh(), line.quantity());
+                }
+
+                if (soQuyRepository.existsByMaChungTuLienQuanAndDirectionAndHangMuc(
+                        saved.getMaHoaDon(), "RECEIPT", "BAN_HANG")) {
+                    throw new IllegalStateException("Phiếu thu cho hóa đơn đã tồn tại");
+                }
+                SoQuy cashEntry = new SoQuy();
+                cashEntry.setId(UUID.randomUUID());
+                cashEntry.setMaChungTu(null);
+                cashEntry.setMaChungTuLienQuan(saved.getMaHoaDon());
+                cashEntry.setIdChiNhanh(request.getIdChiNhanh());
+                cashEntry.setIdNguoiTao(cashierId);
+                cashEntry.setDirection("RECEIPT");
+                cashEntry.setHangMuc("BAN_HANG");
+                cashEntry.setHinhThucTt(paymentMethod);
+                cashEntry.setEntryDate(LocalDate.now());
+                cashEntry.setSoTien(grandTotal);
+                cashEntry.setDoiTuong("Khách lẻ");
+                cashEntry.setDienGiai("Doanh thu hóa đơn " + saved.getMaHoaDon());
+                cashEntry.setRunningBalance(BigDecimal.ZERO);
+                cashEntry.setTrangThai("COMPLETED");
+                cashEntry.setNgayTao(LocalDateTime.now());
+                cashEntry.setNgayCapNhat(LocalDateTime.now());
+                soQuyRepository.saveAndFlush(cashEntry);
+
+                HoaDonDTO result = toDTO(saved);
+                recentCheckoutCache.put(dedupKey, result);
+                recentCheckoutTimestamp.put(dedupKey, System.currentTimeMillis());
+                return result;
+            } finally {
+                checkoutLocks.remove(dedupKey);
             }
         }
-
-        List<CheckoutLineCalculated> calculated = new ArrayList<>();
-        BigDecimal subTotal = BigDecimal.ZERO;
-        BigDecimal lineDiscountTotal = BigDecimal.ZERO;
-        BigDecimal vatTotal = BigDecimal.ZERO;
-
-        List<UUID> productIds = requested.keySet().stream().sorted(Comparator.naturalOrder()).toList();
-        for (UUID productId : productIds) {
-            CheckoutLine line = requested.get(productId);
-            TonKho stock = tonKhoRepository.findByIdSanPhamAndIdChiNhanhForUpdate(productId, request.getIdChiNhanh())
-                    .orElseThrow(() -> new IllegalArgumentException("Sản phẩm chưa có tồn kho tại chi nhánh"));
-            if (stock.getSoLuongTon() == null || stock.getSoLuongTon() < line.getSoLuong()) {
-                throw new IllegalArgumentException("Số lượng bán vượt tồn kho hiện tại");
-            }
-            var product = sanPhamRepository.findById(productId)
-                    .filter(p -> Boolean.TRUE.equals(p.getDangHoatDong()))
-                    .orElseThrow(() -> new IllegalArgumentException("Sản phẩm không tồn tại hoặc đã ngừng bán"));
-            BigDecimal unitPrice = product.getGiaBan();
-            if (unitPrice == null || unitPrice.signum() < 0) {
-                throw new IllegalArgumentException("Sản phẩm chưa có giá bán hợp lệ");
-            }
-            BigDecimal gross = unitPrice.multiply(BigDecimal.valueOf(line.getSoLuong()));
-            BigDecimal lineDiscount = line.getGiamGiaDong() == null ? BigDecimal.ZERO : line.getGiamGiaDong();
-            if (lineDiscount.signum() < 0 || lineDiscount.compareTo(gross) > 0) {
-                throw new IllegalArgumentException("Giảm giá dòng không hợp lệ");
-            }
-            int vat = product.getVatPhantram() == null ? 0 : product.getVatPhantram();
-            BigDecimal net = gross.subtract(lineDiscount);
-            BigDecimal lineVat = net.multiply(BigDecimal.valueOf(vat))
-                    .divide(BigDecimal.valueOf(100))
-                    .setScale(0, RoundingMode.HALF_UP);
-            calculated.add(new CheckoutLineCalculated(productId, line.getSoLuong(), unitPrice,
-                    lineDiscount, vat, net, stock.getGiaVonTrungBinh() == null ? BigDecimal.ZERO : stock.getGiaVonTrungBinh()));
-            subTotal = subTotal.add(gross);
-            lineDiscountTotal = lineDiscountTotal.add(lineDiscount);
-            vatTotal = vatTotal.add(lineVat);
-        }
-
-        BigDecimal orderDiscount = request.getGiamGia() == null ? BigDecimal.ZERO : request.getGiamGia();
-        if (orderDiscount.signum() < 0 || orderDiscount.compareTo(subTotal.subtract(lineDiscountTotal)) > 0) {
-            throw new IllegalArgumentException("Giảm giá hóa đơn không hợp lệ");
-        }
-        BigDecimal totalDiscount = lineDiscountTotal.add(orderDiscount);
-        BigDecimal grandTotal = subTotal.subtract(totalDiscount).add(vatTotal);
-        String paymentMethod = request.getHinhThucTt() == null ? "CASH" : request.getHinhThucTt();
-        validatePayment(paymentMethod, grandTotal, request.getTienKhachDua());
-        BigDecimal tendered = "CASH".equals(paymentMethod) ? request.getTienKhachDua() : grandTotal;
-        BigDecimal change = tendered.subtract(grandTotal);
-
-        HoaDon invoice = new HoaDon();
-        invoice.setId(UUID.randomUUID());
-        invoice.setMaHoaDon(sinhMaHoaDon());
-        invoice.setIdChiNhanh(request.getIdChiNhanh());
-        invoice.setIdThuNgan(cashierId);
-        invoice.setCaLamViec(request.getCaLamViec() == null ? "MORNING" : request.getCaLamViec());
-        invoice.setNgayBan(LocalDateTime.now());
-        invoice.setHinhThucTt(paymentMethod);
-        invoice.setSdtThanhVien(request.getSdtThanhVien());
-        invoice.setSubTotal(subTotal);
-        invoice.setGiamGia(totalDiscount);
-        invoice.setVatTotal(vatTotal);
-        invoice.setGrandTotal(grandTotal);
-        invoice.setTienKhachDua(tendered);
-        invoice.setTienThoi(change);
-        invoice.setTrangThai("COMPLETED");
-        invoice.setNgayTao(LocalDateTime.now());
-        invoice.setNgayCapNhat(LocalDateTime.now());
-        HoaDon saved = hoaDonRepository.saveAndFlush(invoice);
-
-        List<ChiTietHoaDon> invoiceLines = new ArrayList<>();
-        int order = 1;
-        for (CheckoutLineCalculated line : calculated) {
-            ChiTietHoaDon detail = new ChiTietHoaDon();
-            detail.setId(UUID.randomUUID());
-            detail.setIdHoaDon(saved.getId());
-            detail.setIdSanPham(line.productId());
-            detail.setSoLuong(line.quantity());
-            detail.setDonGia(line.unitPrice());
-            detail.setGiamGiaDong(line.lineDiscount());
-            detail.setVatPhantram(line.vatPercent());
-            detail.setThanhTien(line.netAmount());
-            detail.setDonGiaVon(line.unitCost());
-            detail.setThuTu(order++);
-            detail.setNgayTao(LocalDateTime.now());
-            invoiceLines.add(detail);
-        }
-        chiTietHoaDonRepository.saveAll(invoiceLines);
-        chiTietHoaDonRepository.flush();
-
-        for (CheckoutLineCalculated line : calculated) {
-            jdbcTemplate.query(
-                    "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, 'SALE_OUT'::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, NULL::date, ?::text, NOW()::timestamp)",
-                    rs -> { }, line.productId(), request.getIdChiNhanh(), -line.quantity(), line.unitCost(),
-                    saved.getMaHoaDon(), cashier.getHoTen(), "Bán hàng POS: " + saved.getMaHoaDon());
-            loHangService.xuatKhoFEFO(line.productId(), request.getIdChiNhanh(), line.quantity());
-        }
-
-        if (soQuyRepository.existsByMaChungTuLienQuanAndDirectionAndHangMuc(
-                saved.getMaHoaDon(), "RECEIPT", "BAN_HANG")) {
-            throw new IllegalStateException("Phiếu thu cho hóa đơn đã tồn tại");
-        }
-        SoQuy cashEntry = new SoQuy();
-        cashEntry.setId(UUID.randomUUID());
-        cashEntry.setMaChungTu(null);
-        cashEntry.setMaChungTuLienQuan(saved.getMaHoaDon());
-        cashEntry.setIdChiNhanh(request.getIdChiNhanh());
-        cashEntry.setIdNguoiTao(cashierId);
-        cashEntry.setDirection("RECEIPT");
-        cashEntry.setHangMuc("BAN_HANG");
-        cashEntry.setHinhThucTt(paymentMethod);
-        cashEntry.setEntryDate(LocalDate.now());
-        cashEntry.setSoTien(grandTotal);
-        cashEntry.setDoiTuong("Khách lẻ");
-        cashEntry.setDienGiai("Doanh thu hóa đơn " + saved.getMaHoaDon());
-        cashEntry.setRunningBalance(BigDecimal.ZERO);
-        cashEntry.setTrangThai("COMPLETED");
-        cashEntry.setNgayTao(LocalDateTime.now());
-        cashEntry.setNgayCapNhat(LocalDateTime.now());
-        soQuyRepository.saveAndFlush(cashEntry);
-
-        return toDTO(saved);
     }
 
     @Transactional

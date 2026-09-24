@@ -68,8 +68,15 @@ public class GlobalExceptionHandler {
         } else if (text.contains("nha_cung_cap_ma_ncc_key")) {
             userMsg = "Mã NCC đã tồn tại.";
 
-        } else if (text.contains("foreign key")) {
-            userMsg = "Dữ liệu tham chiếu không hợp lệ.";
+        } else if (text.contains("foreign key") || text.contains("violates foreign key constraint")) {
+            if (text.contains("nhan_vien") || text.contains("id_thu_ngan") || text.contains("id_nguoi_nhap")
+                    || text.contains("id_nguoi_tao") || text.contains("id_nguoi_duyet") || text.contains("id_nguoi_nhan")
+                    || text.contains("hoa_don") || text.contains("phieu_") || text.contains("cham_cong")
+                    || text.contains("bang_luong") || text.contains("so_quy")) {
+                userMsg = "Nhân viên này đã có lịch sử giao dịch trong hệ thống (hóa đơn, phiếu kho, chấm công,...). Vui lòng chuyển trạng thái sang 'Ngừng hoạt động' thay vì xóa.";
+            } else {
+                userMsg = "Không thể xóa hoặc thay đổi do dữ liệu đang được sử dụng ở phân hệ khác.";
+            }
 
         } else {
             userMsg = "Dữ liệu không hợp lệ.";
