@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useRef, useState, type FC } from 'react';
 import {
   Alert,
   App as AntdApp,
@@ -85,6 +85,8 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
   const [form] = Form.useForm<TransferFormValues>();
+  const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const user = useAppSelector((state) => state.auth.user);
   const balances = useAppSelector((state) => state.stock.balances);
@@ -228,6 +230,7 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
   };
 
   const handleSubmit = async (): Promise<void> => {
+    if (isSubmittingRef.current) return;
     try {
       const values = await form.validateFields();
 
@@ -253,6 +256,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
           message.warning(`Cảnh báo: Sản phẩm "${p?.name || ''}" sẽ vượt mức tồn tối đa (${tb?.maxStock}) của chi nhánh nhận.`);
         }
       }
+
+      isSubmittingRef.current = true;
+      setSubmitting(true);
 
       let created: PhieuXuatKhoDTO;
 
@@ -281,17 +287,21 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
         created = await response.json();
 
         await chiTietPhieuXuatApi.createBatch(
-          validRows.map((row, index) => ({
-            id: '',
-            idPhieuXuat: created.id,
-            idSanPham: row.productId,
-            soLuongYeuCau: row.quantity,
-            soLuongXuat: 0,
-            soLuongNhan: 0,
-            donGiaVon: 0,
-            thanhTien: 0,
-            thuTu: index,
-          })),
+          validRows.map((row, index) => {
+            const prod = products.find((p) => p.id === row.productId);
+            const cost = prod?.costPrice ?? 0;
+            return {
+              id: '',
+              idPhieuXuat: created.id,
+              idSanPham: row.productId,
+              soLuongYeuCau: row.quantity,
+              soLuongXuat: 0,
+              soLuongNhan: 0,
+              donGiaVon: cost,
+              thanhTien: cost * row.quantity,
+              thuTu: index,
+            };
+          }),
         );
 
         // 2) Thủ kho/Admin lập phiếu trực tiếp: tự chạy luôn bước xuất + nhận
@@ -325,6 +335,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       onClose();
     } catch {
       // antd đã hiển thị lỗi tại từng field.
+    } finally {
+      isSubmittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -485,6 +498,9 @@ export const TransferFormModal: FC<TransferFormModalProps> = ({
       afterClose={handleAfterClose}
       destroyOnHidden
       width={1000}
+      confirmLoading={submitting}
+      okButtonProps={{ loading: submitting, disabled: submitting }}
+      cancelButtonProps={{ disabled: submitting }}
     >
       <Alert
         type="info"

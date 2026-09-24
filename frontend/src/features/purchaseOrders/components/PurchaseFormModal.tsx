@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FC } from 'react';
+import { useEffect, useMemo, useRef, useState, type FC } from 'react';
 import {
   Alert,
   App as AntdApp,
@@ -71,6 +71,8 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
   const [form] = Form.useForm<PurchaseFormValues>();
+  const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const user = useAppSelector((state) => state.auth.user);
   const suppliers = useAppSelector((state) => state.supplier.suppliers);
@@ -191,6 +193,7 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
   };
 
   const handleSubmit = async (): Promise<void> => {
+    if (isSubmittingRef.current) return;
     try {
       const values = await form.validateFields();
 
@@ -212,6 +215,9 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
         message.error('Đơn giá nhập phải lớn hơn 0.');
         return;
       }
+
+      isSubmittingRef.current = true;
+      setSubmitting(true);
 
       // Bước 1 của luồng mới: Thủ kho lập phiếu ở trạng thái "Chờ thanh toán".
       // Chưa cộng tồn Kho Tổng — Kế toán bấm "Thanh toán" (/pay) hàng mới vào
@@ -240,7 +246,13 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       dispatch(fetchPurchaseOrders());
       onClose();
     } catch (error: any) {
+      if (error?.errorFields) {
+        return;
+      }
       message.error(error?.message || 'Có lỗi xảy ra khi lưu phiếu nhập');
+    } finally {
+      isSubmittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -381,7 +393,9 @@ export const PurchaseFormModal: FC<PurchaseFormModalProps> = ({ open, onClose })
       afterClose={handleAfterClose}
       destroyOnHidden
       width={1000}
-      okButtonProps={{ disabled: branchId === null }}
+      confirmLoading={submitting}
+      okButtonProps={{ loading: submitting, disabled: submitting || branchId === null }}
+      cancelButtonProps={{ disabled: submitting }}
     >
       <Alert
         type="info"

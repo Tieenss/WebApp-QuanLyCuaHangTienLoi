@@ -12,9 +12,11 @@ import com.erp.cuahangtienloi.repository.SanPhamRepository;
 import com.erp.cuahangtienloi.repository.TaiKhoanRepository;
 import com.erp.cuahangtienloi.service.BranchAccessService;
 import com.erp.cuahangtienloi.service.BranchProductStatusService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -62,12 +64,18 @@ class MediumFlowRegressionTest {
     @Test
     void profileOnlyUpdateDoesNotRevalidateUntouchedLegacyBranch() {
         NhanVienRepository nhanVienRepository = mock(NhanVienRepository.class);
+        BranchAccessService branchAccessService = mock(BranchAccessService.class);
         NhanVienController controller = new NhanVienController(
                 nhanVienRepository,
                 mock(ChiNhanhRepository.class),
                 mock(TaiKhoanRepository.class),
-                mock(BranchAccessService.class)
+                branchAccessService
         );
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        NhanVien actor = new NhanVien();
+        actor.setVaiTro("ADMIN");
+        when(branchAccessService.requireAuthenticatedEmployee(httpRequest)).thenReturn(actor);
+
         UUID employeeId = UUID.randomUUID();
         NhanVien employee = new NhanVien();
         employee.setId(employeeId);
@@ -81,7 +89,7 @@ class MediumFlowRegressionTest {
         when(nhanVienRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
         when(nhanVienRepository.save(any(NhanVien.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = controller.update(employeeId, request);
+        var response = controller.update(employeeId, request, httpRequest);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(nhanVienRepository).save(employee);
@@ -90,12 +98,18 @@ class MediumFlowRegressionTest {
     @Test
     void changingToOperationalRoleStillRequiresBranch() {
         NhanVienRepository nhanVienRepository = mock(NhanVienRepository.class);
+        BranchAccessService branchAccessService = mock(BranchAccessService.class);
         NhanVienController controller = new NhanVienController(
                 nhanVienRepository,
                 mock(ChiNhanhRepository.class),
                 mock(TaiKhoanRepository.class),
-                mock(BranchAccessService.class)
+                branchAccessService
         );
+        HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+        NhanVien actor = new NhanVien();
+        actor.setVaiTro("ADMIN");
+        when(branchAccessService.requireAuthenticatedEmployee(httpRequest)).thenReturn(actor);
+
         UUID employeeId = UUID.randomUUID();
         NhanVien employee = new NhanVien();
         employee.setId(employeeId);
@@ -106,7 +120,7 @@ class MediumFlowRegressionTest {
 
         when(nhanVienRepository.findById(employeeId)).thenReturn(Optional.of(employee));
 
-        var response = controller.update(employeeId, request);
+        var response = controller.update(employeeId, request, httpRequest);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
@@ -114,10 +128,10 @@ class MediumFlowRegressionTest {
     @Test
     void stocktakeWriteEndpointsDeclareRolesExplicitly() throws NoSuchMethodException {
         List<Method> writeMethods = List.of(
-                ChiTietKiemKeController.class.getDeclaredMethod("create", ChiTietKiemKe.class),
-                ChiTietKiemKeController.class.getDeclaredMethod("createBatch", List.class),
-                ChiTietKiemKeController.class.getDeclaredMethod("delete", UUID.class),
-                ChiTietKiemKeController.class.getDeclaredMethod("deleteByPhieuKiemKe", UUID.class)
+                ChiTietKiemKeController.class.getDeclaredMethod("create", ChiTietKiemKe.class, HttpServletRequest.class),
+                ChiTietKiemKeController.class.getDeclaredMethod("createBatch", List.class, HttpServletRequest.class),
+                ChiTietKiemKeController.class.getDeclaredMethod("delete", UUID.class, HttpServletRequest.class),
+                ChiTietKiemKeController.class.getDeclaredMethod("deleteByPhieuKiemKe", UUID.class, HttpServletRequest.class)
         );
 
         for (Method method : writeMethods) {

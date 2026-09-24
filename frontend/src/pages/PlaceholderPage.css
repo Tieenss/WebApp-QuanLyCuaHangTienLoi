@@ -1,0 +1,13 @@
+/* PlaceholderPage */
+
+.placeholder-card {
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-back-btn {
+  background-color: #e31837;
+  border-color: #e31837;
+}

@@ -5,6 +5,7 @@ import { parseApiError } from '@/utils/apiError';
 export interface SanPhamDTO {
   id: string;
   idDanhMuc?: string;
+  tenDanhMuc?: string;
   sku?: string;
   maVach?: string;
   tenSanPham: string;
@@ -16,6 +17,7 @@ export interface SanPhamDTO {
   giaBan: number;
   vatPhantram?: number;
   idNhaCungCap?: string;
+  tenNhaCungCap?: string;
   tonToiThieu?: number;
   tonToiDa?: number;
   deHong?: boolean;

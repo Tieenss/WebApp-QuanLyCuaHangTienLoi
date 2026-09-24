@@ -388,8 +388,9 @@ export const SuppliersPage: FC = () => {
           loading={isInitialLoading(loading, suppliers)}
           scroll={{ x: 1800 }}
           pagination={{
-            pageSize: 10,
+            defaultPageSize: 10,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total) => `${total} nhà cung cấp`,
           }}
         />

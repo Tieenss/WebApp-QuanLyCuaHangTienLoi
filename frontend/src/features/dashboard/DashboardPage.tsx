@@ -134,6 +134,8 @@ export const DashboardPage: FC = () => {
   const balances = useAppSelector((state) => state.stock.balances);
   const branches = useAppSelector((state) => state.branch.branches);
   const products = useAppSelector((state) => state.product.products);
+  const categories = useAppSelector((state) => state.category.categories);
+  const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
   // ── Dữ liệu từ API ───────────────────────────────────────────────────────────
   const [invoices, setInvoices] = useState<HoaDonDTO[]>([]);
@@ -356,25 +358,32 @@ export const DashboardPage: FC = () => {
       const lines = invoiceLines[hd.id] ?? [];
       for (const line of lines) {
         const product = productById(line.idSanPham);
-        const catId = product?.categoryId ?? 'unknown';
+        const catId = product?.categoryId || 'unknown';
         map.set(catId, (map.get(catId) ?? 0) + line.thanhTien);
       }
     }
     const total = [...map.values()].reduce((s, v) => s + v, 0);
+    const defaultColors = ['#E11D48', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
     return [...map.entries()]
       .map(([catId, revenue], index) => {
         const product = products.find((p) => p.categoryId === catId);
+        const cat = categoryMap.get(catId);
+        const name = cat?.name || product?.categoryName || (catId === 'unknown' ? 'Khác' : 'Khác');
+        const color = cat?.color && cat.color !== '#000000'
+          ? cat.color
+          : defaultColors[index % defaultColors.length];
         return {
           categoryId: catId,
-          categoryName: product?.categoryName || 'Khác',
+          categoryName: name,
           revenue,
           percentage: total === 0 ? 0 : (revenue / total) * 100,
-          color: ['#E11D48', '#F59E0B', '#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899'][index % 7],
+          color,
         };
       })
+      .filter((item) => item.revenue > 0)
       .sort((a, b) => b.revenue - a.revenue);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodInvoices, invoiceLines, products]);
+  }, [periodInvoices, invoiceLines, products, categoryMap]);
 
   const topSelling = useMemo<TopSellingRow[]>(() => {
     const stockByProduct = new Map<string, number>();
@@ -392,7 +401,7 @@ export const DashboardPage: FC = () => {
           rank: 0,
           sku: product?.sku ?? '',
           productName: product?.name ?? '',
-          categoryName: product?.categoryName ?? '',
+          categoryName: product?.categoryName || categoryMap.get(product?.categoryId ?? '')?.name || '',
           imageUrl: product?.imageUrl ?? '',
           quantitySold: v.qty,
           revenue: v.revenue,
@@ -405,7 +414,7 @@ export const DashboardPage: FC = () => {
       .slice(0, 8)
       .map((row, index) => ({ ...row, rank: index + 1 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productStats, balances, products]);
+  }, [productStats, balances, products, categoryMap]);
 
   const alerts = useMemo<InventoryAlertItem[]>(() => {
     const productAlerts = new Map<string, { current: number; min: number }>();
@@ -426,7 +435,7 @@ export const DashboardPage: FC = () => {
           productId,
           sku: product?.sku ?? '',
           productName: product?.name ?? '',
-          categoryName: product?.categoryName ?? '',
+          categoryName: product?.categoryName || categoryMap.get(product?.categoryId ?? '')?.name || '',
           branchName: branchNameById(activeBranchId),
           currentStock: v.current,
           minStock: v.min,
@@ -437,7 +446,7 @@ export const DashboardPage: FC = () => {
       .sort((a, b) => a.currentStock / Math.max(1, a.minStock) - b.currentStock / Math.max(1, b.minStock))
       .slice(0, 6);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [balances, activeBranchId, products, branches]);
+  }, [balances, activeBranchId, products, branches, categoryMap]);
 
   /** 4 thẻ KPI chính theo yêu cầu: doanh số, đơn hàng, giá trị TB, cảnh báo tồn. */
   const kpiCards = useMemo<KpiCard[]>(

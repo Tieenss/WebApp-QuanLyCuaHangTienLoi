@@ -9,7 +9,7 @@ import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
 import { DocumentStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
-import { phieuKiemKeApi, chiTietKiemKeApi } from '@/api/phieuKiemKe';
+import { phieuKiemKeApi } from '@/api/phieuKiemKe';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { fetchProducts } from '@/store/slices/productSlice';
 import { fetchStock } from '@/store/slices/stockSlice';
@@ -39,7 +39,7 @@ export const StocktakesPage: FC = () => {
   const branches = useAppSelector((state) => state.branch.branches);
   const products = useAppSelector((state) => state.product.products);
   const user = useAppSelector((state) => state.auth.user);
-  const productById = (id: string) => products.find((p) => p.id === id);
+  // Removed unused productById
   const dispatch = useAppDispatch();
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState<string | null>(null);
@@ -94,57 +94,10 @@ export const StocktakesPage: FC = () => {
         approvedBy: d.tenNguoiDuyet || null,
         note: d.ghiChu || '',
       }));
-      // Load chi tiết cho tất cả phiếu (1 lần, tránh lazy-load khi expand)
-      const allDetails: Record<string, StocktakeLine[]> = {};
-      const allDetailErrors: Record<string, string> = {};
-      await Promise.all(
-        mapped.map(async (st) => {
-          try {
-            const lines = await chiTietKiemKeApi.getByPhieuKiemKe(st.id);
-            allDetails[st.id] = lines.map((d) => {
-              const product = productById(d.idSanPham);
-              return {
-                id: d.id ?? `d-${d.idSanPham}`,
-                productId: d.idSanPham,
-                sku: product?.sku ?? '',
-                productName: product?.name ?? '',
-                unit: product?.unit ?? '',
-                systemQuantity: d.tonHeThong,
-                countedQuantity: d.tonThucTe,
-                varianceQuantity: d.soLuongLech,
-                unitCost: Number(d.donGiaVon),
-                varianceValue: Number(d.giaTriLech),
-                reason: d.lyDoLech ?? '',
-              };
-            });
-          } catch (error) {
-            allDetails[st.id] = [];
-            allDetailErrors[st.id] = (error as Error).message || 'Không thể tải chi tiết phiếu.';
-          }
-        }),
-      );
-      setDetails(allDetails);
-      setDetailErrors(allDetailErrors);
-
-      // Tính các thống kê trên bảng chính từ details đã load.
-      setStocktakes(
-        mapped.map((st) => {
-          const lines = allDetails[st.id] ?? [];
-          const totalItems = lines.length;
-          const varianceItems = lines.filter((l) => l.varianceQuantity !== 0).length;
-          const totalVarianceValue = lines.reduce(
-            (sum, l) => sum + l.varianceValue,
-            0,
-          );
-          return {
-            ...st,
-            lines,
-            totalItemsCounted: totalItems,
-            totalVarianceItems: varianceItems,
-            totalVarianceValue,
-          };
-        }),
-      );
+      // Lazy load details when expanded or edited
+      setDetails({});
+      setDetailErrors({});
+      setStocktakes(mapped);
     } catch {
       message.error('Lỗi tải danh sách phiếu kiểm kê');
     } finally {
@@ -664,8 +617,9 @@ export const StocktakesPage: FC = () => {
           scroll={{ x: 1500 }}
           expandable={{ expandedRowRender: renderDetail, columnWidth: 44 }}
           pagination={{
-            pageSize: 10,
+            defaultPageSize: 10,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total) => `${total} phiếu kiểm kê`,
           }}
         />

@@ -1,0 +1,45 @@
+/* InternalExportFormModal */
+
+.internal-export-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.internal-export-form {
+  margin-top: 16px;
+}
+
+.internal-export-ok-btn {
+  background-color: #e31837;
+  border-color: #e31837;
+}
+
+.export-date-picker,
+.export-number-input {
+  width: 100%;
+}
+
+.export-items-header {
+  margin-bottom: 12px;
+}
+
+.export-remove-row-btn {
+  margin-top: 4px;
+}
+
+.export-total-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.export-total-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #e31837;
+}

@@ -88,22 +88,7 @@ export const PurchaseOrdersPage: FC = () => {
     }
   };
 
-  // Load chi tiết cho tất cả phiếu (sau khi load orders xong)
-  useEffect(() => {
-    if (enrichedOrders.length === 0) return;
-    Promise.all(
-      enrichedOrders.map(async (o) => {
-        if (detailsCache[o.id] !== undefined) return;
-        try {
-          const data = await chiTietPhieuNhapApi.getByPhieuNhap(o.id);
-          setDetailsCache((prev) => ({ ...prev, [o.id]: data }));
-        } catch {
-          setDetailsCache((prev) => ({ ...prev, [o.id]: [] }));
-        }
-      }),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enrichedOrders.length]);
+  // Lazy loading will be handled by loadDetails when expanding a row
 
   useEffect(() => {
     dispatch(fetchPurchaseOrders());
@@ -672,8 +657,9 @@ export const PurchaseOrdersPage: FC = () => {
             },
           }}
           pagination={{
-            pageSize: 10,
+            defaultPageSize: 10,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total) => `${total} phiếu nhập`,
           }}
         />

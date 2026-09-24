@@ -1,0 +1,107 @@
+/* RevenueOverview */
+
+.revenue-title-icon {
+  color: #e31837;
+  font-size: 18px;
+}
+
+/* Circle K Banner Card */
+.circlek-promo-card {
+  background: linear-gradient(135deg, #1a1d20 0%, #2a080c 50%, #e31837 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(227, 24, 55, 0.25);
+}
+
+.circlek-promo-badge {
+  background: #ffc72c;
+  color: #111827;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
+/* Category Progress Bars */
+.category-progress-item {
+  margin-bottom: 16px;
+}
+
+.category-progress-item:last-child {
+  margin-bottom: 0;
+}
+
+.category-label-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.promo-heading {
+  color: #ffffff;
+  margin: 4px 0 8px;
+}
+
+.promo-description {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.promo-highlight {
+  color: #ffc72c;
+}
+
+.promo-stats {
+  display: flex;
+  gap: 24px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+.promo-stat-label {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.promo-stat-value-white {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.promo-stat-value-gold {
+  color: #ffc72c;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.promo-stat-divider {
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  padding-left: 24px;
+}
+
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.category-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.category-amount {
+  font-weight: 700;
+  color: #111827;
+}

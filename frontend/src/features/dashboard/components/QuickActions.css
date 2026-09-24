@@ -1,0 +1,34 @@
+/* QuickActions */
+
+.quick-action-btn {
+  height: 48px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  transform: scale(1.02);
+}
+
+.qa-btn-primary {
+  background-color: #e31837;
+  border-color: #e31837;
+}
+
+.qa-icon {
+  font-size: 18px;
+}
+
+.qa-icon-dark {
+  font-size: 18px;
+  color: #111827;
+}
+
+.qa-icon-red {
+  font-size: 18px;
+  color: #e31837;
+}

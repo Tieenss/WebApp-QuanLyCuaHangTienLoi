@@ -403,8 +403,9 @@ export const CashbookPage: FC = () => {
           scroll={{ x: 1800 }}
           className="dense-table"
           pagination={{
-            pageSize: 15,
+            defaultPageSize: 10,
             showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total) => `${total} phiếu thu chi`,
           }}
         />
