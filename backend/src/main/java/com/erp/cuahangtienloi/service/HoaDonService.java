@@ -162,8 +162,13 @@ public class HoaDonService {
 
     @Transactional
     public HoaDonDTO create(HoaDon request) {
-        if (request.getIdChiNhanh() == null || !chiNhanhRepository.existsById(request.getIdChiNhanh())) {
+        if (request.getIdChiNhanh() == null) {
             throw new IllegalArgumentException("Chi nhánh bán hàng không tồn tại");
+        }
+        ChiNhanh cnCreate = chiNhanhRepository.findById(request.getIdChiNhanh())
+                .orElseThrow(() -> new IllegalArgumentException("Chi nhánh bán hàng không tồn tại"));
+        if (!"CUA_HANG_BAN_LE".equals(cnCreate.getLoai()) || !Boolean.TRUE.equals(cnCreate.getDangHoatDong())) {
+            throw new IllegalArgumentException("Chỉ có thể bán hàng tại Cửa hàng bán lẻ đang hoạt động");
         }
         validatePayment(request.getHinhThucTt(), request.getGrandTotal(), request.getTienKhachDua());
         HoaDon hd = new HoaDon();
@@ -197,8 +202,10 @@ public class HoaDonService {
         if (request.getLines() == null || request.getLines().isEmpty()) {
             throw new IllegalArgumentException("Giỏ hàng trống");
         }
-        if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
-            throw new IllegalArgumentException("Chi nhánh bán hàng không tồn tại");
+        ChiNhanh cnCreateLines = chiNhanhRepository.findById(request.getIdChiNhanh())
+                .orElseThrow(() -> new IllegalArgumentException("Chi nhánh bán hàng không tồn tại"));
+        if (!"CUA_HANG_BAN_LE".equals(cnCreateLines.getLoai()) || !Boolean.TRUE.equals(cnCreateLines.getDangHoatDong())) {
+            throw new IllegalArgumentException("Chỉ có thể bán hàng tại Cửa hàng bán lẻ đang hoạt động");
         }
         validatePayment(request.getHinhThucTt(), request.getGrandTotal(), request.getTienKhachDua());
         for (SaleLine line : request.getLines()) {
@@ -287,8 +294,10 @@ public class HoaDonService {
                     throw new org.springframework.web.server.ResponseStatusException(
                             org.springframework.http.HttpStatus.FORBIDDEN, "Không được bán hàng tại chi nhánh khác");
                 }
-                if (!chiNhanhRepository.existsById(request.getIdChiNhanh())) {
-                    throw new IllegalArgumentException("Chi nhánh bán hàng không tồn tại");
+                ChiNhanh cnCheckout = chiNhanhRepository.findById(request.getIdChiNhanh())
+                        .orElseThrow(() -> new IllegalArgumentException("Chi nhánh bán hàng không tồn tại"));
+                if (!"CUA_HANG_BAN_LE".equals(cnCheckout.getLoai()) || !Boolean.TRUE.equals(cnCheckout.getDangHoatDong())) {
+                    throw new IllegalArgumentException("Chỉ có thể bán hàng tại Cửa hàng bán lẻ đang hoạt động");
                 }
 
                 Map<UUID, CheckoutLine> requested = new LinkedHashMap<>();

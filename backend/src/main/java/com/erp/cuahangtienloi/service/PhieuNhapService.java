@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.service;
 
 import com.erp.cuahangtienloi.dto.PhieuNhapDTO;
+import com.erp.cuahangtienloi.entity.ChiNhanh;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuNhap;
 import com.erp.cuahangtienloi.entity.NhaCungCap;
 import com.erp.cuahangtienloi.entity.NhanVien;
@@ -143,8 +144,13 @@ public class PhieuNhapService {
         if (idChiNhanh == null) {
             throw new IllegalArgumentException("Thiếu kho nhận hàng");
         }
-        if (!chiNhanhRepository.existsById(idChiNhanh)) {
-            throw new IllegalArgumentException("Chi nhánh nhập hàng không tồn tại");
+        ChiNhanh chiNhanhNhap = chiNhanhRepository.findById(idChiNhanh)
+                .orElseThrow(() -> new IllegalArgumentException("Chi nhánh nhập hàng không tồn tại"));
+        if (!"KHO_TONG".equals(chiNhanhNhap.getLoai())) {
+            throw new IllegalArgumentException("Phiếu nhập chỉ được tạo cho Kho Tổng");
+        }
+        if (!Boolean.TRUE.equals(chiNhanhNhap.getDangHoatDong())) {
+            throw new IllegalArgumentException("Kho Tổng đã ngừng hoạt động");
         }
         branchAccessService.requireReadableBranch(actor, idChiNhanh);
         for (PurchaseLine line : request.getLines()) {

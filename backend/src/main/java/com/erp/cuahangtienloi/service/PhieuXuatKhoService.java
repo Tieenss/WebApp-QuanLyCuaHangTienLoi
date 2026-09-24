@@ -1,6 +1,7 @@
 package com.erp.cuahangtienloi.service;
 
 import com.erp.cuahangtienloi.dto.PhieuXuatKhoDTO;
+import com.erp.cuahangtienloi.entity.ChiNhanh;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuXuat;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuXuatKho;
@@ -93,11 +94,21 @@ public class PhieuXuatKhoService {
 
     @Transactional
     public PhieuXuatKhoDTO create(PhieuXuatKho request, UUID idNguoiTao, NhanVien actor) {
-        if (request.getIdChiNhanhXuat() == null || !chiNhanhRepository.existsById(request.getIdChiNhanhXuat())) {
-            throw new IllegalArgumentException("Chi nhánh xuất không tồn tại");
+        if (request.getIdChiNhanhXuat() == null || request.getIdChiNhanhNhan() == null) {
+            throw new IllegalArgumentException("Chi nhánh xuất hoặc nhận không được để trống");
         }
-        if (request.getIdChiNhanhNhan() == null || !chiNhanhRepository.existsById(request.getIdChiNhanhNhan())) {
-            throw new IllegalArgumentException("Chi nhánh nhận không tồn tại");
+        ChiNhanh nguon = chiNhanhRepository.findById(request.getIdChiNhanhXuat())
+                .orElseThrow(() -> new IllegalArgumentException("Chi nhánh xuất không tồn tại"));
+        ChiNhanh dich = chiNhanhRepository.findById(request.getIdChiNhanhNhan())
+                .orElseThrow(() -> new IllegalArgumentException("Chi nhánh nhận không tồn tại"));
+        if (!"KHO_TONG".equals(nguon.getLoai())) {
+            throw new IllegalArgumentException("Kho xuất phải là Kho Tổng");
+        }
+        if (!"CUA_HANG_BAN_LE".equals(dich.getLoai())) {
+            throw new IllegalArgumentException("Kho nhận phải là Cửa hàng bán lẻ");
+        }
+        if (!Boolean.TRUE.equals(nguon.getDangHoatDong()) || !Boolean.TRUE.equals(dich.getDangHoatDong())) {
+            throw new IllegalArgumentException("Cả hai chi nhánh phải đang hoạt động");
         }
         if (request.getIdChiNhanhXuat().equals(request.getIdChiNhanhNhan())) {
             throw new IllegalArgumentException("Kho xuất và kho nhận phải khác nhau");
@@ -137,11 +148,18 @@ public class PhieuXuatKhoService {
                             ? request.getIdChiNhanhXuat() : pxk.getIdChiNhanhXuat();
                     UUID destinationId = request.getIdChiNhanhNhan() != null
                             ? request.getIdChiNhanhNhan() : pxk.getIdChiNhanhNhan();
-                    if (sourceId == null || !chiNhanhRepository.existsById(sourceId)) {
-                        throw new IllegalArgumentException("Chi nhánh xuất không tồn tại");
+                    if (sourceId == null || destinationId == null) {
+                        throw new IllegalArgumentException("Chi nhánh xuất hoặc nhận không được để trống");
                     }
-                    if (destinationId == null || !chiNhanhRepository.existsById(destinationId)) {
-                        throw new IllegalArgumentException("Chi nhánh nhận không tồn tại");
+                    ChiNhanh nguonUpdate = chiNhanhRepository.findById(sourceId)
+                            .orElseThrow(() -> new IllegalArgumentException("Chi nhánh xuất không tồn tại"));
+                    ChiNhanh dichUpdate = chiNhanhRepository.findById(destinationId)
+                            .orElseThrow(() -> new IllegalArgumentException("Chi nhánh nhận không tồn tại"));
+                    if (!"KHO_TONG".equals(nguonUpdate.getLoai()) || !"CUA_HANG_BAN_LE".equals(dichUpdate.getLoai())) {
+                        throw new IllegalArgumentException("Luôn phải điều chuyển từ Kho Tổng sang Cửa hàng bán lẻ");
+                    }
+                    if (!Boolean.TRUE.equals(nguonUpdate.getDangHoatDong()) || !Boolean.TRUE.equals(dichUpdate.getDangHoatDong())) {
+                        throw new IllegalArgumentException("Cả hai chi nhánh phải đang hoạt động");
                     }
                     if (sourceId.equals(destinationId)) {
                         throw new IllegalArgumentException("Kho xuất và kho nhận phải khác nhau");

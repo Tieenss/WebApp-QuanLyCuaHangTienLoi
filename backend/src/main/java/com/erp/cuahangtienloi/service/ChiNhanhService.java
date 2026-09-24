@@ -45,13 +45,13 @@ public class ChiNhanhService {
 
     public List<ChiNhanh> getKhoTong() {
         return chiNhanhRepository.findAll().stream()
-                .filter(cn -> "KHO_TONG".equals(cn.getLoai()))
+                .filter(cn -> "KHO_TONG".equals(cn.getLoai()) && Boolean.TRUE.equals(cn.getDangHoatDong()))
                 .toList();
     }
 
     public List<ChiNhanh> getCuaHang() {
         return chiNhanhRepository.findAll().stream()
-                .filter(cn -> "CUA_HANG_BAN_LE".equals(cn.getLoai()))
+                .filter(cn -> "CUA_HANG_BAN_LE".equals(cn.getLoai()) && Boolean.TRUE.equals(cn.getDangHoatDong()))
                 .toList();
     }
 
