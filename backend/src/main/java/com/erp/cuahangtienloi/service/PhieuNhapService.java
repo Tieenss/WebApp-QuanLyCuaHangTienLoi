@@ -2,8 +2,11 @@ package com.erp.cuahangtienloi.service;
 
 import com.erp.cuahangtienloi.dto.PhieuNhapDTO;
 import com.erp.cuahangtienloi.entity.ChiTietPhieuNhap;
+import com.erp.cuahangtienloi.entity.NhaCungCap;
 import com.erp.cuahangtienloi.entity.NhanVien;
 import com.erp.cuahangtienloi.entity.PhieuNhap;
+import com.erp.cuahangtienloi.entity.SanPham;
+import com.erp.cuahangtienloi.entity.SoQuy;
 import com.erp.cuahangtienloi.repository.*;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -34,6 +37,8 @@ public class PhieuNhapService {
     private final NhanVienRepository nhanVienRepository;
     private final ChiTietPhieuNhapRepository chiTietPhieuNhapRepository;
     private final SanPhamRepository sanPhamRepository;
+    private final LoHangService loHangService;
+    private final SoQuyRepository soQuyRepository;
     private final JdbcTemplate jdbcTemplate;
     private final BranchAccessService branchAccessService;
 
@@ -217,12 +222,22 @@ public class PhieuNhapService {
         PhieuNhap reloaded = phieuNhapRepository.findById(saved.getId()).orElseThrow();
         for (ChiTietPhieuNhap ct : lines) {
             if (ct.getSoLuongNhan() != null && ct.getSoLuongNhan() > 0) {
+                LocalDate hsd = ct.getHanSuDung();
+                if (hsd == null) {
+                    SanPham sp = sanPhamRepository.findById(ct.getIdSanPham()).orElse(null);
+                    if (sp != null && sp.getHanSuDungNgay() != null && sp.getHanSuDungNgay() >= 0) {
+                        hsd = LocalDate.now().plusDays(sp.getHanSuDungNgay());
+                    }
+                }
                 jdbcTemplate.query(
                         "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, ?::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, ?::date, ?::text, NOW()::timestamp)",
                         rs -> { },
                         ct.getIdSanPham(), idChiNhanh, "PURCHASE_IN", ct.getSoLuongNhan(), ct.getDonGiaNhap(),
-                        reloaded.getMaPhieu(), "Hệ thống POS", ct.getHanSuDung(),
+                        reloaded.getMaPhieu(), "Hệ thống POS", hsd,
                         "Nhập hàng từ NCC: phiếu " + reloaded.getMaPhieu());
+                loHangService.taoHoacCapNhatLoHang(
+                        ct.getIdSanPham(), idChiNhanh, ct.getSoLuongNhan(),
+                        ct.getDonGiaNhap(), hsd, null, null);
             }
         }
 
@@ -230,6 +245,14 @@ public class PhieuNhapService {
         return toDTO(phieuNhapRepository.findById(saved.getId()).orElseThrow());
     }
 
+    /**
+     * Bước 2: Kế toán bấm "Thanh toán" trả NCC:
+     *   1. Kiểm tra phiếu ở trạng thái PENDING_PAYMENT.
+     *   2. Cập nhật da_thanh_toan = grand_total.
+     *   3. Chuyển trạng thái: PENDING_PAYMENT -> PENDING ("Chờ nhận hàng").
+     *   4. Ghi sổ quỹ phiếu CHI (hạng mục NHAP_HANG).
+     *   Lưu ý: Chưa cộng tồn kho và chưa tạo lô hàng tại bước này (hàng thực tế chưa về kho).
+     */
     @Transactional
     public Optional<PhieuNhapDTO> pay(UUID id, PayRequest request, NhanVien actor) {
         Optional<PhieuNhap> found = phieuNhapRepository.findByIdForUpdate(id);
@@ -259,20 +282,101 @@ public class PhieuNhapService {
             throw new IllegalArgumentException("Phải thanh toán đủ giá trị phiếu nhập");
         }
 
+        jdbcTemplate.update(
+                "UPDATE phieu_nhap SET trang_thai = 'PENDING', da_thanh_toan = ?, ngay_cap_nhat = NOW() WHERE id = ?",
+                paid, id);
+
+        if (!soQuyRepository.existsByMaChungTuLienQuanAndDirectionAndHangMuc(
+                pn.getMaPhieu(), "PAYMENT", "NHAP_HANG")) {
+            String tenNcc = nhaCungCapRepository.findById(pn.getIdNcc())
+                    .map(NhaCungCap::getTenNcc)
+                    .orElse("Nhà cung cấp");
+            SoQuy cashEntry = new SoQuy();
+            cashEntry.setId(UUID.randomUUID());
+            cashEntry.setMaChungTu(null);
+            cashEntry.setMaChungTuLienQuan(pn.getMaPhieu());
+            cashEntry.setIdChiNhanh(pn.getIdChiNhanh());
+            cashEntry.setIdNguoiTao(actor.getId());
+            cashEntry.setDirection("PAYMENT");
+            cashEntry.setHangMuc("NHAP_HANG");
+            cashEntry.setHinhThucTt("BANK_TRANSFER");
+            cashEntry.setEntryDate(LocalDate.now());
+            cashEntry.setSoTien(paid);
+            cashEntry.setDoiTuong(tenNcc);
+            cashEntry.setDienGiai("Thanh toán nhập hàng " + pn.getMaPhieu() + " · NCC " + tenNcc);
+            cashEntry.setRunningBalance(BigDecimal.ZERO);
+            cashEntry.setTrangThai("COMPLETED");
+            cashEntry.setNgayTao(LocalDateTime.now());
+            cashEntry.setNgayCapNhat(LocalDateTime.now());
+            soQuyRepository.save(cashEntry);
+        }
+
+        entityManager.clear();
+        return Optional.of(toDTO(phieuNhapRepository.findById(id).orElseThrow()));
+    }
+
+    /**
+     * Bước 3: Thủ kho bấm "Đã nhận hàng" khi xe giao đến kho:
+     *   1. Ghi nhận ngay_nhan_thuc_te = LocalDate.now().
+     *   2. Chuyển trạng thái: PENDING -> COMPLETED.
+     *   3. Tính hạn sử dụng từng dòng: HSD = ngay_nhan_thuc_te + sp.hanSuDungNgay (nếu chưa có).
+     *   4. Cộng tồn Kho Tổng + ghi thẻ kho PURCHASE_IN cho từng dòng.
+     *   5. Tạo Lô hàng (lo_hang) theo FEFO chuẩn.
+     */
+    @Transactional
+    public Optional<PhieuNhapDTO> receive(UUID id, NhanVien actor) {
+        Optional<PhieuNhap> found = phieuNhapRepository.findByIdForUpdate(id);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+        PhieuNhap pn = found.get();
+        branchAccessService.requireReadableBranch(actor, pn.getIdChiNhanh());
+
+        if ("COMPLETED".equalsIgnoreCase(pn.getTrangThai())) {
+            throw new IllegalArgumentException("Phiếu nhập này đã nhận hàng hoàn tất");
+        }
+        if ("CANCELLED".equalsIgnoreCase(pn.getTrangThai())) {
+            throw new IllegalArgumentException("Không thể nhận hàng cho phiếu đã huỷ");
+        }
+        if (!"PENDING".equalsIgnoreCase(pn.getTrangThai())) {
+            throw new IllegalArgumentException("Chỉ nhận hàng cho phiếu ở trạng thái chờ nhận hàng (đã thanh toán)");
+        }
+
+        List<ChiTietPhieuNhap> lines = chiTietPhieuNhapRepository.findByIdPhieuNhap(id);
+        if (lines.isEmpty()) {
+            throw new IllegalArgumentException("Phiếu không có dòng chi tiết — không thể nhận hàng");
+        }
+
+        LocalDate ngayNhan = LocalDate.now();
+
         for (ChiTietPhieuNhap ct : lines) {
             if (ct.getSoLuongNhan() != null && ct.getSoLuongNhan() > 0) {
+                LocalDate hsd = ct.getHanSuDung();
+                if (hsd == null) {
+                    SanPham sp = sanPhamRepository.findById(ct.getIdSanPham()).orElse(null);
+                    if (sp != null && sp.getHanSuDungNgay() != null && sp.getHanSuDungNgay() >= 0) {
+                        hsd = ngayNhan.plusDays(sp.getHanSuDungNgay());
+                    }
+                }
+                ct.setHanSuDung(hsd);
+                chiTietPhieuNhapRepository.save(ct);
+
                 jdbcTemplate.query(
                         "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, ?::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, ?::date, ?::text, NOW()::timestamp)",
                         rs -> { },
                         ct.getIdSanPham(), pn.getIdChiNhanh(), "PURCHASE_IN", ct.getSoLuongNhan(),
-                        ct.getDonGiaNhap(), pn.getMaPhieu(), "Kế toán", ct.getHanSuDung(),
-                        "Nhập hàng từ NCC (đã thanh toán): phiếu " + pn.getMaPhieu());
+                        ct.getDonGiaNhap(), pn.getMaPhieu(), "Thủ kho", hsd,
+                        "Nhập hàng từ NCC: phiếu " + pn.getMaPhieu());
+
+                loHangService.taoHoacCapNhatLoHang(
+                        ct.getIdSanPham(), pn.getIdChiNhanh(), ct.getSoLuongNhan(),
+                        ct.getDonGiaNhap(), hsd, null, null);
             }
         }
 
         jdbcTemplate.update(
-                "UPDATE phieu_nhap SET trang_thai = 'COMPLETED', da_thanh_toan = ?, ngay_cap_nhat = NOW() WHERE id = ?",
-                paid, id);
+                "UPDATE phieu_nhap SET trang_thai = 'COMPLETED', ngay_nhan_thuc_te = ?, ngay_cap_nhat = NOW() WHERE id = ?",
+                ngayNhan, id);
 
         entityManager.clear();
         return Optional.of(toDTO(phieuNhapRepository.findById(id).orElseThrow()));
