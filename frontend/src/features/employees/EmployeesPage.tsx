@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FC } from 'react';
 import { isInitialLoading } from '@/utils/tableLoading';
 import {
+  App as AntdApp,
   Avatar,
   Button,
   Card,
@@ -43,6 +44,7 @@ import {
 import { formatDate, formatDateShort } from '@/utils/dateUtils';
 import { compareDateDescWithId, formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
+import { getErrorMessage } from '@/utils/apiError';
 import { EmployeeFormModal } from './components/EmployeeFormModal';
 import './EmployeesPage.css';
 
@@ -56,6 +58,7 @@ const SHIFT_COLOR: Record<ShiftCode, string> = {
 
 export const EmployeesPage: FC = () => {
   const dispatch = useAppDispatch();
+  const { message } = AntdApp.useApp();
   const { user, activeBranchId } = useAppSelector((state) => state.auth);
   const { employees, loading } = useAppSelector((state) => state.employee);
   const branchesState = useAppSelector((state) => state.branch.branches);
@@ -207,8 +210,14 @@ export const EmployeesPage: FC = () => {
     dispatch(setEmployeeModalOpen(true));
   };
 
-  const handleDelete = (id: string): void => {
-    dispatch(deleteEmployeeThunk(id));
+  const handleDelete = async (employee: Employee): Promise<void> => {
+    try {
+      await dispatch(deleteEmployeeThunk(employee.id)).unwrap();
+      message.success(`Đã xoá nhân viên "${employee.fullName}" thành công.`);
+      dispatch(fetchEmployees());
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, 'Xoá nhân viên thất bại.'));
+    }
   };
 
   const columns: ColumnsType<Employee> = [
@@ -366,7 +375,7 @@ export const EmployeesPage: FC = () => {
                   okText="Xoá"
                   cancelText="Huỷ"
                   okButtonProps={{ danger: true }}
-                  onConfirm={() => handleDelete(row.id)}
+                  onConfirm={() => handleDelete(row)}
               >
                 <Button
                     type="text"

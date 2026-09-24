@@ -1,4 +1,4 @@
-import { useMemo, type FC } from 'react';
+import { useMemo, useRef, useState, type FC } from 'react';
 import { API_BASE_URL } from '@/config/api';
 import { CATEGORY_ID } from '@/config/businessRules';
 import { apiFetch } from '@/api/http';
@@ -85,6 +85,9 @@ export const CartPanel: FC = () => {
   const dispatch = useAppDispatch();
   const { message } = AntdApp.useApp();
 
+  const isCheckingOutRef = useRef(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
   const { user } = useAppSelector((state) => state.auth);
   const posState = useAppSelector((state) => state.pos);
   const products = useAppSelector((state) => state.product.products);
@@ -128,6 +131,9 @@ export const CartPanel: FC = () => {
    * lưu hoá đơn, trừ tồn kho, ghi thẻ kho, tạo phiếu thu sổ quỹ.
    */
   const handleCheckout = (): void => {
+    // Ngăn chặn bấm nhiều lần liên tiếp (spam click) ngay lập tức
+    if (isCheckingOutRef.current) return;
+
     if (lines.length === 0) {
       message.warning('Giỏ hàng đang trống.');
       return;
@@ -162,7 +168,7 @@ export const CartPanel: FC = () => {
       unitCosts[line.productId] = productById(line.productId)?.costPrice ?? 0;
     }
 
-const sale = buildSalesOrder({
+    const sale = buildSalesOrder({
       state: posState,
       cashierId,
       cashierName,
@@ -171,6 +177,14 @@ const sale = buildSalesOrder({
       soldAt: nowIso(),
     });
     if (sale === null) return;
+
+    // Khoá ngay lập tức đồng bộ trước khi re-render
+    isCheckingOutRef.current = true;
+    setIsCheckingOut(true);
+
+    const clientRequestId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`;
 
     // Không cập nhật Redux trước: checkout backend phải commit cả hóa đơn,
     // tồn kho, thẻ kho và sổ quỹ trước khi UI thay đổi.
@@ -185,6 +199,7 @@ const sale = buildSalesOrder({
               ...{},
             },
             body: JSON.stringify({
+              clientRequestId,
               idChiNhanh: sale.order.branchId,
               caLamViec: sale.order.shiftCode,
               hinhThucTt: sale.order.paymentMethod,
@@ -236,6 +251,9 @@ const sale = buildSalesOrder({
       } catch (e) {
         console.warn('Không lưu được hoá đơn xuống DB:', e);
         message.error('Không thể kết nối máy chủ. Giỏ hàng chưa thay đổi.');
+      } finally {
+        isCheckingOutRef.current = false;
+        setIsCheckingOut(false);
       }
     })();
   };
@@ -461,10 +479,13 @@ const sale = buildSalesOrder({
           size="large"
           block
           className="cart-checkout-btn"
-          disabled={lines.length === 0 || isTenderInsufficient || hasOutOfStockLines}
+          loading={isCheckingOut}
+          disabled={isCheckingOut || lines.length === 0 || isTenderInsufficient || hasOutOfStockLines}
           onClick={handleCheckout}
         >
-          Thanh toán {totals.grandTotal > 0 && formatVND(totals.grandTotal)}
+          {isCheckingOut
+            ? 'Đang thanh toán...'
+            : `Thanh toán ${totals.grandTotal > 0 ? formatVND(totals.grandTotal) : ''}`}
         </Button>
       </Space>
     </Card>

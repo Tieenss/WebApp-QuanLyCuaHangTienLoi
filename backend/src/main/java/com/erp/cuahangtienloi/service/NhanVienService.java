@@ -231,8 +231,10 @@ public class NhanVienService {
         }
 
         if (chiNhanhRepository.findByIdQuanLy(id).isPresent()) {
-            throw new IllegalArgumentException("Không thể xóa người phụ trách; hãy thay thế hoặc bỏ phân công trước");
+            throw new IllegalArgumentException("Không thể xóa người phụ trách chi nhánh; hãy thay thế hoặc bỏ phân công trước");
         }
+
+        taiKhoanRepository.findByIdNhanVien(id).ifPresent(taiKhoanRepository::delete);
 
         nhanVienRepository.deleteById(id);
     }
