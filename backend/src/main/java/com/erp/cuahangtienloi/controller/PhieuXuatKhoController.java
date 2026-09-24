@@ -10,8 +10,10 @@ import com.erp.cuahangtienloi.service.PhieuXuatKhoService;
 import com.erp.cuahangtienloi.service.PhieuXuatKhoService.ApproveRequest;
 import com.erp.cuahangtienloi.service.PhieuXuatKhoService.MoveRequest;
 import com.erp.cuahangtienloi.service.PhieuXuatKhoService.RejectRequest;
+import com.erp.cuahangtienloi.service.RequestDeduplicationService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +29,7 @@ public class PhieuXuatKhoController {
     private final PhieuXuatKhoService phieuXuatKhoService;
     private final BranchAccessService branchAccessService;
     private final NhanVienRepository nhanVienRepository;
+    private final RequestDeduplicationService requestDeduplicationService;
 
     private UUID resolveAuthenticatedIdNhanVien(HttpServletRequest request) {
         Object attr = request.getAttribute("authenticatedIdNhanVien");
@@ -82,8 +85,22 @@ public class PhieuXuatKhoController {
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> create(@RequestBody PhieuXuatKho request, HttpServletRequest httpRequest) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
+        String dedupKey = "TRANSFER_CREATE:" + actor.getId() + ":" + request.getIdChiNhanhXuat() + ":" + request.getIdChiNhanhNhan();
+        if (!requestDeduplicationService.tryAcquire(dedupKey, 5)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(ApiResponse.err("Yêu cầu tạo phiếu xuất kho đang được xử lý hoặc vừa được gửi. Vui lòng không thao tác liên tục."));
+        }
+
         UUID idNguoiTao = resolveAuthenticatedIdNhanVien(httpRequest);
-        return ResponseEntity.ok(phieuXuatKhoService.create(request, idNguoiTao, actor));
+        try {
+            return ResponseEntity.ok(phieuXuatKhoService.create(request, idNguoiTao, actor));
+        } catch (IllegalArgumentException e) {
+            requestDeduplicationService.release(dedupKey);
+            return ResponseEntity.badRequest().body(ApiResponse.err(e.getMessage()));
+        } catch (Exception e) {
+            requestDeduplicationService.release(dedupKey);
+            throw e;
+        }
     }
 
     @PutMapping("/{id}")
@@ -126,20 +143,48 @@ public class PhieuXuatKhoController {
     @PutMapping("/{id}/ship")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> ship(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body, HttpServletRequest httpRequest) {
+        String dedupKey = "TRANSFER_SHIP:" + id;
+        if (!requestDeduplicationService.tryAcquire(dedupKey, 5)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(ApiResponse.err("Thao tác xuất kho đang được xử lý. Vui lòng không thao tác liên tục."));
+        }
+
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
         UUID idNguoiDuyet = resolveAuthenticatedIdNhanVien(httpRequest);
-        return phieuXuatKhoService.ship(id, body, idNguoiDuyet, actor)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            return phieuXuatKhoService.ship(id, body, idNguoiDuyet, actor)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            requestDeduplicationService.release(dedupKey);
+            return ResponseEntity.badRequest().body(ApiResponse.err(e.getMessage()));
+        } catch (Exception e) {
+            requestDeduplicationService.release(dedupKey);
+            throw e;
+        }
     }
 
     @PutMapping("/{id}/receive")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY')")
     public ResponseEntity<?> receive(@PathVariable UUID id, @RequestBody(required = false) MoveRequest body, HttpServletRequest httpRequest) {
+        String dedupKey = "TRANSFER_RECEIVE:" + id;
+        if (!requestDeduplicationService.tryAcquire(dedupKey, 5)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(ApiResponse.err("Thao tác nhận hàng đang được xử lý. Vui lòng không thao tác liên tục."));
+        }
+
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
         UUID idNguoiNhan = resolveAuthenticatedIdNhanVien(httpRequest);
-        return phieuXuatKhoService.receive(id, body, idNguoiNhan, actor)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            return phieuXuatKhoService.receive(id, body, idNguoiNhan, actor)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            requestDeduplicationService.release(dedupKey);
+            return ResponseEntity.badRequest().body(ApiResponse.err(e.getMessage()));
+        } catch (Exception e) {
+            requestDeduplicationService.release(dedupKey);
+            throw e;
+        }
     }
 }

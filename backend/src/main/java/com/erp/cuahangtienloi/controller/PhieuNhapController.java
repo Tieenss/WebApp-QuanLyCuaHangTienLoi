@@ -8,6 +8,7 @@ import com.erp.cuahangtienloi.service.BranchAccessService;
 import com.erp.cuahangtienloi.service.PhieuNhapService;
 import com.erp.cuahangtienloi.service.PhieuNhapService.CreatePurchaseRequest;
 import com.erp.cuahangtienloi.service.PhieuNhapService.PayRequest;
+import com.erp.cuahangtienloi.service.RequestDeduplicationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class PhieuNhapController {
 
     private final PhieuNhapService phieuNhapService;
     private final BranchAccessService branchAccessService;
+    private final RequestDeduplicationService requestDeduplicationService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'KE_TOAN', 'THU_KHO')")
@@ -76,7 +78,30 @@ public class PhieuNhapController {
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
     public ResponseEntity<?> createWithLines(@Valid @RequestBody CreatePurchaseRequest request, HttpServletRequest httpRequest) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
-        return ResponseEntity.ok(phieuNhapService.createWithLines(request, actor));
+
+        String linesFingerprint = request.getLines() != null
+                ? request.getLines().stream()
+                        .filter(l -> l.getIdSanPham() != null)
+                        .map(l -> l.getIdSanPham() + ":" + l.getSoLuong() + ":" + l.getDonGiaNhap())
+                        .sorted()
+                        .collect(java.util.stream.Collectors.joining(";"))
+                : "";
+        String dedupKey = "PURCHASE_ORDER:" + actor.getId() + ":" + request.getIdChiNhanh() + ":" + request.getIdNcc() + ":" + linesFingerprint;
+
+        if (!requestDeduplicationService.tryAcquire(dedupKey, 6)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(ApiResponse.err("Yêu cầu tạo phiếu nhập đang được xử lý hoặc vừa được gửi. Vui lòng không thao tác liên tục."));
+        }
+
+        try {
+            return ResponseEntity.ok(phieuNhapService.createWithLines(request, actor));
+        } catch (IllegalArgumentException e) {
+            requestDeduplicationService.release(dedupKey);
+            return ResponseEntity.badRequest().body(ApiResponse.err(e.getMessage()));
+        } catch (Exception e) {
+            requestDeduplicationService.release(dedupKey);
+            throw e;
+        }
     }
 
     @PutMapping("/{id}/pay")
