@@ -20,11 +20,9 @@ import { DocumentStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import {
-  fetchPurchaseOrders,
-  purchaseReceived,
-} from '@/store/slices/purchaseSlice';
+import { fetchPurchaseOrders } from '@/store/slices/purchaseSlice';
 import { fetchStock } from '@/store/slices/stockSlice';
+import { fetchCashbook } from '@/store/slices/cashbookSlice';
 import { phieuNhapApi } from '@/api/phieuNhap';
 import { chiTietPhieuNhapApi, type ChiTietPhieuNhapDTO } from '@/api/chiTietPhieuNhap';
 import {
@@ -117,40 +115,18 @@ export const PurchaseOrdersPage: FC = () => {
   /**
    * Bước 2: Kế toán bấm Thanh toán: ghi nhận chi tiền trả NCC,
    * chuyển PENDING_PAYMENT → PENDING ("Chờ nhận hàng").
-   * Chưa cộng tồn kho và chưa tạo lô hàng.
+   * Chưa cộng tồn kho và chưa tạo lô hàng (hàng thực tế chưa về kho).
    */
   const handlePay = async (order: PurchaseOrder): Promise<void> => {
     if (user === null) return;
     setPaying(order.id);
     try {
-      const updated = await phieuNhapApi.pay(order.id);
-      const details = detailsCache[order.id] ?? [];
-      const withLines: PurchaseOrder = {
-        ...order,
-        status: DOCUMENT_STATUS.Pending,
-        paidAmount: updated.daThanhToan ?? order.grandTotal,
-        lines: details.map((d) => {
-          const product = products.find((p) => p.id === d.idSanPham);
-          return {
-            id: d.id,
-            productId: d.idSanPham,
-            sku: product?.sku ?? '',
-            productName: product?.name ?? '',
-            unit: product?.unit ?? '',
-            orderedQuantity: d.soLuongDat,
-            receivedQuantity: d.soLuongNhan,
-            unitCost: d.donGiaNhap,
-            vatPercent: d.vatPhantram,
-            lineTotal: d.thanhTien,
-            expiryDate: d.hanSuDung ?? null,
-          } as PurchaseOrderLine;
-        }),
-      };
-      dispatch(purchaseReceived({ order: withLines, performedBy: user.fullName }));
+      await phieuNhapApi.pay(order.id);
       message.success(
         `Đã thanh toán ${formatVND(order.grandTotal)} cho phiếu ${order.code}. Phiếu chuyển sang trạng thái "Chờ nhận hàng".`,
       );
       dispatch(fetchPurchaseOrders());
+      dispatch(fetchCashbook());
     } catch (e) {
       message.error((e as Error).message || 'Lỗi thanh toán phiếu nhập');
     } finally {
@@ -161,7 +137,8 @@ export const PurchaseOrdersPage: FC = () => {
   /**
    * Bước 3: Thủ kho bấm "Đã nhận hàng" khi xe giao đến kho:
    * Backend lấy ngày nhận là hôm nay, tự động cộng tồn kho Kho Tổng
-   * và tính hạn sử dụng các lô hàng: ngày nhận + han_su_dung_ngay.
+   * và tính hạn sử dụng các lô hàng: ngày nhận + han_su_dung_ngay,
+   * đồng thời tạo lô hàng (lo_hang) lưu vào DB.
    */
   const handleReceive = async (order: PurchaseOrder): Promise<void> => {
     if (user === null) return;
@@ -171,6 +148,12 @@ export const PurchaseOrdersPage: FC = () => {
       message.success(
         `Nhận hàng thành công cho phiếu ${order.code}! Tồn kho Kho Tổng đã tăng và hạn sử dụng các lô hàng đã được tính từ ngày hôm nay.`,
       );
+      // Xoá cache chi tiết để nếu mở rộng xem bảng chi tiết sẽ tải hạn sử dụng mới được lưu từ backend
+      setDetailsCache((prev) => {
+        const copy = { ...prev };
+        delete copy[order.id];
+        return copy;
+      });
       dispatch(fetchPurchaseOrders());
       dispatch(fetchStock());
     } catch (e) {

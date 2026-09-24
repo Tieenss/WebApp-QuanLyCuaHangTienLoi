@@ -110,9 +110,26 @@ public class PhieuNhapController {
                                  @RequestBody(required = false) PayRequest request,
                                  HttpServletRequest httpRequest) {
         NhanVien actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
-        return phieuNhapService.pay(id, request, actor)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            return phieuNhapService.pay(id, request, actor)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.err(e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/receive")
+    @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO')")
+    public ResponseEntity<?> receive(@PathVariable UUID id, HttpServletRequest httpRequest) {
+        NhanVien actor = branchAccessService.requireAuthenticatedEmployee(httpRequest);
+        try {
+            return phieuNhapService.receive(id, actor)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.err(e.getMessage()));
+        }
     }
 
     @PutMapping("/{id}")
