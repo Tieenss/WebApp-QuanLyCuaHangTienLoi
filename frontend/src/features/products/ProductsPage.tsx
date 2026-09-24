@@ -499,7 +499,7 @@ export const ProductsPage: FC = () => {
                   <Tooltip title="Ngừng kinh doanh tại chi nhánh">
                     <Button
                       type="text"
-                      icon={<DeleteOutlined className="action-delete-icon" />}
+                      icon={<StopOutlined style={{ color: '#faad14' }} />}
                     />
                   </Tooltip>
                 </Popconfirm>
