@@ -108,6 +108,7 @@ export const SalesOrdersPage: FC = () => {
   const branches = useAppSelector((state) => state.branch.branches);
   const employees = useAppSelector((state) => state.employee.employees);
   const products = useAppSelector((state) => state.product.products);
+  const [loading, setLoading] = useState(false);
   const selectedOrderId = useAppSelector(
     (state) => state.salesOrder.selectedOrderId,
   );
@@ -137,26 +138,53 @@ export const SalesOrdersPage: FC = () => {
   useEffect(() => {
     let cancelled = false;
     const load = async (): Promise<void> => {
+      setLoading(true);
+
       try {
         const list = await hoaDonApi.getAll();
+
         if (cancelled) return;
+
         const branchNameOf = (id: string) =>
-          branches.find((b) => b.id === id)?.name ?? '';
+            branches.find((b) => b.id === id)?.name ?? '';
+
         const cashierNameOf = (id: string) =>
-          employees.find((e) => e.id === id)?.fullName ?? 'Thu ngân';
-        const mapped = list.map((dto) => {
-            return {
-              ...mapDtoToOrder(
+            employees.find((e) => e.id === id)?.fullName ?? 'Thu ngân';
+
+        const mapped = list.map((dto) =>
+            mapDtoToOrder(
                 dto,
                 branchNameOf(dto.idChiNhanh),
                 cashierNameOf(dto.idThuNgan),
-              ),
-              lines: [], // Lazy load later when viewed
-            };
-          });
-        if (!cancelled) setApiOrders(mapped);
+            ),
+        );
+
+        const ordersWithLines = await Promise.all(
+            mapped.map(async (order) => {
+              try {
+                const lines = await chiTietHoaDonApi.getByHoaDon(order.id);
+
+                return {
+                  ...order,
+                  lines: lines.map((line, index) =>
+                      mapDtoToOrderLine(line, index, products),
+                  ),
+                };
+              } catch {
+                return order;
+              }
+            }),
+        );
+
+        if (!cancelled) {
+          setApiOrders(ordersWithLines);
+        }
       } catch {
         // im lặng — vẫn hiện đơn trong session
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
     void load();
@@ -672,6 +700,7 @@ export const SalesOrdersPage: FC = () => {
           columns={columns}
           dataSource={filtered}
           rowKey="id"
+          loading={loading}
           size="middle"
           scroll={{ x: canRefund ? 1700 : 1500 }}
           onRow={(record) => ({
