@@ -51,7 +51,7 @@ export const LedgerDrawer: FC = () => {
   const columns: ColumnsType<StockLedgerEntry> = [
     {
       title: 'Thời điểm',
-      dataIndex: 'timestamp',
+      dataIndex: 'occurredAt',
       width: 140,
       render: (value: string) => (
         <Text className="ledger-text-12">{formatDateTime(value)}</Text>
@@ -71,7 +71,7 @@ export const LedgerDrawer: FC = () => {
     },
     {
       title: 'Thay đổi',
-      dataIndex: 'quantity',
+      dataIndex: 'quantityChange',
       align: 'right',
       width: 90,
       render: (value: number) => (
@@ -180,7 +180,7 @@ export const LedgerDrawer: FC = () => {
                     </Space>
                     <Text type="secondary" className="ledger-timeline-note">
                       {formatDateTime(entry.occurredAt)} · {entry.branchName} ·{' '}
-                      {entry.referenceCode}
+                      {entry.referenceCode} · Bởi {entry.performedBy || 'Hệ thống'}
                     </Text>
                     {entry.note !== '' && (
                       <Text type="secondary" className="ledger-timeline-note">

@@ -549,7 +549,7 @@ export const InventoryPage: FC = () => {
   const ledgerColumns: ColumnsType<StockLedgerEntry> = [
     {
       title: 'Thời điểm',
-      dataIndex: 'timestamp',
+      dataIndex: 'occurredAt',
       width: 150,
       fixed: 'left',
       render: (value: string) => (
@@ -591,7 +591,7 @@ export const InventoryPage: FC = () => {
     },
     {
       title: 'Nhập / Xuất',
-      dataIndex: 'quantity',
+      dataIndex: 'quantityChange',
       align: 'right',
       width: 110,
       render: (value: number) => (
