@@ -11,6 +11,7 @@ import {
   Modal,
   Popconfirm,
   Space,
+  Spin,
   Table,
   Tag,
   Typography,
@@ -28,6 +29,7 @@ import {
   rejectTransfer,
 } from '@/store/slices/transferSlice';
 import { fetchStock, stockOf } from '@/store/slices/stockSlice';
+import { fetchProducts } from '@/store/slices/productSlice';
 import { phieuXuatKhoApi } from '@/api/phieuXuatKho';
 import {
   DOCUMENT_STATUS,
@@ -57,6 +59,16 @@ export const TransfersPage: FC = () => {
   const [isFormOpen, setFormOpen] = useState(false);
   const [detailsCache, setDetailsCache] = useState<Record<string, ChiTietPhieuXuatDTO[]>>({});
 
+  const loadDetails = async (transferId: string): Promise<ChiTietPhieuXuatDTO[]> => {
+    try {
+      const data = await chiTietPhieuXuatApi.getByPhieuXuat(transferId);
+      setDetailsCache((prev) => ({ ...prev, [transferId]: data }));
+      return data;
+    } catch {
+      setDetailsCache((prev) => ({ ...prev, [transferId]: [] }));
+      return [];
+    }
+  };
 
   const [rejectTarget, setRejectTarget] = useState<StockTransfer | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -73,25 +85,60 @@ export const TransfersPage: FC = () => {
 
   useEffect(() => {
     dispatch(fetchTransfers());
-  }, [dispatch]);
+    if (products.length === 0) {
+      dispatch(fetchProducts());
+    }
+  }, [dispatch, products.length]);
+
+  // Tự động tải chi tiết sản phẩm cho các phiếu xuất kho để hiển thị số mặt hàng, số lượng, giá trị
+  useEffect(() => {
+    if (!transfers || transfers.length === 0) return;
+    let isCancelled = false;
+
+    const missing = transfers.filter((t) => detailsCache[t.id] === undefined);
+    if (missing.length === 0) return;
+
+    void Promise.all(
+      missing.map(async (t) => {
+        try {
+          const data = await chiTietPhieuXuatApi.getByPhieuXuat(t.id);
+          return { id: t.id, data };
+        } catch {
+          return { id: t.id, data: [] };
+        }
+      }),
+    ).then((results) => {
+      if (!isCancelled) {
+        setDetailsCache((prev) => {
+          const next = { ...prev };
+          results.forEach((r) => {
+            next[r.id] = r.data;
+          });
+          return next;
+        });
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [transfers]);
 
   const enrichedTransfers = useMemo(
-      () =>
-          transfers.map((t) => ({
-            ...t,
-            fromBranchName:
-                t.fromBranchName ||
-                branches.find((b) => b.id === t.fromBranchId)?.name ||
-                '',
-            toBranchName:
-                t.toBranchName ||
-                branches.find((b) => b.id === t.toBranchId)?.name ||
-                '',
-          })),
-      [transfers, branches],
+    () =>
+      transfers.map((t) => ({
+        ...t,
+        fromBranchName:
+          t.fromBranchName ||
+          branches.find((b) => b.id === t.fromBranchId)?.name ||
+          '',
+        toBranchName:
+          t.toBranchName ||
+          branches.find((b) => b.id === t.toBranchId)?.name ||
+          '',
+      })),
+    [transfers, branches],
   );
-
-  // Lazy loading will be handled when expanding a row
 
   const scoped = useMemo(() => {
     const list = enrichedTransfers.filter((t) => {
@@ -261,6 +308,7 @@ export const TransfersPage: FC = () => {
       message.success(
         `Đã nhận hàng phiếu ${transfer.code}. Tồn kho chi nhánh đã tăng theo số thực nhận.`,
       );
+      void loadDetails(transfer.id);
       dispatch(fetchTransfers());
       dispatch(fetchStock());
     } catch (e) {
@@ -411,7 +459,12 @@ export const TransfersPage: FC = () => {
   }
 
   const renderDetail = (transfer: StockTransfer): ReactElement => {
-    const details = detailsCache[transfer.id] || [];
+    const details = detailsCache[transfer.id];
+    const isLoading = details === undefined;
+
+    if (isLoading) {
+      void loadDetails(transfer.id);
+    }
 
     const detailColumns: ColumnsType<ChiTietPhieuXuatDTO> = [
       {
@@ -506,15 +559,18 @@ export const TransfersPage: FC = () => {
         </Descriptions>
 
         <div style={{ marginBottom: 6 }}>
-          <Text strong>Danh sách sản phẩm xuất kho ({details.length} mặt hàng):</Text>
+          <Text strong>
+            Danh sách sản phẩm xuất kho {isLoading ? '(đang tải...)' : `(${details?.length || 0} mặt hàng)`}:
+          </Text>
         </div>
         <Table<ChiTietPhieuXuatDTO>
           columns={detailColumns}
-          dataSource={details}
+          dataSource={details || []}
           rowKey={(r) => r.id || r.idSanPham}
           size="small"
           pagination={false}
           bordered
+          loading={isLoading}
         />
       </div>
     );
@@ -611,7 +667,15 @@ export const TransfersPage: FC = () => {
           size="middle"
           loading={isInitialLoading(loading, transfers)}
           scroll={{ x: canSeeActions ? 2200 : 2050 }}
-          expandable={{ expandedRowRender: renderDetail, columnWidth: 44 }}
+          expandable={{
+            expandedRowRender: renderDetail,
+            columnWidth: 44,
+            onExpand: (expanded, record) => {
+              if (expanded && detailsCache[record.id] === undefined) {
+                void loadDetails(record.id);
+              }
+            },
+          }}
           pagination={{
             defaultPageSize: 10,
             showSizeChanger: true,
@@ -628,7 +692,12 @@ export const TransfersPage: FC = () => {
       <ShipModal
         open={shipTarget !== null}
         transfer={shipTarget}
-        onClose={() => setShipTarget(null)}
+        onClose={() => {
+          if (shipTarget) {
+            void loadDetails(shipTarget.id);
+          }
+          setShipTarget(null);
+        }}
       />
       <Modal
         open={rejectTarget !== null}
