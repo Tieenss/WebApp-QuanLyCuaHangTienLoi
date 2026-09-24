@@ -26,8 +26,8 @@ public class LoHangController {
     @GetMapping("/by-product/{idSanPham}/{idChiNhanh}")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY', 'KE_TOAN')")
     public ResponseEntity<List<LoHangDTO>> getLotsByProduct(
-            @PathVariable UUID idSanPham,
-            @PathVariable UUID idChiNhanh,
+            @PathVariable("idSanPham") UUID idSanPham,
+            @PathVariable("idChiNhanh") UUID idChiNhanh,
             HttpServletRequest request) {
         branchAccessService.requireReadableBranch(branchAccessService.requireAuthenticatedEmployee(request), idChiNhanh);
         List<LoHangDTO> list = loHangService.getDanhSachLoHang(idChiNhanh, idSanPham);
@@ -37,7 +37,7 @@ public class LoHangController {
     @PostMapping("/{id}/dispose")
     @PreAuthorize("hasAnyRole('ADMIN', 'THU_KHO', 'QUAN_LY')")
     public ResponseEntity<?> disposeLot(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @RequestBody(required = false) Map<String, String> body,
             HttpServletRequest request) {
         NhanVien employee = branchAccessService.requireAuthenticatedEmployee(request);
