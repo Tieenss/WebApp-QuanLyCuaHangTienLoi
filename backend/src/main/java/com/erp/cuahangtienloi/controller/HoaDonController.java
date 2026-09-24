@@ -117,16 +117,6 @@ public class HoaDonController {
         return ResponseEntity.ok(hoaDonService.refund(id, lyDo, actor));
     }
 
-    @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
-    public ResponseEntity<HoaDonDTO> cancel(@PathVariable UUID id,
-                                           @RequestBody(required = false) RefundRequest body,
-                                           HttpServletRequest httpRequest) {
-        NhanVien actor = requireAuthenticatedEmployee(httpRequest);
-        String lyDo = (body != null) ? body.lyDoHoan() : null;
-        return ResponseEntity.ok(hoaDonService.cancel(id, lyDo, actor));
-    }
-
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'QUAN_LY', 'THU_NGAN')")
     public ResponseEntity<?> update(@PathVariable UUID id, @RequestBody HoaDon request) {

@@ -95,4 +95,20 @@ public class GlobalExceptionHandler {
                 .badRequest()
                 .body(Map.of("message", "Body JSON không hợp lệ."));
     }
+
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<?> handleResponseStatus(org.springframework.web.server.ResponseStatusException ex) {
+        String msg = ex.getReason() != null ? ex.getReason() : ex.getMessage();
+        return ResponseEntity
+                .status(ex.getStatusCode())
+                .body(Map.of("message", msg));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleGeneral(Exception ex) {
+        String msg = NestedExceptionUtils.getMostSpecificCause(ex).getMessage();
+        return ResponseEntity
+                .badRequest()
+                .body(Map.of("message", msg != null ? msg : "Đã xảy ra lỗi khi xử lý yêu cầu."));
+    }
 }

@@ -647,57 +647,46 @@ public class HoaDonService {
                 ? actor.getHoTen()
                 : "Hệ thống";
 
-        jdbcTemplate.query(
-                "SELECT fn_hoan_hoa_don(?::uuid, ?::uuid, ?::text, ?::varchar)",
-                rs -> { }, hd.getId(), actor.getId(), lyDo, nguoiThucHien
-        );
-
+        // 1. Cập nhật trạng thái hoá đơn sang REFUNDED
         hd.setTrangThai("REFUNDED");
         hd.setIdNguoiHoan(actor.getId());
         hd.setNgayHoan(LocalDateTime.now());
         hd.setLyDoHoan(lyDo);
         hd.setNgayCapNhat(LocalDateTime.now());
+        HoaDon saved = hoaDonRepository.saveAndFlush(hd);
 
-        return toDTO(hd);
-    }
-
-    @Transactional
-    public HoaDonDTO cancel(UUID id, String lyDoHoan, NhanVien actor) {
-        HoaDon hd = hoaDonRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy hoá đơn"));
-        if (!"COMPLETED".equals(hd.getTrangThai())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ huỷ được hoá đơn ở trạng thái COMPLETED");
-        }
-
-        if ("QUAN_LY".equals(actor.getVaiTro()) || "THU_NGAN".equals(actor.getVaiTro())) {
-            if (actor.getIdChiNhanh() != null && !actor.getIdChiNhanh().equals(hd.getIdChiNhanh())) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Không thể huỷ hoá đơn khác chi nhánh");
-            }
-        }
-
-        String lyDo = (lyDoHoan != null && !lyDoHoan.trim().isEmpty())
-                ? lyDoHoan.trim()
-                : "Huỷ đơn hàng";
-
-        String nguoiThucHien = (actor.getHoTen() != null && !actor.getHoTen().trim().isEmpty())
-                ? actor.getHoTen()
-                : "Hệ thống";
-
-        hd.setTrangThai("CANCELLED");
-        hd.setIdNguoiHoan(actor.getId());
-        hd.setNgayHoan(LocalDateTime.now());
-        hd.setLyDoHoan(lyDo);
-        hd.setNgayCapNhat(LocalDateTime.now());
-        hoaDonRepository.saveAndFlush(hd);
-
+        // 2. Trả lại tồn kho và ghi thẻ kho cho từng dòng hàng
         List<ChiTietHoaDon> lines = chiTietHoaDonRepository.findByIdHoaDon(id);
         for (ChiTietHoaDon line : lines) {
             jdbcTemplate.query(
                     "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, 'SALE_RETURN'::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, NULL::date, ?::text, NOW()::timestamp)",
                     rs -> { }, line.getIdSanPham(), hd.getIdChiNhanh(), line.getSoLuong(), line.getDonGiaVon(),
-                    hd.getMaHoaDon(), nguoiThucHien, "Huỷ đơn hàng: " + hd.getMaHoaDon());
+                    hd.getMaHoaDon(), nguoiThucHien, "Hoàn tiền hoá đơn: " + hd.getMaHoaDon());
         }
 
-        return toDTO(hd);
+        // 3. Tự động sinh Phiếu chi hoàn tiền trong Sổ quỹ (so_quy) nếu chưa có
+        if (!soQuyRepository.existsByMaChungTuLienQuanAndDirectionAndHangMuc(
+                saved.getMaHoaDon(), "PAYMENT", "KHAC")) {
+            SoQuy refundCashEntry = new SoQuy();
+            refundCashEntry.setId(UUID.randomUUID());
+            refundCashEntry.setMaChungTu(null);
+            refundCashEntry.setMaChungTuLienQuan(saved.getMaHoaDon());
+            refundCashEntry.setIdChiNhanh(saved.getIdChiNhanh());
+            refundCashEntry.setIdNguoiTao(actor.getId());
+            refundCashEntry.setDirection("PAYMENT");
+            refundCashEntry.setHangMuc("KHAC");
+            refundCashEntry.setHinhThucTt(saved.getHinhThucTt() != null ? saved.getHinhThucTt() : "CASH");
+            refundCashEntry.setEntryDate(LocalDate.now());
+            refundCashEntry.setSoTien(saved.getGrandTotal() != null ? saved.getGrandTotal() : BigDecimal.ZERO);
+            refundCashEntry.setDoiTuong("Khách lẻ");
+            refundCashEntry.setDienGiai("Hoàn tiền hoá đơn " + saved.getMaHoaDon() + ": " + lyDo);
+            refundCashEntry.setRunningBalance(BigDecimal.ZERO);
+            refundCashEntry.setTrangThai("COMPLETED");
+            refundCashEntry.setNgayTao(LocalDateTime.now());
+            refundCashEntry.setNgayCapNhat(LocalDateTime.now());
+            soQuyRepository.saveAndFlush(refundCashEntry);
+        }
+
+        return toDTO(saved);
     }
 }

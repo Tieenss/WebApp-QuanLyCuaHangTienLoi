@@ -120,21 +120,9 @@ export const hoaDonApi = {
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.message || 'Không thể hoàn tiền hoá đơn');
-    }
-    return response.json();
-  },
-
-  cancel: async (id: string, reason?: string): Promise<HoaDonDTO> => {
-    const response = await fetch(`${API_BASE_URL}/api/hoa-don/${id}/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getHeaders() },
-      body: JSON.stringify({ lyDoHoan: reason }),
-    });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.message || 'Không thể huỷ hoá đơn');
+      throw new Error(err.message || err.error || 'Không thể hoàn tiền hoá đơn');
     }
     return response.json();
   },
 };
+

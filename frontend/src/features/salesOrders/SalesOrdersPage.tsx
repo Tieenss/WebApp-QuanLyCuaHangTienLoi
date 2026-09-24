@@ -10,7 +10,7 @@ import {
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { RollbackOutlined, StopOutlined } from '@ant-design/icons';
+import { RollbackOutlined } from '@ant-design/icons';
 import { PageHeader } from '@/components/PageHeader';
 import { SummaryStrip, type SummaryItem } from '@/components/SummaryStrip';
 import { TableToolbar, type ToolbarFilter } from '@/components/TableToolbar';
@@ -18,10 +18,10 @@ import { OrderStatusTag } from '@/components/StatusTag';
 import { BRAND } from '@/config/brand';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  orderCancelled,
   orderRefunded,
   setSelectedOrder,
 } from '@/store/slices/salesOrderSlice';
+import { fetchCashbook } from '@/store/slices/cashbookSlice';
 import { hoaDonApi, type HoaDonDTO } from '@/api/hoaDon';
 import { chiTietHoaDonApi, type ChiTietHoaDonDTO } from '@/api/chiTietHoaDon';
 import {
@@ -33,7 +33,7 @@ import {
   type Product,
   type SalesOrder,
 } from '@/types';
-import { formatDate, formatTime, today } from '@/utils/dateUtils';
+import { formatDate, formatTime } from '@/utils/dateUtils';
 import { formatNumber, formatVND, matchKeyword } from '@/utils/formatters';
 import { exportToExcel } from '@/utils/exportUtils';
 import { OrderDetailDrawer } from './components/OrderDetailDrawer';
@@ -425,61 +425,30 @@ export const SalesOrdersPage: FC = () => {
               // Chỉ thao tác được khi đơn đang COMPLETED — REFUNDED / CANCELLED
               // đã khoá vĩnh viễn (audit).
               if (row.status !== ORDER_STATUS.Completed) return null;
-              // "Huỷ đơn" chỉ cho phép trong ngày — quá ngày phải dùng
-              // "Hoàn tiền" để truy vết dòng tiền chính xác.
-              const sameDay = row.soldAt.slice(0, 10) === today();
               return (
-                <Space size={4}>
-                  <Popconfirm
-                    title="Hoàn tiền hoá đơn?"
-                    description={
-                      <span>
-                        Hoàn <strong>{formatVND(row.grandTotal)}</strong> cho khách.
-                        Hệ thống sẽ cộng lại tồn kho và tạo phiếu chi tiền mặt.
-                      </span>
-                    }
-                    okText="Xác nhận hoàn"
-                    cancelText="Đóng"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => handleRefund(row)}
+                <Popconfirm
+                  title="Hoàn tiền hoá đơn?"
+                  description={
+                    <span>
+                      Hoàn <strong>{formatVND(row.grandTotal)}</strong> cho khách.
+                      Hệ thống sẽ cộng lại tồn kho và tạo phiếu chi sổ quỹ.
+                    </span>
+                  }
+                  okText="Xác nhận hoàn"
+                  cancelText="Đóng"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleRefund(row)}
+                >
+                  <Button
+                    danger
+                    size="small"
+                    icon={<RollbackOutlined />}
+                    loading={actionLoadingId === row.id}
+                    disabled={actionLoadingId !== null}
                   >
-                    <Button
-                      danger
-                      size="small"
-                      icon={<RollbackOutlined />}
-                      loading={actionLoadingId === row.id}
-                      disabled={actionLoadingId !== null}
-                    >
-                      Hoàn tiền
-                    </Button>
-                  </Popconfirm>
-                  {sameDay && (
-                    <Popconfirm
-                      title="Huỷ đơn này?"
-                      description={
-                        <span>
-                          Đánh dấu đơn <strong>{row.code}</strong> là đã huỷ
-                          (lỗi nhập / khách đổi ý). Hệ thống sẽ cộng lại tồn
-                          kho nhưng KHÔNG tạo phiếu chi — dùng khi chưa giao
-                          nhận, chưa chốt két.
-                        </span>
-                      }
-                      okText="Xác nhận huỷ"
-                      cancelText="Đóng"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => handleCancel(row)}
-                    >
-                      <Button
-                        size="small"
-                        icon={<StopOutlined />}
-                        loading={actionLoadingId === row.id}
-                        disabled={actionLoadingId !== null}
-                      >
-                        Huỷ đơn
-                      </Button>
-                    </Popconfirm>
-                  )}
-                </Space>
+                    Hoàn tiền
+                  </Button>
+                </Popconfirm>
               );
             },
           },
@@ -571,6 +540,7 @@ export const SalesOrdersPage: FC = () => {
       await hoaDonApi.refund(order.id, 'Khách trả hàng hoàn tiền');
 
       dispatch(orderRefunded({ order: orderWithLines, performedBy, refundedAt }));
+      dispatch(fetchCashbook());
 
       const refundStamp = `[Hoàn ${refundedAt.slice(0, 16).replace('T', ' ')} bởi ${performedBy}]`;
       setApiOrders((prev) =>
@@ -591,64 +561,6 @@ export const SalesOrdersPage: FC = () => {
       );
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Không thể hoàn tiền hoá đơn';
-      message.error(errMsg);
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  /**
-   * Huỷ đơn (lỗi nhập / khách đổi ý trong ngày):
-   *   1. Nạp lines nếu chưa có để đảm bảo Redux stockSlice hoàn tồn.
-   *   2. Gọi API hoaDonApi.cancel để cập nhật trạng thái DB thành CANCELLED.
-   *   3. Dispatch `orderCancelled` để stockSlice hoàn tồn.
-   *   4. Cập nhật state `apiOrders` trên UI để chuyển thành 'Đã huỷ'.
-   */
-  const handleCancel = async (order: SalesOrder): Promise<void> => {
-    if (user === null || actionLoadingId !== null) return;
-    const performedBy = `${user.fullName} (${user.employeeCode})`;
-    const cancelledAt = new Date().toISOString();
-
-    setActionLoadingId(order.id);
-    try {
-      let orderWithLines = order;
-      if (order.lines.length === 0) {
-        try {
-          const lines = await chiTietHoaDonApi.getByHoaDon(order.id);
-          orderWithLines = {
-            ...order,
-            lines: lines.map((line, index) =>
-              mapDtoToOrderLine(line, index, products),
-            ),
-          };
-        } catch {
-          // tiếp tục với order gốc nếu nạp lines thất bại
-        }
-      }
-
-      await hoaDonApi.cancel(order.id, 'Huỷ đơn hàng');
-
-      dispatch(orderCancelled({ order: orderWithLines, performedBy, cancelledAt }));
-
-      const cancelStamp = `[Huỷ ${cancelledAt.slice(0, 16).replace('T', ' ')} bởi ${performedBy}]`;
-      setApiOrders((prev) =>
-        prev.map((item) =>
-          item.id === order.id
-            ? {
-                ...item,
-                lines: orderWithLines.lines,
-                status: ORDER_STATUS.Cancelled,
-                note: item.note === '' ? cancelStamp : `${item.note}\n${cancelStamp}`,
-              }
-            : item,
-        ),
-      );
-
-      message.success(
-        `Đã huỷ đơn ${order.code}. Tồn kho đã được cộng lại.`,
-      );
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : 'Không thể huỷ đơn hàng';
       message.error(errMsg);
     } finally {
       setActionLoadingId(null);
