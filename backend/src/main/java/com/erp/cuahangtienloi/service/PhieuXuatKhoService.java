@@ -31,6 +31,7 @@ public class PhieuXuatKhoService {
     private final SanPhamRepository sanPhamRepository;
     private final JdbcTemplate jdbcTemplate;
     private final BranchAccessService branchAccessService;
+    private final LoHangService loHangService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -248,6 +249,14 @@ public class PhieuXuatKhoService {
                 ct.setSoLuongNhan(0);
                 ct.setDonGiaVon(giaVon);
                 ct.setThanhTien(giaVon.multiply(BigDecimal.valueOf(xuat)));
+
+                // Lưu HSD từ lô xuất gần nhất của kho xuất
+                if (xuat > 0) {
+                    var activeLots = loHangService.getActiveLots(pxk.getIdChiNhanhXuat(), ct.getIdSanPham());
+                    if (!activeLots.isEmpty() && activeLots.get(0).getHanSuDung() != null) {
+                        ct.setHanSuDung(activeLots.get(0).getHanSuDung());
+                    }
+                }
                 chiTietPhieuXuatRepository.save(ct);
 
                 if (xuat > 0) {
@@ -301,9 +310,20 @@ public class PhieuXuatKhoService {
                     throw new IllegalArgumentException("Số lượng nhận phải từ 0 đến số lượng xuất");
                 }
                 ct.setSoLuongNhan(nhan);
-                chiTietPhieuXuatRepository.save(ct);
 
                 if (nhan > 0) {
+                    // Chuyển lô hàng FEFO: kho nhận kế thừa đầy đủ mã lô, HSD, NSX, giá vốn từ kho xuất (Kho Tổng)
+                    var transferred = loHangService.chuyenLoHangFEFO(
+                            pxk.getIdChiNhanhXuat(),
+                            pxk.getIdChiNhanhNhan(),
+                            ct.getIdSanPham(),
+                            nhan,
+                            ct.getDonGiaVon());
+
+                    if (transferred != null && !transferred.isEmpty() && transferred.get(0).getHanSuDung() != null) {
+                        ct.setHanSuDung(transferred.get(0).getHanSuDung());
+                    }
+
                     jdbcTemplate.query(
                             "SELECT fn_ghi_the_kho_va_dieu_chinh_ton(?::uuid, ?::uuid, ?::varchar, ?::integer, ?::numeric, ?::varchar, ?::varchar, ?::date, ?::text, NOW()::timestamp)",
                             rs -> { },
@@ -312,6 +332,8 @@ public class PhieuXuatKhoService {
                             pxk.getMaPhieu(), "Hệ thống", ct.getHanSuDung(),
                             "Nhận hàng luân chuyển từ kho tổng: phiếu " + pxk.getMaPhieu());
                 }
+
+                chiTietPhieuXuatRepository.save(ct);
             }
 
             pxk.setTrangThai("COMPLETED");

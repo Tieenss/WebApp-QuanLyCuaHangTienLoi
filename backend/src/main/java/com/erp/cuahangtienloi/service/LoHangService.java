@@ -91,6 +91,188 @@ public class LoHangService {
     }
 
     /**
+     * Lấy danh sách các lô hàng đang ACTIVE còn tồn > 0 theo FEFO.
+     */
+    public List<LoHang> getActiveLots(UUID idChiNhanh, UUID idSanPham) {
+        return loHangRepository.findByIdChiNhanhAndIdSanPhamAndSoLuongTonGreaterThanAndTrangThaiOrderByHanSuDungAscNgayTaoAsc(
+                idChiNhanh, idSanPham, 0, "ACTIVE");
+    }
+
+    /**
+     * Chuyển lô hàng từ kho xuất sang kho nhận theo nguyên tắc FEFO.
+     * Kho nhận kế thừa đầy đủ thông tin mã lô, HSD, NSX, giá vốn từ kho xuất.
+     */
+    @Transactional
+    public List<LoHang> chuyenLoHangFEFO(
+            UUID idChiNhanhXuat,
+            UUID idChiNhanhNhan,
+            UUID idSanPham,
+            int soLuongChuyen,
+            BigDecimal donGiaFallback) {
+
+        if (soLuongChuyen <= 0) return Collections.emptyList();
+
+        // 1. Đảm bảo kho xuất có đủ dữ liệu lô hàng tương ứng với tồn kho
+        tuDongDongBoLoHangNeuThieu(idChiNhanhXuat, idSanPham);
+
+        List<LoHang> activeSourceLots = loHangRepository.findActiveLotsForUpdate(idChiNhanhXuat, idSanPham);
+        int remaining = soLuongChuyen;
+        List<LoHang> transferredLots = new ArrayList<>();
+
+        for (LoHang srcLot : activeSourceLots) {
+            if (remaining <= 0) break;
+            int srcQty = (srcLot.getSoLuongTon() != null) ? srcLot.getSoLuongTon() : 0;
+            if (srcQty <= 0) continue;
+
+            int take = Math.min(remaining, srcQty);
+
+            // Giảm tồn lô tại kho xuất
+            srcLot.setSoLuongTon(srcQty - take);
+            srcLot.setNgayCapNhat(LocalDateTime.now());
+            loHangRepository.save(srcLot);
+
+            // Kế thừa sang kho nhận: giữ nguyên maLo, hanSuDung, ngaySanXuat, giaVon
+            LoHang destLot = congDonHoacTaoLoTaiKhoNhan(
+                    idChiNhanhNhan, idSanPham, srcLot.getMaLo(),
+                    take, srcLot.getHanSuDung(), srcLot.getNgaySanXuat(),
+                    srcLot.getGiaVon());
+            transferredLots.add(destLot);
+
+            remaining -= take;
+        }
+
+        // 2. Nếu kho xuất không đủ số lượng trong lo_hang (dữ liệu ban đầu thiếu):
+        // Vẫn tạo lô cho kho nhận để đảm bảo tồn kho và lô luôn khớp nhau
+        if (remaining > 0) {
+            SanPham sp = sanPhamRepository.findById(idSanPham).orElse(null);
+            LocalDate hsd = null;
+            if (sp != null && sp.getHanSuDungNgay() != null && sp.getHanSuDungNgay() >= 0) {
+                hsd = LocalDate.now().plusDays(sp.getHanSuDungNgay());
+            }
+            BigDecimal giaVon = (donGiaFallback != null) ? donGiaFallback : BigDecimal.ZERO;
+            String maLo = generateMaLo();
+
+            LoHang destLot = congDonHoacTaoLoTaiKhoNhan(
+                    idChiNhanhNhan, idSanPham, maLo,
+                    remaining, hsd, LocalDate.now(), giaVon);
+            transferredLots.add(destLot);
+        }
+
+        dongBoHanSuDungGanNhat(idSanPham, idChiNhanhXuat);
+        dongBoHanSuDungGanNhat(idSanPham, idChiNhanhNhan);
+
+        return transferredLots;
+    }
+
+    private LoHang congDonHoacTaoLoTaiKhoNhan(
+            UUID idChiNhanh, UUID idSanPham, String maLo,
+            int soLuong, LocalDate hanSuDung, LocalDate ngaySanXuat, BigDecimal giaVon) {
+
+        Optional<LoHang> existing = loHangRepository.findByMaLoAndIdChiNhanh(maLo, idChiNhanh);
+        LoHang loHang;
+        if (existing.isPresent()) {
+            loHang = existing.get();
+            loHang.setSoLuongTon(loHang.getSoLuongTon() + soLuong);
+            if (hanSuDung != null) loHang.setHanSuDung(hanSuDung);
+            if (ngaySanXuat != null) loHang.setNgaySanXuat(ngaySanXuat);
+            loHang.setTrangThai("ACTIVE");
+            loHang.setNgayCapNhat(LocalDateTime.now());
+        } else {
+            loHang = LoHang.builder()
+                    .id(UUID.randomUUID())
+                    .maLo(maLo)
+                    .idSanPham(idSanPham)
+                    .idChiNhanh(idChiNhanh)
+                    .soLuongTon(soLuong)
+                    .hanSuDung(hanSuDung)
+                    .ngaySanXuat(ngaySanXuat)
+                    .giaVon(giaVon != null ? giaVon : BigDecimal.ZERO)
+                    .trangThai("ACTIVE")
+                    .ngayTao(LocalDateTime.now())
+                    .ngayCapNhat(LocalDateTime.now())
+                    .build();
+        }
+        return loHangRepository.save(loHang);
+    }
+
+    /**
+     * Tự động kiểm tra và kế thừa/đồng bộ dữ liệu lô hàng nếu chi nhánh có tồn kho
+     * nhưng bảng lo_hang bị thiếu (ví dụ các phiếu nhận hàng thực hiện trước khi có FEFO).
+     */
+    @Transactional
+    public void tuDongDongBoLoHangNeuThieu(UUID idChiNhanh, UUID idSanPham) {
+        if (idChiNhanh == null || idSanPham == null) return;
+
+        TonKho tk = tonKhoRepository.findByIdSanPhamAndIdChiNhanh(idSanPham, idChiNhanh).orElse(null);
+        if (tk == null || tk.getSoLuongTon() == null || tk.getSoLuongTon() <= 0) {
+            return;
+        }
+
+        int tonKhoQty = tk.getSoLuongTon();
+        List<LoHang> currentActiveLots = loHangRepository
+                .findByIdChiNhanhAndIdSanPhamAndSoLuongTonGreaterThanAndTrangThaiOrderByHanSuDungAscNgayTaoAsc(
+                        idChiNhanh, idSanPham, 0, "ACTIVE");
+
+        int currentLotQty = currentActiveLots.stream()
+                .mapToInt(l -> l.getSoLuongTon() != null ? l.getSoLuongTon() : 0)
+                .sum();
+
+        if (currentLotQty >= tonKhoQty) {
+            return;
+        }
+
+        int missingQty = tonKhoQty - currentLotQty;
+        log.info("Tự động đồng bộ lô hàng: Chi nhánh {} thiếu {} SP {} (Tồn kho: {}, Tồn lô: {}). Bổ sung kế thừa...",
+                idChiNhanh, missingQty, idSanPham, tonKhoQty, currentLotQty);
+
+        int remaining = missingQty;
+
+        // 1. Thử kế thừa từ Kho Tổng (nếu đây là chi nhánh con và Kho Tổng có lô còn hạn)
+        List<ChiNhanh> khoTongs = chiNhanhRepository.findAll().stream()
+                .filter(cn -> "KHO".equalsIgnoreCase(cn.getLoai()) ||
+                        (cn.getTenChiNhanh() != null && cn.getTenChiNhanh().toLowerCase().contains("kho tổng")))
+                .toList();
+
+        for (ChiNhanh kt : khoTongs) {
+            if (kt.getId().equals(idChiNhanh)) continue;
+            List<LoHang> ktLots = loHangRepository.findActiveLotsForUpdate(kt.getId(), idSanPham);
+            for (LoHang ktLot : ktLots) {
+                if (remaining <= 0) break;
+                int ktQty = (ktLot.getSoLuongTon() != null) ? ktLot.getSoLuongTon() : 0;
+                if (ktQty <= 0) continue;
+
+                int take = Math.min(remaining, ktQty);
+                ktLot.setSoLuongTon(ktQty - take);
+                ktLot.setNgayCapNhat(LocalDateTime.now());
+                loHangRepository.save(ktLot);
+
+                congDonHoacTaoLoTaiKhoNhan(
+                        idChiNhanh, idSanPham, ktLot.getMaLo(),
+                        take, ktLot.getHanSuDung(), ktLot.getNgaySanXuat(), ktLot.getGiaVon());
+                remaining -= take;
+            }
+            if (remaining <= 0) break;
+        }
+
+        // 2. Nếu vẫn còn thiếu (do kho tổng không đủ lô hoặc là tồn kho ban đầu):
+        if (remaining > 0) {
+            SanPham sp = sanPhamRepository.findById(idSanPham).orElse(null);
+            LocalDate hsd = tk.getHanSuDungGanNhat();
+            if (hsd == null && sp != null && sp.getHanSuDungNgay() != null && sp.getHanSuDungNgay() >= 0) {
+                hsd = LocalDate.now().plusDays(sp.getHanSuDungNgay());
+            }
+            BigDecimal giaVon = (tk.getGiaVonTrungBinh() != null) ? tk.getGiaVonTrungBinh() : BigDecimal.ZERO;
+            String maLo = generateMaLo();
+
+            congDonHoacTaoLoTaiKhoNhan(
+                    idChiNhanh, idSanPham, maLo,
+                    remaining, hsd, LocalDate.now(), giaVon);
+        }
+
+        dongBoHanSuDungGanNhat(idSanPham, idChiNhanh);
+    }
+
+    /**
      * Xuất kho theo nguyên tắc FEFO (Hết hạn trước xuất trước).
      * Duyệt các lô còn tồn theo HSD tăng dần, trừ số lượng tương ứng.
      * Trả về thông tin HSD của lô được xuất (dùng để lưu vào phiếu xuất kho).
@@ -98,6 +280,8 @@ public class LoHangService {
     @Transactional
     public LocalDate xuatKhoFEFO(UUID idSanPham, UUID idChiNhanh, int soLuongCanXuat) {
         if (soLuongCanXuat <= 0) return null;
+
+        tuDongDongBoLoHangNeuThieu(idChiNhanh, idSanPham);
 
         List<LoHang> activeLots = loHangRepository.findActiveLotsForUpdate(idChiNhanh, idSanPham);
         int remaining = soLuongCanXuat;
@@ -161,8 +345,10 @@ public class LoHangService {
     /**
      * Lấy danh sách toàn bộ lô hàng của một sản phẩm tại một chi nhánh.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public List<LoHangDTO> getDanhSachLoHang(UUID idChiNhanh, UUID idSanPham) {
+        tuDongDongBoLoHangNeuThieu(idChiNhanh, idSanPham);
+
         List<LoHang> list = loHangRepository.findByIdChiNhanhAndIdSanPhamOrderByHanSuDungAscNgayTaoAsc(idChiNhanh, idSanPham);
         SanPham sp = sanPhamRepository.findById(idSanPham).orElse(null);
         ChiNhanh cn = chiNhanhRepository.findById(idChiNhanh).orElse(null);
